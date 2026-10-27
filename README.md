@@ -1,81 +1,83 @@
 # 💎 AutoManager
 
-SaaS de gestão para **micronegócios brasileiros** (doces, bijuterias, semijoias, cosméticos,
-roupas, papelaria, artesanato e qualquer pequena loja). Estoque, vendas em 1 toque, comissão
-automática de revendedoras, financeiro (a receber/a pagar), vitrine pública com chat e
-relatórios de lucro real. PWA mobile-first com **dados na nuvem (Supabase)**, isolados por loja
-via RLS. Documentação completa do sistema em **`DOCUMENTACAO.md`**.
+Management SaaS for **Brazilian micro-businesses** (sweets, costume jewelry, semi-fine jewelry,
+cosmetics, clothing, stationery, handicrafts and any small shop). Inventory, one-tap sales,
+automatic reseller commissions, finances (receivables/payables), a public storefront with chat
+and real-profit reports. Mobile-first PWA with **cloud data (Supabase)**, isolated per store
+via RLS. Full system documentation (in Portuguese) lives in **`DOCUMENTACAO.md`**.
 
-## Rodar localmente
+## Running locally
 
 ```bash
 npm install
-cp .env.local.example .env.local   # já preenchido com o projeto AutoManager
+cp .env.local.example .env.local   # fill in your Supabase / Mercado Pago keys
 npm run dev
-# abre http://localhost:3000
+# open http://localhost:3000
 ```
 
-> `.env.local` contém apenas a **chave pública (publishable)** do Supabase - segura no browser.
-> Nunca coloque a `service_role`/secret aqui.
+> Only `NEXT_PUBLIC_*` variables reach the browser. `SUPABASE_SERVICE_ROLE_KEY`,
+> `MP_ACCESS_TOKEN` and `MP_CLIENT_SECRET` are **server-only** secrets - never commit them.
 
-## Autenticação e multi-tenant
-
-- Cada conta (`auth.users`) recebe automaticamente uma **org** (loja) via trigger `on_auth_user_created`.
-- Todos os dados (produtos, vendas, revendedoras, estoque) são isolados por org com **RLS**.
-- Funções `SECURITY DEFINER` ficam no schema `private` (fora da Data API). Advisors de segurança: **limpos**.
-- Confirmação de e-mail está **desligada** (`mailer_autoconfirm`) para o cadastro entrar em 2 minutos.
-
-Build de produção:
+Production build:
 
 ```bash
 npm run build && npm start
 ```
 
-## Como usar (fluxo de demo)
+## Authentication and multi-tenancy
 
-0. **Criar conta** em `/login` (e-mail + senha, entra na hora).
-1. **Onboarding** (< 2 min) - escolha "começar com exemplos" para já ter catálogo + 3 revendedoras.
-2. **Vender** - toque no botão central, selecione produtos, escolha canal/revendedora, registre.
-3. **Painel** - faturamento, lucro, comissão pendente, ranking e gráfico.
-4. **Repor** - sugestões automáticas do que comprar (média de venda dos últimos 30 dias).
-5. **Equipe** - comissão pendente por revendedora + botão "pagar" e link de WhatsApp.
+- Every account (`auth.users`) automatically gets an **org** (store) via the `on_auth_user_created` trigger.
+- All data (products, sales, resellers, inventory) is isolated per org with **RLS**.
+- `SECURITY DEFINER` functions live in the `private` schema (outside the Data API). Security advisors: **clean**.
+- Email confirmation is **disabled** (`mailer_autoconfirm`) so sign-up takes under 2 minutes.
 
-> Cada conta tem seus próprios dados (isolados por RLS). Para começar do zero, crie outra conta.
+## How to use (demo flow)
 
-## Arquitetura
+0. **Create an account** at `/login` (email + password, instant access).
+1. **Onboarding** (< 2 min) - choose "start with examples" to get a sample catalog + 3 resellers.
+2. **Sell** - tap the center button, pick products, choose channel/reseller, record the sale.
+3. **Dashboard** - revenue, profit, pending commission, ranking and chart.
+4. **Restock** - automatic purchase suggestions (based on the last 30 days of sales).
+5. **Team** - pending commission per reseller + "pay" button and WhatsApp link.
 
-| Camada | Stack |
+> Each account has its own data (isolated by RLS). To start from scratch, create another account.
+
+## Architecture
+
+| Layer | Stack |
 |---|---|
 | Frontend | Next.js 14 (App Router) + Tailwind + lucide + recharts |
-| Auth/sessão | `@supabase/ssr` (cookies) + `middleware.ts` (refresh + proteção de rotas) |
-| Dados | Supabase Postgres - `lib/store.ts` (Zustand write-through) lê/grava via `supabase-js` |
-| Lógica de negócio | `lib/store.ts` (estoque/comissão) + `lib/analytics.ts` (reposição/métricas) |
-| Schema | `supabase/migrations/0001_init.sql` (multi-tenant + RLS + trigger de bootstrap) |
+| Auth/session | `@supabase/ssr` (cookies) + `middleware.ts` (refresh + route protection) |
+| Data | Supabase Postgres - `lib/store.ts` (Zustand write-through) reads/writes via `supabase-js` |
+| Business logic | `lib/store.ts` (inventory/commission) + `lib/analytics.ts` (restock/metrics) |
+| Payments | Mercado Pago subscriptions (`lib/mercadopago.ts`, `app/api/mercadopago/*`) |
+| Schema | `supabase/migrations/*.sql` (multi-tenant + RLS + bootstrap trigger) |
 
-### Estrutura
+### Structure
 ```
 app/
-  onboarding/   → auto-configuração
-  painel/       → dashboard executivo
-  produtos/     → estoque (cadastro, entrada, ajuste)
-  vender/       → venda rápida (carrinho + comissão)
-  revendedoras/ → comissão por revendedora
-  reposicao/    → sugestões de compra
-lib/            → tipos, store, seed, analytics
-components/     → AppShell (nav), Guard (hidratação/onboarding)
-supabase/       → migration SQL de produção
+  (app)/          → authenticated app (painel, vender, produtos, revendedoras,
+                    reposicao, financeiro, relatorios, entregas, conversas, ...)
+  onboarding/     → self-setup
+  loja/[slug]/    → public storefront with chat
+  admin/          → super-admin panel
+  api/            → server routes (members, admin, Mercado Pago, onboarding)
+lib/              → types, store, seed, analytics, plans, permissions
+components/       → AppShell (nav), Guard (hydration/onboarding), landing, charts
+supabase/         → production SQL migrations
+scripts/          → maintenance scripts (e.g. create the super-admin account)
 ```
 
-## Reaplicar o schema em outro projeto Supabase
+## Applying the schema to another Supabase project
 
-1. Crie o projeto e rode `supabase/migrations/0001_init.sql` (SQL Editor ou CLI).
-2. Em **Auth → Providers → Email**, ligue *autoconfirm* (ou configure SMTP).
-3. Preencha `.env.local` com a URL e a chave publishable do novo projeto.
+1. Create the project and run the files in `supabase/migrations/` in order (SQL Editor or CLI).
+2. In **Auth → Providers → Email**, enable *autoconfirm* (or configure SMTP).
+3. Fill `.env.local` with the new project's URL and keys.
 
-## Modelo de monetização (resumo)
+## Monetization model (summary)
 
-- **Free**: até 20 produtos, sem revendedoras (isca de TikTok).
-- **Pro - R$ 49/mês** ⭐: ilimitado + revendedoras + comissão + reposição.
-- **Loja+ - R$ 99/mês**: multiusuário + relatórios (ancoragem).
+- **Free**: up to 20 products, no resellers (TikTok hook).
+- **Pro - R$ 49/month** ⭐: unlimited + resellers + commission + restock.
+- **Loja+ - R$ 99/month**: multi-user + reports (price anchoring).
 
-Meta: 10 clientes em 72h via DM manual no Instagram/grupos de Facebook do nicho.
+Goal: 10 customers in 72h via manual DMs on Instagram / niche Facebook groups.
