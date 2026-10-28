@@ -26,7 +26,6 @@ import { usePlano } from "@/lib/usePlano";
 import { useConversasNaoLidas } from "@/lib/useConversasNaoLidas";
 import { useRecebimentosPendentes } from "@/lib/useRecebimentos";
 import type { PlanoDef } from "@/lib/plans";
-import { ehSuperadmin } from "@/lib/admin";
 import PageTransition from "./PageTransition";
 import { DialogProvider } from "./Dialog";
 
@@ -74,9 +73,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const logoUrl = useStore((s) => s.config.logoUrl);
   const nomeLoja = useStore((s) => s.config.nomeLoja);
   const role = useStore((s) => s.role);
-  const email = useStore((s) => s.email);
+  const admin = useStore((s) => s.superadmin);
   const { caps } = usePlano();
-  const admin = ehSuperadmin(email);
   const conversasNaoLidas = useConversasNaoLidas();
   const recebimentosPendentes = useRecebimentosPendentes();
 

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlano } from "@/lib/usePlano";
 import { ORDEM_PLANOS, PLANOS, brlPreco, type PlanoId } from "@/lib/plans";
@@ -149,7 +150,11 @@ function Planos() {
         <ShieldCheck size={18} className="text-brand-500 shrink-0 mt-0.5" />
         <div>
           Pagamento seguro pelo <b>Mercado Pago</b> - cartão, Pix ou boleto. A cobrança é mensal e
-          recorrente; você cancela quando quiser e seus dados nunca são apagados. Ao assinar, você é
+          recorrente; você cancela quando quiser (
+          <Link href="/cancelamento" className="font-medium text-brand-500 hover:underline">
+            veja como cancelar
+          </Link>
+          ) e seus dados nunca são apagados. Ao assinar, você é
           levado ao ambiente do Mercado Pago para concluir o pagamento.
         </div>
       </div>

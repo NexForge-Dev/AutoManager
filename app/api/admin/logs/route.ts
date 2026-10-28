@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { SUPERADMIN_EMAIL } from "@/lib/admin";
+import { ehSuperadminUser } from "@/lib/admin";
 
 // Trilha de auditoria do super-admin (tabela admin_log, migration 0032).
 // Service role após confirmar o super-admin pela sessão.
@@ -18,7 +18,8 @@ async function exigirSuperadmin() {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return null;
-  if ((user.email ?? "").trim().toLowerCase() !== SUPERADMIN_EMAIL) return null;
+  // papel no app_metadata (só a service_role grava) - não mais pelo e-mail
+  if (!ehSuperadminUser(user)) return null;
   return user;
 }
 

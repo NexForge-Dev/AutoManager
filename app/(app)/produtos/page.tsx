@@ -21,7 +21,7 @@ export default function ProdutosPage() {
 
 function Produtos() {
   const { produtos, config, entradaEstoque, ajustarEstoque, role } = useStore();
-  const { prompt } = useDialog();
+  const { prompt, alerta } = useDialog();
   const podeEditar = role === "owner";
 
   async function reporEstoque(p: Produto) {
@@ -34,7 +34,9 @@ function Produtos() {
       confirmar: "Dar entrada",
     });
     const n = parseInt(q || "");
-    if (n > 0) entradaEstoque(p.id, n);
+    if (!(n > 0)) return;
+    const res = await entradaEstoque(p.id, n);
+    if (!res.ok) alerta({ titulo: "Não foi possível dar entrada", mensagem: res.erro || "Tente novamente." });
   }
 
   async function ajustar(p: Produto) {
@@ -47,7 +49,9 @@ function Produtos() {
       confirmar: "Salvar",
     });
     const n = parseInt(q || "");
-    if (!isNaN(n) && n >= 0) ajustarEstoque(p.id, n, "Ajuste manual");
+    if (isNaN(n) || n < 0) return;
+    const res = await ajustarEstoque(p.id, n, "Ajuste manual");
+    if (!res.ok) alerta({ titulo: "Não foi possível ajustar", mensagem: res.erro || "Tente novamente." });
   }
   const [form, setForm] = useState<{ open: boolean; editar: Produto | null }>({
     open: false,
@@ -499,18 +503,22 @@ function ProdutoForm({
     };
     setSalvando(true);
     try {
-      if (editar) {
-        await updateProduto(editar.id, {
-          ...base,
-          estoqueAtual: usaGrade ? editar.estoqueAtual : parseInt(estoque) || 0,
-          variacoes: vars,
-        });
-      } else {
-        await addProduto({
-          ...base,
-          estoqueAtual: usaGrade ? 0 : parseInt(estoque) || 0,
-          variacoes: vars.map(({ id, ...rest }) => rest),
-        });
+      // estoque só é gravado se o número mudou (o store compara com o atual e
+      // usa ajuste atômico no banco); com grade, vale o estoque das variações.
+      const res = editar
+        ? await updateProduto(editar.id, {
+            ...base,
+            estoqueAtual: usaGrade ? editar.estoqueAtual : parseInt(estoque) || 0,
+            variacoes: vars,
+          })
+        : await addProduto({
+            ...base,
+            estoqueAtual: usaGrade ? 0 : parseInt(estoque) || 0,
+            variacoes: vars.map(({ id, ...rest }) => rest),
+          });
+      if (!res.ok) {
+        alerta({ titulo: "Não foi possível salvar o produto", mensagem: res.erro || "Tente novamente." });
+        return;
       }
       onClose();
     } finally {

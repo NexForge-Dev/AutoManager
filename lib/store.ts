@@ -21,6 +21,7 @@ import type {
   ContaPagar,
 } from "./types";
 import type { Assinatura, PlanoId } from "./plans";
+import { ehSuperadminUser } from "./admin";
 
 function uid() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -235,6 +236,8 @@ interface State {
   orgId: string | null;
   usuarioId: string | null;
   email: string | null;
+  // superadmin = app_metadata.role (só a service_role grava); só define a UI do /admin
+  superadmin: boolean;
   role: Role;
   // autenticado, porém sem loja própria (revendedora/visitante): não pertence ao painel
   semOrg: boolean;
@@ -261,7 +264,7 @@ interface State {
     senha: string;
     role: Role;
   }) => Promise<{ ok: boolean; erro?: string }>;
-  removerMembro: (id: string) => Promise<void>;
+  removerMembro: (id: string) => Promise<Resultado>;
 
   addEntrega: (e: {
     clienteNome: string;
@@ -272,21 +275,23 @@ interface State {
     vendaId?: string | null;
     observacao?: string;
   }) => Promise<{ ok: boolean; erro?: string }>;
-  atribuirMotoboy: (entregaId: string, motoboyId: string | null) => Promise<void>;
-  setStatusEntrega: (entregaId: string, status: StatusEntrega) => Promise<void>;
+  atribuirMotoboy: (entregaId: string, motoboyId: string | null) => Promise<Resultado>;
+  setStatusEntrega: (entregaId: string, status: StatusEntrega) => Promise<Resultado>;
   // pool do motoboy: pegar uma entrega disponível / devolver ao balcão
   pegarEntrega: (entregaId: string) => Promise<{ ok: boolean; erro?: string }>;
   devolverEntrega: (entregaId: string) => Promise<void>;
   recarregarEntregas: () => Promise<void>;
 
-  addProduto: (p: NovoProduto) => Promise<void>;
+  addProduto: (p: NovoProduto) => Promise<Resultado>;
   importarProdutos: (linhas: NovoProduto[]) => Promise<{ ok: boolean; inseridos: number; erro?: string }>;
-  updateProduto: (id: string, patch: EditarProduto) => Promise<void>;
-  entradaEstoque: (id: string, qtd: number) => Promise<void>;
-  ajustarEstoque: (id: string, novaQtd: number, motivo: string) => Promise<void>;
+  updateProduto: (id: string, patch: EditarProduto) => Promise<Resultado>;
+  // entrada RELATIVA (+qtd) e ajuste (define valor) feitos no banco via RPC;
+  // variacaoId opcional (produto com grade exige variação)
+  entradaEstoque: (id: string, qtd: number, variacaoId?: string | null) => Promise<Resultado>;
+  ajustarEstoque: (id: string, novaQtd: number, motivo: string, variacaoId?: string | null) => Promise<Resultado>;
 
-  addRevendedora: (r: Omit<Revendedora, "id" | "criadaEm" | "ativa" | "acessoLiberado" | "temAcesso">) => Promise<void>;
-  updateRevendedora: (id: string, patch: Partial<Revendedora>) => Promise<void>;
+  addRevendedora: (r: Omit<Revendedora, "id" | "criadaEm" | "ativa" | "acessoLiberado" | "temAcesso">) => Promise<Resultado>;
+  updateRevendedora: (id: string, patch: Partial<Revendedora>) => Promise<Resultado>;
   // libera o 1º acesso e devolve o código de convite (uso único) p/ o dono compartilhar
   liberarAcessoRevendedora: (id: string) => Promise<{ ok: boolean; codigo?: string; erro?: string }>;
   revogarAcessoRevendedora: (id: string) => Promise<void>;
@@ -300,8 +305,11 @@ interface State {
     desconto?: number;
     fiado?: boolean;
   }) => Promise<Venda | null>;
-  marcarComissaoPaga: (revendedoraId: string) => Promise<void>;
-  marcarVendaRecebida: (vendaId: string) => Promise<void>;
+  // marca como paga SÓ as vendas informadas (as que a tela somou/mostrou)
+  marcarComissaoPaga: (revendedoraId: string, vendaIds: string[]) => Promise<Resultado>;
+  marcarVendaRecebida: (vendaId: string) => Promise<Resultado>;
+  // cancela a venda no banco (devolve estoque, anula comissão pendente)
+  cancelarVenda: (vendaId: string) => Promise<Resultado>;
 
   // contas a pagar (financeiro)
   addContaPagar: (c: {
@@ -313,7 +321,7 @@ interface State {
     recorrente?: boolean;
     observacao?: string | null;
   }) => Promise<{ ok: boolean; erro?: string }>;
-  marcarContaPaga: (id: string, paga: boolean) => Promise<void>;
+  marcarContaPaga: (id: string, paga: boolean) => Promise<Resultado>;
   removerContaPagar: (id: string) => Promise<void>;
 
   // caixa de entrada de recebimentos
@@ -333,6 +341,40 @@ interface State {
   resolverChamado: (id: string, resolvido: boolean) => Promise<void>;
 }
 
+// retorno padrão das ações que gravam no banco (a tela mostra `erro` se falhar)
+export type Resultado = { ok: boolean; erro?: string };
+
+// Lê TODAS as linhas de uma consulta em páginas (o PostgREST corta em 1000 por
+// requisição). `montar` recria a query para cada faixa; precisa de ordem estável.
+const PAGINA_LEITURA = 1000;
+async function lerPaginado(
+  montar: (de: number, ate: number) => PromiseLike<{ data: any[] | null; error: any }>
+): Promise<{ data: any[]; error: any }> {
+  const todas: any[] = [];
+  for (let offset = 0; ; offset += PAGINA_LEITURA) {
+    const { data, error } = await montar(offset, offset + PAGINA_LEITURA - 1);
+    if (error) return { data: todas, error };
+    if (!data || data.length === 0) break;
+    todas.push(...data);
+    if (data.length < PAGINA_LEITURA) break;
+  }
+  return { data: todas, error: null };
+}
+
+// mensagens amigáveis p/ erros levantados pelas RPCs de estoque/venda
+function erroAmigavel(msg: string | undefined): string {
+  const m = msg || "";
+  if (/sem_estoque|estoque_nao_negativo/.test(m)) return "Estoque insuficiente.";
+  if (/escolha_variacao/.test(m)) return "Este produto tem variações: escolha a variação.";
+  if (/sem_permissao/.test(m)) return "Só o dono da loja pode fazer isso.";
+  if (/ja_cancelada/.test(m)) return "Essa venda já foi cancelada.";
+  if (/venda_invalida/.test(m)) return "Venda não encontrada.";
+  if (/produto_invalido|variacao_invalida/.test(m)) return "Produto não encontrado (foi excluído?).";
+  if (/qtd_invalida/.test(m)) return "Quantidade inválida.";
+  if (/failed to fetch|network/i.test(m)) return "Sem conexão. Tente de novo.";
+  return m || "Não foi possível salvar. Tente de novo.";
+}
+
 // Janela inicial de vendas carregada na hydrate (cobre painel + analytics de 6 meses).
 // O histórico mais antigo é buscado em segundo plano, paginado, e mesclado.
 const JANELA_VENDAS_DIAS = 180;
@@ -341,11 +383,30 @@ const PAGINA_VENDAS = 500;
 export const useStore = create<State>()((set, get) => {
   const sb = () => createClient();
 
+  // Relê do banco os produtos informados (com variações) e substitui no estado.
+  // Usado após gravações de estoque p/ refletir o valor REAL (não o do cache).
+  async function recarregarProdutos(ids: string[]) {
+    const unicos = [...new Set(ids)].filter(Boolean);
+    if (unicos.length === 0) return;
+    const { data, error } = await sb()
+      .from("produto")
+      .select("*, produto_variacao(*)")
+      .in("id", unicos);
+    if (error || !data) return;
+    const frescos = new Map(data.map((r: any) => [r.id as string, mapProduto(r)]));
+    set((s) => ({
+      produtos: s.produtos
+        .filter((p) => !unicos.includes(p.id) || frescos.has(p.id))
+        .map((p) => frescos.get(p.id) ?? p),
+    }));
+  }
+
   return {
     ready: false,
     orgId: null,
     usuarioId: null,
     email: null,
+    superadmin: false,
     role: "owner",
     semOrg: false,
     config: configInicial,
@@ -386,14 +447,34 @@ export const useStore = create<State>()((set, get) => {
       ] = await Promise.all([
         supabase.from("org").select("*").limit(1).maybeSingle(),
         supabase.from("usuario").select("role").eq("id", user.id).maybeSingle(),
-        supabase
-          .from("produto")
-          .select("*, produto_variacao(*)")
-          .order("criado_em", { ascending: true }),
+        // paginadas: sem isso o PostgREST corta em 1000 linhas e some dado
+        lerPaginado((de, ate) =>
+          supabase
+            .from("produto")
+            .select("*, produto_variacao(*)")
+            .order("criado_em", { ascending: true })
+            .order("id", { ascending: true })
+            .range(de, ate)
+        ),
         supabase.from("revendedora").select("*").order("criada_em", { ascending: true }),
-        supabase.from("venda").select("*, venda_item(*)").gte("data", corteISO).order("data", { ascending: false }),
+        lerPaginado((de, ate) =>
+          supabase
+            .from("venda")
+            .select("*, venda_item(*)")
+            .gte("data", corteISO)
+            .order("data", { ascending: false })
+            .order("id", { ascending: true })
+            .range(de, ate)
+        ),
         supabase.from("usuario").select("id, nome, email, role"),
-        supabase.from("entrega").select("*").order("criada_em", { ascending: false }),
+        lerPaginado((de, ate) =>
+          supabase
+            .from("entrega")
+            .select("*")
+            .order("criada_em", { ascending: false })
+            .order("id", { ascending: true })
+            .range(de, ate)
+        ),
         // recebimentos pendentes de confirmação (tabela pode não existir se 0024 não rodou)
         supabase
           .from("entrada_pendente")
@@ -422,6 +503,7 @@ export const useStore = create<State>()((set, get) => {
         orgId: org?.id ?? null,
         usuarioId: user.id,
         email: user.email ?? null,
+        superadmin: ehSuperadminUser(user),
         role: (eu?.role as Role) ?? "owner",
         // sem linha em usuario = não é dono nem membro desta loja (revendedora/visitante)
         semOrg: !eu,
@@ -474,6 +556,7 @@ export const useStore = create<State>()((set, get) => {
             .select("*, venda_item(*)")
             .lt("data", corteISO)
             .order("data", { ascending: false })
+            .order("id", { ascending: true })
             .range(offset, offset + PAGINA_VENDAS - 1);
           if (error || !antigas || antigas.length === 0) break;
           const mapeadas = antigas.map(mapVenda);
@@ -558,12 +641,29 @@ export const useStore = create<State>()((set, get) => {
     },
 
     removerMembro: async (id) => {
+      const anterior = get().membros.find((m) => m.id === id);
       set((s) => ({ membros: s.membros.filter((m) => m.id !== id) }));
-      await fetch("/api/membros", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      let erro: string | null = null;
+      try {
+        const res = await fetch("/api/membros", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          erro = json?.erro || "Falha ao remover membro";
+        }
+      } catch {
+        erro = "Sem conexão. Tente de novo.";
+      }
+      if (erro) {
+        // falhou -> devolve o membro à lista
+        if (anterior)
+          set((s) => (s.membros.some((m) => m.id === id) ? s : { membros: [...s.membros, anterior] }));
+        return { ok: false, erro };
+      }
+      return { ok: true };
     },
 
     addEntrega: async (e) => {
@@ -608,26 +708,46 @@ export const useStore = create<State>()((set, get) => {
     },
 
     atribuirMotoboy: async (entregaId, motoboyId) => {
+      const anterior = get().entregas.find((e) => e.id === entregaId);
       set((s) => ({
         entregas: s.entregas.map((e) => (e.id === entregaId ? { ...e, motoboyId } : e)),
       }));
-      await sb().from("entrega").update({ motoboy_id: motoboyId }).eq("id", entregaId);
+      const { error } = await sb().from("entrega").update({ motoboy_id: motoboyId }).eq("id", entregaId);
+      if (error) {
+        if (anterior)
+          set((s) => ({
+            entregas: s.entregas.map((e) => (e.id === entregaId ? { ...e, motoboyId: anterior.motoboyId } : e)),
+          }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     setStatusEntrega: async (entregaId, status) => {
+      const anterior = get().entregas.find((e) => e.id === entregaId);
       const entregueEm = status === "entregue" ? Date.now() : null;
       set((s) => ({
         entregas: s.entregas.map((e) =>
           e.id === entregaId ? { ...e, status, entregueEm } : e
         ),
       }));
-      await sb()
+      const { error } = await sb()
         .from("entrega")
         .update({
           status,
           entregue_em: entregueEm ? new Date(entregueEm).toISOString() : null,
         })
         .eq("id", entregaId);
+      if (error) {
+        if (anterior)
+          set((s) => ({
+            entregas: s.entregas.map((e) =>
+              e.id === entregaId ? { ...e, status: anterior.status, entregueEm: anterior.entregueEm } : e
+            ),
+          }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     // motoboy reivindica uma entrega do balcão. O `.is("motoboy_id", null)`
@@ -664,8 +784,17 @@ export const useStore = create<State>()((set, get) => {
     },
 
     recarregarEntregas: async () => {
-      const { data } = await sb().from("entrega").select("*").order("criada_em", { ascending: false });
-      set({ entregas: (data || []).map(mapEntrega) });
+      const supabase = sb();
+      const { data, error } = await lerPaginado((de, ate) =>
+        supabase
+          .from("entrega")
+          .select("*")
+          .order("criada_em", { ascending: false })
+          .order("id", { ascending: true })
+          .range(de, ate)
+      );
+      if (error) return; // mantém a lista atual em vez de zerar por falha de rede
+      set({ entregas: data.map(mapEntrega) });
     },
 
     completarOnboarding: async () => {
@@ -701,9 +830,10 @@ export const useStore = create<State>()((set, get) => {
         criadoEm: Date.now(),
       };
       set((s) => ({ produtos: [...s.produtos, novo] }));
-      if (!orgId) return;
+      if (!orgId) return { ok: true };
       const supabase = sb();
-      await supabase.from("produto").insert({
+      const desfaz = () => set((s) => ({ produtos: s.produtos.filter((x) => x.id !== id) }));
+      const { error } = await supabase.from("produto").insert({
         id,
         org_id: orgId,
         nome: p.nome,
@@ -720,8 +850,12 @@ export const useStore = create<State>()((set, get) => {
         estoque_minimo: p.estoqueMinimo,
         ativo: true,
       });
+      if (error) {
+        desfaz();
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
       if (variacoes.length > 0) {
-        await supabase.from("produto_variacao").insert(
+        const { error: errVar } = await supabase.from("produto_variacao").insert(
           variacoes.map((v) => ({
             id: v.id,
             org_id: orgId,
@@ -733,8 +867,15 @@ export const useStore = create<State>()((set, get) => {
             ativo: v.ativo,
           }))
         );
+        if (errVar) {
+          // sem as variações o produto ficaria com estoque "fantasma": desfaz tudo
+          await supabase.from("produto").delete().eq("id", id);
+          desfaz();
+          return { ok: false, erro: erroAmigavel(errVar.message) };
+        }
       }
       if (estoqueAtual > 0) {
+        // histórico apenas: falha aqui não invalida o cadastro
         await supabase.from("movimento_estoque").insert({
           org_id: orgId,
           produto_id: id,
@@ -743,6 +884,7 @@ export const useStore = create<State>()((set, get) => {
           motivo: "Estoque inicial",
         });
       }
+      return { ok: true };
     },
 
     // Importação em lote (CSV): grava todos os produtos numa tacada só, sem
@@ -818,7 +960,7 @@ export const useStore = create<State>()((set, get) => {
     updateProduto: async (id, patch) => {
       const { orgId } = get();
       const atual = get().produtos.find((p) => p.id === id);
-      if (!atual) return;
+      if (!atual) return { ok: false, erro: "Produto não encontrado." };
 
       // reconcilia variações (lista completa desejada substitui a atual)
       const novasVariacoes: Variacao[] | undefined = patch.variacoes
@@ -837,9 +979,20 @@ export const useStore = create<State>()((set, get) => {
       );
 
       set((s) => ({ produtos: s.produtos.map((p) => (p.id === id ? merged : p)) }));
-      if (!orgId) return;
+      if (!orgId) return { ok: true };
       const supabase = sb();
 
+      // falhou no meio: ressincroniza com o banco (parte pode ter gravado);
+      // se nem a leitura funcionar, volta ao estado anterior à edição.
+      const falhou = async (msg: string | undefined): Promise<Resultado> => {
+        set((s) => ({ produtos: s.produtos.map((p) => (p.id === id ? atual : p)) }));
+        await recarregarProdutos([id]);
+        return { ok: false, erro: erroAmigavel(msg) };
+      };
+
+      // ATENÇÃO: estoque_atual NÃO entra neste update. Gravar o valor do cache
+      // apagaria vendas feitas em paralelo. Estoque só muda via RPC (abaixo),
+      // e só quando o usuário de fato alterou a quantidade.
       const row: any = {};
       if (patch.nome !== undefined) row.nome = patch.nome;
       if (patch.categoria !== undefined) row.categoria = patch.categoria;
@@ -854,84 +1007,198 @@ export const useStore = create<State>()((set, get) => {
       if (patch.imagens !== undefined) row.imagens = patch.imagens;
       if (patch.estoqueMinimo !== undefined) row.estoque_minimo = patch.estoqueMinimo;
       if (patch.ativo !== undefined) row.ativo = patch.ativo;
-      row.estoque_atual = merged.estoqueAtual;
-      await supabase.from("produto").update(row).eq("id", id);
+      if (Object.keys(row).length > 0) {
+        const { error } = await supabase.from("produto").update(row).eq("id", id);
+        if (error) return falhou(error.message);
+      }
 
+      let mexeuGrade = false;
       if (novasVariacoes) {
-        const antesIds = new Set(atual.variacoes.map((v) => v.id));
+        const antes = new Map(atual.variacoes.map((v) => [v.id, v]));
         const depoisIds = new Set(novasVariacoes.map((v) => v.id));
-        const removidas = [...antesIds].filter((vid) => !depoisIds.has(vid));
-        if (removidas.length > 0)
-          await supabase.from("produto_variacao").delete().in("id", removidas);
+        const removidas = [...antes.keys()].filter((vid) => !depoisIds.has(vid));
+        if (removidas.length > 0) {
+          mexeuGrade = true;
+          const { error } = await supabase.from("produto_variacao").delete().in("id", removidas);
+          if (error) return falhou(error.message);
+        }
         for (const v of novasVariacoes) {
-          if (antesIds.has(v.id)) {
-            await supabase
+          const orig = antes.get(v.id);
+          if (orig) {
+            // dados cadastrais (sem estoque_atual)
+            const { error } = await supabase
               .from("produto_variacao")
               .update({
                 nome: v.nome,
                 sku: v.sku || null,
-                estoque_atual: v.estoqueAtual,
                 preco_ajuste: v.precoAjuste,
                 ativo: v.ativo,
               })
               .eq("id", v.id);
+            if (error) return falhou(error.message);
+            // estoque só se o usuário mudou a quantidade: ajuste atômico no banco
+            if (v.estoqueAtual !== orig.estoqueAtual) {
+              mexeuGrade = true;
+              const { error: errAj } = await supabase.rpc("ajustar_estoque", {
+                p_produto: id,
+                p_variacao: v.id,
+                p_qtd: Math.max(0, v.estoqueAtual || 0),
+                p_motivo: "Ajuste na edição do produto",
+              });
+              if (errAj) return falhou(errAj.message);
+            }
           } else {
-            await supabase.from("produto_variacao").insert({
+            // variação nova: linha nova, estoque inicial é o informado
+            mexeuGrade = true;
+            const { error } = await supabase.from("produto_variacao").insert({
               id: v.id,
               org_id: orgId,
               produto_id: id,
               nome: v.nome,
               sku: v.sku || null,
-              estoque_atual: v.estoqueAtual,
+              estoque_atual: Math.max(0, v.estoqueAtual || 0),
               preco_ajuste: v.precoAjuste,
               ativo: v.ativo,
             });
+            if (error) return falhou(error.message);
           }
         }
       }
+
+      // grade mudou: agregado = soma das variações, calculada no banco
+      if (mexeuGrade) {
+        const { error } = await supabase.rpc("recalcular_estoque_produto", { p_produto: id });
+        if (error) return falhou(error.message);
+      }
+
+      // sem grade: estoque base só é gravado se o usuário alterou o número
+      if (
+        variacoesFinal.length === 0 &&
+        patch.estoqueAtual !== undefined &&
+        patch.estoqueAtual !== atual.estoqueAtual
+      ) {
+        const { error } = await supabase.rpc("ajustar_estoque", {
+          p_produto: id,
+          p_variacao: null,
+          p_qtd: Math.max(0, patch.estoqueAtual),
+          p_motivo: "Ajuste na edição do produto",
+        });
+        if (error) return falhou(error.message);
+      }
+
+      // reflete o estoque real do banco (pode ter havido vendas em paralelo)
+      await recarregarProdutos([id]);
+      return { ok: true };
     },
 
-    entradaEstoque: async (id, qtd) => {
+    entradaEstoque: async (id, qtd, variacaoId = null) => {
       const { orgId } = get();
       const prod = get().produtos.find((x) => x.id === id);
-      if (!prod) return;
-      // grade: o estoque é a soma das variações; dar entrada no agregado
-      // criaria estoque "fantasma" invendável. Reposição vai na tela do produto.
-      if (prod.variacoes.length > 0) return;
-      const novoEstoque = prod.estoqueAtual + qtd;
-      set((s) => ({
-        produtos: s.produtos.map((x) => (x.id === id ? { ...x, estoqueAtual: novoEstoque } : x)),
-      }));
-      if (!orgId) return;
-      await sb().from("produto").update({ estoque_atual: novoEstoque }).eq("id", id);
-      await sb().from("movimento_estoque").insert({
-        org_id: orgId,
-        produto_id: id,
-        tipo: "entrada",
-        qtd,
-        motivo: "Reposição de estoque",
+      if (!prod) return { ok: false, erro: "Produto não encontrado." };
+      if (!Number.isFinite(qtd) || qtd < 1) return { ok: false, erro: "Quantidade inválida." };
+      // grade: o estoque é a soma das variações; dar entrada só no agregado
+      // criaria estoque "fantasma" invendável. Exige a variação.
+      if (prod.variacoes.length > 0 && !variacaoId)
+        return { ok: false, erro: "Este produto tem variações: dê entrada pela variação." };
+
+      // otimista RELATIVO (+qtd), p/ não pisar em outras mudanças do estado
+      const aplica = (sinal: 1 | -1) =>
+        set((s) => ({
+          produtos: s.produtos.map((x) =>
+            x.id !== id
+              ? x
+              : {
+                  ...x,
+                  estoqueAtual: x.estoqueAtual + sinal * qtd,
+                  variacoes: x.variacoes.map((v) =>
+                    v.id === variacaoId ? { ...v, estoqueAtual: v.estoqueAtual + sinal * qtd } : v
+                  ),
+                }
+          ),
+        }));
+      aplica(1);
+      if (!orgId) return { ok: true };
+
+      const { data, error } = await sb().rpc("entrada_estoque", {
+        p_produto: id,
+        p_variacao: variacaoId,
+        p_qtd: qtd,
+        p_obs: "Reposição de estoque",
       });
+      if (error) {
+        aplica(-1);
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      // valor devolvido pelo banco é a verdade (inclui vendas paralelas)
+      const r = data as any;
+      set((s) => ({
+        produtos: s.produtos.map((x) =>
+          x.id !== id
+            ? x
+            : {
+                ...x,
+                estoqueAtual: Number(r?.estoque_produto ?? x.estoqueAtual),
+                variacoes: x.variacoes.map((v) =>
+                  v.id === variacaoId && r?.estoque_variacao != null
+                    ? { ...v, estoqueAtual: Number(r.estoque_variacao) }
+                    : v
+                ),
+              }
+        ),
+      }));
+      return { ok: true };
     },
 
-    ajustarEstoque: async (id, novaQtd, motivo) => {
+    ajustarEstoque: async (id, novaQtd, motivo, variacaoId = null) => {
       const { orgId } = get();
       const prod = get().produtos.find((x) => x.id === id);
-      if (!prod) return;
-      // grade: ajuste é por variação (na tela do produto); não mexe no agregado.
-      if (prod.variacoes.length > 0) return;
-      const delta = novaQtd - prod.estoqueAtual;
+      if (!prod) return { ok: false, erro: "Produto não encontrado." };
+      if (!Number.isFinite(novaQtd) || novaQtd < 0) return { ok: false, erro: "Quantidade inválida." };
+      // grade: ajuste é por variação; não mexe só no agregado.
+      if (prod.variacoes.length > 0 && !variacaoId)
+        return { ok: false, erro: "Este produto tem variações: ajuste pela variação." };
+
+      const anterior = prod;
       set((s) => ({
-        produtos: s.produtos.map((x) => (x.id === id ? { ...x, estoqueAtual: novaQtd } : x)),
+        produtos: s.produtos.map((x) => {
+          if (x.id !== id) return x;
+          if (!variacaoId) return { ...x, estoqueAtual: novaQtd };
+          const variacoes = x.variacoes.map((v) =>
+            v.id === variacaoId ? { ...v, estoqueAtual: novaQtd } : v
+          );
+          return { ...x, variacoes, estoqueAtual: estoqueEfetivo(x.estoqueAtual, variacoes) };
+        }),
       }));
-      if (!orgId) return;
-      await sb().from("produto").update({ estoque_atual: novaQtd }).eq("id", id);
-      await sb().from("movimento_estoque").insert({
-        org_id: orgId,
-        produto_id: id,
-        tipo: "ajuste",
-        qtd: delta,
-        motivo,
+      if (!orgId) return { ok: true };
+
+      // define o valor NO BANCO (linha travada); o delta registrado é o real
+      const { data, error } = await sb().rpc("ajustar_estoque", {
+        p_produto: id,
+        p_variacao: variacaoId,
+        p_qtd: novaQtd,
+        p_motivo: motivo,
       });
+      if (error) {
+        set((s) => ({ produtos: s.produtos.map((x) => (x.id === id ? anterior : x)) }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      const r = data as any;
+      set((s) => ({
+        produtos: s.produtos.map((x) =>
+          x.id !== id
+            ? x
+            : {
+                ...x,
+                estoqueAtual: Number(r?.estoque_produto ?? x.estoqueAtual),
+                variacoes: x.variacoes.map((v) =>
+                  v.id === variacaoId && r?.estoque_variacao != null
+                    ? { ...v, estoqueAtual: Number(r.estoque_variacao) }
+                    : v
+                ),
+              }
+        ),
+      }));
+      return { ok: true };
     },
 
     addRevendedora: async (r) => {
@@ -946,7 +1213,7 @@ export const useStore = create<State>()((set, get) => {
         temAcesso: false,
       };
       set((s) => ({ revendedoras: [...s.revendedoras, nova] }));
-      if (!orgId) return;
+      if (!orgId) return { ok: true };
       const { error } = await sb().from("revendedora").insert({
         id,
         org_id: orgId,
@@ -958,15 +1225,25 @@ export const useStore = create<State>()((set, get) => {
         ativa: true,
       });
       // limite do plano (trigger no banco) ou outro erro -> desfaz o otimista
-      if (error) set((s) => ({ revendedoras: s.revendedoras.filter((x) => x.id !== id) }));
+      if (error) {
+        set((s) => ({ revendedoras: s.revendedoras.filter((x) => x.id !== id) }));
+        return {
+          ok: false,
+          erro: /limite_revendedoras/.test(error.message)
+            ? "Você atingiu o limite de revendedoras do seu plano."
+            : erroAmigavel(error.message),
+        };
+      }
+      return { ok: true };
     },
 
     updateRevendedora: async (id, patch) => {
+      const anterior = get().revendedoras.find((r) => r.id === id);
       set((s) => ({
         revendedoras: s.revendedoras.map((r) => (r.id === id ? { ...r, ...patch } : r)),
       }));
       const { orgId } = get();
-      if (!orgId) return;
+      if (!orgId) return { ok: true };
       const row: any = {};
       if (patch.nome !== undefined) row.nome = patch.nome;
       if (patch.whatsapp !== undefined) row.whatsapp = patch.whatsapp || null;
@@ -975,7 +1252,19 @@ export const useStore = create<State>()((set, get) => {
       if (patch.metaMensal !== undefined) row.meta_mensal = patch.metaMensal;
       if (patch.ativa !== undefined) row.ativa = patch.ativa;
       if (patch.acessoLiberado !== undefined) row.acesso_liberado = patch.acessoLiberado;
-      await sb().from("revendedora").update(row).eq("id", id);
+      if (Object.keys(row).length === 0) return { ok: true };
+      const { error } = await sb().from("revendedora").update(row).eq("id", id);
+      if (error) {
+        if (anterior)
+          set((s) => ({ revendedoras: s.revendedoras.map((r) => (r.id === id ? anterior : r)) }));
+        return {
+          ok: false,
+          erro: /limite_revendedoras/.test(error.message)
+            ? "Você atingiu o limite de revendedoras do seu plano."
+            : erroAmigavel(error.message),
+        };
+      }
+      return { ok: true };
     },
 
     liberarAcessoRevendedora: async (id) => {
@@ -1095,7 +1384,7 @@ export const useStore = create<State>()((set, get) => {
 
       // Tudo numa transação atômica no banco (valida estoque, grava venda+itens,
       // baixa estoque relativo e movimentos). O id vem do cliente p/ casar com o otimista.
-      const { error } = await sb().rpc("registrar_venda", {
+      const { data: res, error } = await sb().rpc("registrar_venda", {
         p_venda_id: vendaId,
         p_itens: itens.map((it) => ({
           produto_id: it.produtoId,
@@ -1122,30 +1411,67 @@ export const useStore = create<State>()((set, get) => {
             return orig ?? p;
           }),
         }));
+        // o cache pode estar velho (ex.: sem_estoque por venda em paralelo): ressincroniza
+        void recarregarProdutos([...afetados]);
         return null;
       }
 
-      return venda;
+      // o banco é a fonte da verdade: sobrescreve totais/comissão/lucro do otimista
+      const r = res as any;
+      const confirmada: Venda = r
+        ? {
+            ...venda,
+            total: Number(r.total ?? venda.total),
+            custoTotal: Number(r.custo_total ?? venda.custoTotal),
+            comissaoTotal: Number(r.comissao_total ?? venda.comissaoTotal),
+            lucro: Number(r.lucro ?? venda.lucro),
+          }
+        : venda;
+      set((st) => ({ vendas: st.vendas.map((v) => (v.id === vendaId ? confirmada : v)) }));
+      // estoque real (outras vendas podem ter baixado as mesmas peças)
+      void recarregarProdutos([...baixaPorProduto.keys()]);
+
+      return confirmada;
     },
 
-    marcarComissaoPaga: async (revendedoraId) => {
+    // Paga SÓ as vendas que a tela somou (ids explícitos). Antes marcava todas
+    // as pendentes da revendedora, inclusive vendas que entraram depois da
+    // conferência (outra aba / venda dela) e que o dono não viu nem pagou.
+    marcarComissaoPaga: async (revendedoraId, vendaIds) => {
+      const ids = new Set(vendaIds);
+      if (ids.size === 0) return { ok: true };
+      const alvo = (v: Venda) =>
+        ids.has(v.id) && v.revendedoraId === revendedoraId && v.statusComissao === "pendente";
+      const afetadas = get().vendas.filter(alvo).map((v) => v.id);
+      if (afetadas.length === 0) return { ok: true };
+      const marcadas = new Set(afetadas);
       set((s) => ({
-        vendas: s.vendas.map((v) =>
-          v.revendedoraId === revendedoraId && v.statusComissao === "pendente"
-            ? { ...v, statusComissao: "paga" }
-            : v
-        ),
+        vendas: s.vendas.map((v) => (marcadas.has(v.id) ? { ...v, statusComissao: "paga" } : v)),
       }));
       const { orgId } = get();
-      if (!orgId) return;
-      await sb()
+      if (!orgId) return { ok: true };
+      const { error } = await sb()
         .from("venda")
         .update({ status_comissao: "paga" })
+        .in("id", afetadas)
         .eq("revendedora_id", revendedoraId)
         .eq("status_comissao", "pendente");
+      if (error) {
+        set((s) => ({
+          vendas: s.vendas.map((v) =>
+            marcadas.has(v.id) && v.statusComissao === "paga" ? { ...v, statusComissao: "pendente" } : v
+          ),
+        }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     marcarVendaRecebida: async (vendaId) => {
+      const anterior = get().vendas.find((v) => v.id === vendaId);
+      if (!anterior) return { ok: false, erro: "Venda não encontrada." };
+      if (anterior.statusPagamento === "cancelada")
+        return { ok: false, erro: "Venda cancelada não pode ser recebida." };
       const agora = Date.now();
       set((s) => ({
         vendas: s.vendas.map((v) =>
@@ -1153,11 +1479,73 @@ export const useStore = create<State>()((set, get) => {
         ),
       }));
       const { orgId } = get();
-      if (!orgId) return;
-      await sb()
+      if (!orgId) return { ok: true };
+      const { error } = await sb()
         .from("venda")
         .update({ status_pagamento: "paga", data_pagamento: new Date(agora).toISOString() })
-        .eq("id", vendaId);
+        .eq("id", vendaId)
+        .neq("status_pagamento", "cancelada");
+      if (error) {
+        set((s) => ({
+          vendas: s.vendas.map((v) =>
+            v.id === vendaId
+              ? { ...v, statusPagamento: anterior.statusPagamento, dataPagamento: anterior.dataPagamento }
+              : v
+          ),
+        }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
+    },
+
+    // Cancelamento atômico no banco (RPC cancelar_venda): devolve o estoque,
+    // registra o movimento, marca 'cancelada' e anula a comissão pendente.
+    // Sem otimista: só muda a tela depois que o banco confirmou.
+    cancelarVenda: async (vendaId) => {
+      const venda = get().vendas.find((v) => v.id === vendaId);
+      if (!venda) return { ok: false, erro: "Venda não encontrada." };
+      if (venda.statusPagamento === "cancelada") return { ok: false, erro: "Essa venda já foi cancelada." };
+      const { orgId } = get();
+      const comissaoPendente = venda.statusComissao === "pendente";
+      let atualizada: Venda = {
+        ...venda,
+        statusPagamento: "cancelada",
+        statusComissao: comissaoPendente ? "cancelada" : venda.statusComissao,
+        comissaoTotal: comissaoPendente ? 0 : venda.comissaoTotal,
+        lucro: comissaoPendente ? Math.round((venda.total - venda.custoTotal) * 100) / 100 : venda.lucro,
+      };
+      if (orgId) {
+        const { data, error } = await sb().rpc("cancelar_venda", { p_venda: vendaId });
+        if (error) return { ok: false, erro: erroAmigavel(error.message) };
+        const r = data as any;
+        if (r)
+          atualizada = {
+            ...atualizada,
+            statusComissao: (r.status_comissao ?? atualizada.statusComissao) as Venda["statusComissao"],
+            comissaoTotal: Number(r.comissao_total ?? atualizada.comissaoTotal),
+            lucro: Number(r.lucro ?? atualizada.lucro),
+          };
+      }
+      set((s) => ({ vendas: s.vendas.map((v) => (v.id === vendaId ? atualizada : v)) }));
+      const ids = venda.itens.map((i) => i.produtoId).filter(Boolean);
+      if (orgId) {
+        // estoque devolvido no banco: relê os produtos para mostrar o valor real
+        await recarregarProdutos(ids);
+      } else {
+        set((s) => ({
+          produtos: s.produtos.map((p) => {
+            const its = venda.itens.filter((i) => i.produtoId === p.id);
+            if (its.length === 0) return p;
+            const volta = its.reduce((a, i) => a + i.qtd, 0);
+            const variacoes = p.variacoes.map((v) => {
+              const q = its.filter((i) => i.variacaoId === v.id).reduce((a, i) => a + i.qtd, 0);
+              return q ? { ...v, estoqueAtual: v.estoqueAtual + q } : v;
+            });
+            return { ...p, estoqueAtual: p.estoqueAtual + volta, variacoes };
+          }),
+        }));
+      }
+      return { ok: true };
     },
 
     addContaPagar: async (c) => {
@@ -1201,6 +1589,7 @@ export const useStore = create<State>()((set, get) => {
     },
 
     marcarContaPaga: async (id, paga) => {
+      const anterior = get().contasPagar.find((c) => c.id === id);
       const pagoEm = paga ? Date.now() : null;
       set((s) => ({
         contasPagar: s.contasPagar.map((c) =>
@@ -1208,14 +1597,20 @@ export const useStore = create<State>()((set, get) => {
         ),
       }));
       const { orgId } = get();
-      if (!orgId) return;
-      await sb()
+      if (!orgId) return { ok: true };
+      const { error } = await sb()
         .from("conta_pagar")
         .update({
           status: paga ? "paga" : "pendente",
           pago_em: pagoEm ? new Date(pagoEm).toISOString() : null,
         })
         .eq("id", id);
+      if (error) {
+        if (anterior)
+          set((s) => ({ contasPagar: s.contasPagar.map((c) => (c.id === id ? anterior : c)) }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     removerContaPagar: async (id) => {

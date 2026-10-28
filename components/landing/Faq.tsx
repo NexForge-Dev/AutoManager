@@ -18,7 +18,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "Preciso entender de tecnologia para usar?",
-    a: "Não. Se você usa WhatsApp, você usa o AutoManager. O cadastro inicial é guiado por 4 perguntas e o sistema monta sua loja sozinho. A maioria registra a primeira venda em menos de 5 minutos.",
+    a: "Não. Se você usa WhatsApp, você usa o AutoManager. O cadastro inicial é guiado por 4 perguntas e o sistema monta sua loja sozinho. Dá pra registrar a primeira venda em poucos minutos.",
   },
   {
     q: "Meus dados ficam seguros?",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { SUPERADMIN_EMAIL } from "@/lib/admin";
+import { ehSuperadminUser } from "@/lib/admin";
 import { registrarAdminLog } from "@/lib/adminAudit";
 
 // Moderação de contas pelo super-admin (cortesia / abuso):
@@ -27,7 +27,8 @@ async function exigirSuperadmin() {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return null;
-  if ((user.email ?? "").trim().toLowerCase() !== SUPERADMIN_EMAIL) return null;
+  // papel no app_metadata (só a service_role grava) - não mais pelo e-mail
+  if (!ehSuperadminUser(user)) return null;
   return user;
 }
 
@@ -55,10 +56,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: erroUsuarios.message }, { status: 500 });
 
   // trava de segurança: nunca agir sobre a própria conta do super-admin
-  if ((usuarios ?? []).some((u) => (u.email ?? "").trim().toLowerCase() === SUPERADMIN_EMAIL))
-    return NextResponse.json({ erro: "Não é possível moderar a conta de administração." }, { status: 400 });
-
   const ids = (usuarios ?? []).map((u) => u.id);
+  if (ids.includes(su.id))
+    return NextResponse.json({ erro: "Não é possível moderar a conta de administração." }, { status: 400 });
+  for (const id of ids) {
+    const { data: au, error: eAu } = await a.auth.admin.getUserById(id);
+    if (eAu) return NextResponse.json({ erro: eAu.message }, { status: 500 });
+    if (ehSuperadminUser(au.user))
+      return NextResponse.json({ erro: "Não é possível moderar a conta de administração." }, { status: 400 });
+  }
 
   // descrição da loja p/ a trilha de auditoria (nome + e-mail do dono).
   const { data: orgRow } = await a.from("org").select("nome").eq("id", orgId).maybeSingle();

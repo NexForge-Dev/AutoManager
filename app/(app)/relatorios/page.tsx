@@ -6,6 +6,8 @@ import { calcularRelatorio, rankingRevendedoras, brl } from "@/lib/analytics";
 import { baixarCSV, dataHora } from "@/lib/export";
 import Guard from "@/components/Guard";
 import CountUp from "@/components/CountUp";
+import { useDialog } from "@/components/Dialog";
+import type { Venda } from "@/lib/types";
 const VendasArea = dynamic(() => import("@/components/charts/VendasArea"), {
   ssr: false,
   loading: () => <div style={{ height: 150 }} className="skeleton rounded-xl" />,
@@ -18,6 +20,9 @@ import {
   Wallet,
   Clock,
   Trophy,
+  Receipt,
+  XCircle,
+  Check,
 } from "lucide-react";
 
 export default function RelatoriosPage() {
@@ -36,8 +41,12 @@ function ymd(d: Date) {
 }
 
 function Relatorios() {
-  const { vendas, revendedoras, config } = useStore();
+  const { vendas, revendedoras, config, role, cancelarVenda, marcarVendaRecebida } = useStore();
+  const { confirm, alerta } = useDialog();
   const [preset, setPreset] = useState<Preset>("mes");
+  const [mostrarVendas, setMostrarVendas] = useState(20);
+  const [processando, setProcessando] = useState<string | null>(null);
+  const ehDono = role === "owner";
 
   const hoje = new Date();
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -94,6 +103,43 @@ function Relatorios() {
       maxParcelas: parceladas.reduce((m, v) => Math.max(m, v.parcelas), 0),
     };
   }, [vendas, deMs, ateMs]);
+
+  // lista de vendas do período (mais recentes primeiro), com ações do dono
+  const vendasPeriodo = useMemo(
+    () => vendas.filter((v) => v.data >= deMs && v.data <= ateMs).sort((a, b) => b.data - a.data),
+    [vendas, deMs, ateMs]
+  );
+
+  async function cancelar(v: Venda) {
+    const itens = v.itens.map((i) => `${i.qtd}x ${i.nome}`).join(", ");
+    const ok = await confirm({
+      titulo: "Cancelar venda?",
+      mensagem:
+        `Venda de ${brl(v.total)}${itens ? ` (${itens})` : ""}. ` +
+        "O estoque volta para o produto e a comissão pendente é anulada. Não dá para desfazer.",
+      confirmar: "Cancelar venda",
+      cancelar: "Voltar",
+      perigo: true,
+    });
+    if (!ok) return;
+    setProcessando(v.id);
+    const res = await cancelarVenda(v.id);
+    setProcessando(null);
+    if (!res.ok) alerta({ titulo: "Não foi possível cancelar", mensagem: res.erro || "Tente novamente." });
+  }
+
+  async function receber(v: Venda) {
+    const ok = await confirm({
+      titulo: "Marcar como recebida?",
+      mensagem: `Confirma que ${brl(v.total)} desta venda fiado já entrou no caixa?`,
+      confirmar: "Recebida",
+    });
+    if (!ok) return;
+    setProcessando(v.id);
+    const res = await marcarVendaRecebida(v.id);
+    setProcessando(null);
+    if (!res.ok) alerta({ titulo: "Não foi possível atualizar", mensagem: res.erro || "Tente novamente." });
+  }
 
   function exportarExcel() {
     const noPeriodo = vendas
@@ -305,6 +351,79 @@ function Relatorios() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* vendas do período (cancelar / receber fiado) */}
+      {vendasPeriodo.length > 0 && (
+        <div className="card print-hidden">
+          <div className="flex items-center gap-2 font-semibold mb-3">
+            <Receipt size={18} className="text-brand-500" /> Vendas do período
+            <span className="text-xs text-muted font-normal">({vendasPeriodo.length})</span>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {vendasPeriodo.slice(0, mostrarVendas).map((v) => {
+              const { data, hora } = dataHora(v.data);
+              const cancelada = v.statusPagamento === "cancelada";
+              const quem = v.revendedoraId
+                ? revendedoras.find((x) => x.id === v.revendedoraId)?.nome ?? "-"
+                : "Loja";
+              return (
+                <div key={v.id} className="py-2 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-sm font-medium truncate ${cancelada ? "line-through text-muted" : ""}`}>
+                      {v.itens.length > 0
+                        ? v.itens.map((i) => `${i.qtd}x ${i.nome}${i.variacaoNome ? ` (${i.variacaoNome})` : ""}`).join(", ")
+                        : "Recebimento avulso"}
+                    </div>
+                    <div className="text-[11px] text-muted truncate">
+                      {data} {hora} · {quem}
+                      {cancelada ? (
+                        <span className="text-red-500 font-semibold"> · cancelada</span>
+                      ) : v.statusPagamento === "pendente" ? (
+                        <span className="text-amber-500 font-semibold"> · a receber</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className={`text-sm font-bold shrink-0 ${cancelada ? "line-through text-muted" : ""}`}>
+                    {brl(v.total)}
+                  </div>
+                  {ehDono && !cancelada && (
+                    <div className="flex gap-1 shrink-0">
+                      {v.statusPagamento === "pendente" && (
+                        <button
+                          onClick={() => receber(v)}
+                          disabled={processando === v.id}
+                          className="grid place-items-center h-8 w-8 rounded-lg text-green-600 hover:bg-[var(--hover)] disabled:opacity-50"
+                          title="Marcar como recebida"
+                          aria-label="Marcar como recebida"
+                        >
+                          <Check size={16} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => cancelar(v)}
+                        disabled={processando === v.id}
+                        className="grid place-items-center h-8 w-8 rounded-lg text-red-500 hover:bg-[var(--hover)] disabled:opacity-50"
+                        title="Cancelar venda"
+                        aria-label="Cancelar venda"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {vendasPeriodo.length > mostrarVendas && (
+            <button
+              onClick={() => setMostrarVendas((n) => n + 20)}
+              className="btn-ghost w-full py-2 text-sm mt-2"
+            >
+              Mostrar mais ({vendasPeriodo.length - mostrarVendas})
+            </button>
+          )}
         </div>
       )}
 

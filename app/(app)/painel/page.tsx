@@ -60,7 +60,7 @@ function Painel() {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={config.logoUrl}
-              alt="logo"
+              alt={config.nomeLoja || "Logo da loja"}
               className="h-11 w-11 rounded-xl object-cover shrink-0 border border-default"
             />
           )}

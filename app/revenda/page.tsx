@@ -214,16 +214,16 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
         <div className="card space-y-3 sticky bottom-4 shadow-xl">
           <div className="flex items-center justify-between font-semibold">
             <span className="flex items-center gap-2"><ShoppingBag size={16} className="text-brand-500" /> Venda</span>
-            <button onClick={() => setCarrinho([])} className="text-muted"><X size={16} /></button>
+            <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="-mr-2 grid h-10 w-10 place-items-center text-muted"><X size={18} /></button>
           </div>
           <div className="space-y-1.5 max-h-40 overflow-auto">
             {carrinho.map((i, idx) => (
               <div key={idx} className="flex items-center gap-2 text-sm">
                 <div className="flex-1 min-w-0 truncate">{i.nome}</div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => mudarQtd(idx, -1)} className="h-6 w-6 rounded-full surface-alt grid place-items-center"><Minus size={13} /></button>
+                  <button onClick={() => mudarQtd(idx, -1)} aria-label={`Diminuir quantidade de ${i.nome}`} className="h-10 w-10 rounded-full surface-alt grid place-items-center"><Minus size={16} /></button>
                   <span className="w-5 text-center">{i.qtd}</span>
-                  <button onClick={() => mudarQtd(idx, 1)} className="h-6 w-6 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={13} /></button>
+                  <button onClick={() => mudarQtd(idx, 1)} aria-label={`Aumentar quantidade de ${i.nome}`} className="h-10 w-10 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={16} /></button>
                 </div>
                 <div className="w-16 text-right font-medium">{brl(i.preco * i.qtd)}</div>
               </div>
@@ -325,7 +325,7 @@ function ProdutoCard({ p, onAdd }: { p: Prod; onAdd: (p: Prod, v: Variacao | nul
                 <span className="text-muted">{v.estoque_atual > 0 ? `${v.estoque_atual} un` : "esgotado"}</span>
               </button>
             ))}
-            <button onClick={() => setEscolha(false)} className="text-[11px] text-muted underline">cancelar</button>
+            <button onClick={() => setEscolha(false)} className="min-h-[40px] w-full rounded-lg px-3 text-sm text-muted underline">cancelar</button>
           </div>
         )}
       </div>

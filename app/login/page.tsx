@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useStore } from "@/lib/store";
@@ -20,10 +21,32 @@ export default function LoginPage() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [enviandoReset, setEnviandoReset] = useState(false);
+
+  async function esqueciSenha() {
+    setErro(null);
+    setAviso(null);
+    if (!email.trim()) {
+      setErro("Digite seu e-mail acima para receber o link de redefinição.");
+      return;
+    }
+    setEnviandoReset(true);
+    const { error } = await createClient().auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${location.origin}/redefinir-senha`,
+    });
+    setEnviandoReset(false);
+    if (error) {
+      setErro(traduzErro(error.message));
+      return;
+    }
+    setAviso("Se existir uma conta com esse e-mail, enviamos um link para criar uma nova senha. Confira a caixa de entrada e o spam.");
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
+    setAviso(null);
     setLoading(true);
     const supabase = createClient();
 
@@ -75,12 +98,16 @@ export default function LoginPage() {
         <div className="card space-y-4">
           <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
             <button
+              type="button"
+              aria-pressed={modo === "criar"}
               onClick={() => setModo("criar")}
               className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "criar" ? "surface shadow" : "text-muted hover:text-strong"}`}
             >
               Criar conta
             </button>
             <button
+              type="button"
+              aria-pressed={modo === "entrar"}
               onClick={() => setModo("entrar")}
               className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "entrar" ? "surface shadow" : "text-muted hover:text-strong"}`}
             >
@@ -90,8 +117,9 @@ export default function LoginPage() {
 
           <form onSubmit={submit} className="space-y-3">
             <div>
-              <label className="label">E-mail</label>
+              <label htmlFor="login-email" className="label">E-mail</label>
               <input
+                id="login-email"
                 type="email"
                 className="input"
                 value={email}
@@ -101,8 +129,21 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label">Senha</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="login-senha" className="label">Senha</label>
+                {modo === "entrar" && (
+                  <button
+                    type="button"
+                    onClick={esqueciSenha}
+                    disabled={enviandoReset}
+                    className="mb-1 text-xs font-medium text-brand-500 hover:underline disabled:opacity-60"
+                  >
+                    {enviandoReset ? "Enviando…" : "Esqueci minha senha"}
+                  </button>
+                )}
+              </div>
               <input
+                id="login-senha"
                 type="password"
                 className="input"
                 value={senha}
@@ -112,7 +153,8 @@ export default function LoginPage() {
                 autoComplete={modo === "criar" ? "new-password" : "current-password"}
               />
             </div>
-            {erro && <p className="text-sm text-red-600">{erro}</p>}
+            {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
+            {aviso && <p role="status" className="text-sm text-green-600">{aviso}</p>}
             <button disabled={loading} className="btn-primary w-full disabled:opacity-60">
               {loading ? (
                 <Loader2 className="animate-spin" size={18} />
@@ -125,7 +167,9 @@ export default function LoginPage() {
           </form>
         </div>
         <p className="text-center text-xs text-muted mt-4">
-          Ao continuar você concorda em organizar sua loja em 2 minutos 💎
+          Ao criar a conta você concorda com os{" "}
+          <Link href="/termos" className="underline hover:text-strong">Termos de Uso</Link> e a{" "}
+          <Link href="/privacidade" className="underline hover:text-strong">Política de Privacidade</Link>.
         </p>
       </div>
     </div>
@@ -136,5 +180,6 @@ function traduzErro(msg: string) {
   if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
   if (/already registered|already exists/i.test(msg)) return "E-mail já cadastrado. Tente entrar.";
   if (/password should be at least/i.test(msg)) return "A senha precisa de pelo menos 6 caracteres.";
+  if (/rate limit|too many|security purposes/i.test(msg)) return "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.";
   return msg;
 }

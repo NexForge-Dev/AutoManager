@@ -2,11 +2,14 @@ import type { Produto, Venda, ContaPagar } from "./types";
 
 const DIA = 24 * 60 * 60 * 1000;
 
+// venda cancelada (estoque devolvido) não conta em nenhuma métrica
+const naoCancelada = (v: Venda) => v.statusPagamento !== "cancelada";
+
 export function vendidoUltimosDias(vendas: Venda[], produtoId: string, dias: number) {
   const corte = Date.now() - dias * DIA;
   let qtd = 0;
   for (const v of vendas) {
-    if (v.data < corte) continue;
+    if (v.data < corte || !naoCancelada(v)) continue;
     for (const it of v.itens) if (it.produtoId === produtoId) qtd += it.qtd;
   }
   return qtd;
@@ -44,7 +47,9 @@ export function sugestoesReposicao(
     if (!motivo) continue;
 
     const alvo = velocidadeDia > 0 ? Math.ceil(velocidadeDia * 30) : p.estoqueMinimo * 2;
-    const qtdSugerida = Math.max(alvo - p.estoqueAtual, p.estoqueMinimo);
+    // nunca sugere 0 un: sem vendas e com mínimo 0, um produto zerado ainda
+    // aparece (motivo "sem_estoque") e a sugestão mínima é 1 unidade.
+    const qtdSugerida = Math.max(alvo - p.estoqueAtual, p.estoqueMinimo, 1);
 
     out.push({ produto: p, vendido30d, velocidadeDia, diasCobertura, qtdSugerida, motivo });
   }
@@ -73,9 +78,12 @@ function inicioDoMes(offset = 0) {
 
 export function calcularMetricas(
   produtos: Produto[],
-  vendas: Venda[],
+  todasVendas: Venda[],
   revendedoras: { id: string; nome: string }[]
 ): MetricasDashboard {
+  // Regime de competência (igual ao Relatório: faturamento/lucro projetado por
+  // data da venda, fiado incluso). Canceladas ficam de fora de tudo.
+  const vendas = todasVendas.filter(naoCancelada);
   const ini = inicioDoMes(0);
   const iniAnt = inicioDoMes(1);
 
@@ -334,7 +342,7 @@ export interface AnalyticsLoja {
 }
 
 export function calcularAnalytics(produtos: Produto[], vendas: Venda[]): AnalyticsLoja {
-  const validas = vendas.filter((v) => v.statusPagamento !== "cancelada");
+  const validas = vendas.filter(naoCancelada);
 
   // por produto (receita e qtd)
   const prodMap = new Map<string, { receita: number; qtd: number }>();

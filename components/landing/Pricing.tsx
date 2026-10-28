@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Check, X, ArrowRight, Star } from "lucide-react";
-
-const COMECAR = "/login";
+import { ORDEM_PLANOS, PLANOS as PLANOS_DEF, type PlanoId } from "@/lib/plans";
 
 type Plano = {
+  id: PlanoId;
   nome: string;
   preco: number;
   resumo: string;
@@ -15,53 +15,44 @@ type Plano = {
   cta: string;
 };
 
-const PLANOS: Plano[] = [
-  {
-    nome: "AMBULANTE",
-    preco: 20,
-    resumo: "Para quem vende na rua e quer controlar estoque e vendas no bolso.",
-    para: "Vendedor ambulante",
-    cta: "Começar no AMBULANTE",
-  },
-  {
-    nome: "SOLO",
-    preco: 49,
-    resumo: "Para quem vende sozinha e quer parar com o caderno.",
-    para: "Loja de 1 pessoa",
-    cta: "Começar no SOLO",
-  },
-  {
-    nome: "EQUIPE",
-    preco: 99,
-    resumo: "Para quem tem revendedoras e precisa de comissão no automático.",
-    para: "Loja com equipe e revendedoras",
-    destaque: true,
-    badge: "⭐ MAIS VENDIDO",
-    cta: "Começar no EQUIPE",
-  },
-  {
-    nome: "EXPANSÃO",
-    preco: 199,
-    resumo: "Para quem está crescendo e quer escalar sem perder o controle.",
-    para: "Várias revendedoras + entregas",
-    cta: "Começar no EXPANSÃO",
-  },
-];
+// textos de marketing por plano; nome, preço e destaque vêm de lib/plans.ts (fonte única)
+const TEXTOS: Record<PlanoId, { resumo: string; para: string }> = {
+  ambulante: { resumo: "Para quem vende na rua e quer controlar estoque e vendas no bolso.", para: "Vendedor ambulante" },
+  solo: { resumo: "Para quem vende sozinha e quer parar com o caderno.", para: "Loja de 1 pessoa" },
+  equipe: { resumo: "Para quem tem revendedoras e precisa de comissão no automático.", para: "Loja com equipe e revendedoras" },
+  expansao: { resumo: "Para quem está crescendo e quer escalar sem perder o controle.", para: "Várias revendedoras + entregas" },
+};
+
+const PLANOS: Plano[] = ORDEM_PLANOS.map((id) => {
+  const def = PLANOS_DEF[id];
+  const nome = def.nome.toUpperCase();
+  return {
+    id,
+    nome,
+    preco: def.precoCentavos / 100,
+    ...TEXTOS[id],
+    destaque: def.destaque,
+    badge: def.destaque ? "⭐ RECOMENDADO" : undefined,
+    cta: `Começar no ${nome}`,
+  };
+});
 
 // linha de comparação: [recurso, ambulante, solo, equipe, expansao]
 type Cel = boolean | string;
 const COMPARACAO: [string, Cel, Cel, Cel, Cel][] = [
-  ["Estoque ilimitado em tempo real", true, true, true, true],
+  ["Estoque em tempo real", true, true, true, true],
   ["Venda rápida (balcão + WhatsApp)", true, true, true, true],
-  ["Relatório de lucro real por produto", true, true, true, true],
+  ["Relatórios de vendas e lucro", true, true, true, true],
   ["Vitrine online com link próprio", true, true, true, true],
   ["Chat com o cliente final", true, true, true, true],
   ["Revendedoras com login próprio", "-", "Até 3", "Até 15", "Ilimitado"],
   ["Vendedores internos", "-", "-", "Até 3", "Ilimitado"],
-  ["Comissão automática + ranking", "-", "-", true, true],
-  ["Controle de entregas / motoboy", "-", "-", true, true],
-  ["Metas e bônus por revendedora", "-", "-", "-", true],
-  ["Suporte prioritário no WhatsApp", "-", "-", true, true],
+  ["Comissão automática", "-", true, true, true],
+  ["Ranking de revendedoras", "-", "-", true, true],
+  ["Analytics de vendas (canal/produto)", "-", "-", true, true],
+  ["Tendência e ruptura de estoque", "-", "-", "-", true],
+  ["Controle de entregas / motoboy", "-", "-", "-", true],
+  ["Suporte prioritário", "-", "-", "-", true],
 ];
 
 function Celula({ v }: { v: boolean | string }) {
@@ -103,7 +94,7 @@ export default function Pricing() {
               <p className="mt-4 text-sm text-muted">{p.resumo}</p>
 
               <Link
-                href={COMECAR}
+                href={`/login?plano=${p.id}`}
                 className={`mt-6 px-5 py-3 text-sm ${p.destaque ? "btn-primary" : "btn-ghost"}`}
               >
                 {p.cta} <ArrowRight size={16} />
@@ -122,14 +113,14 @@ export default function Pricing() {
           <thead>
             <tr className="border-b border-default">
               <th className="py-3 pr-4 text-sm font-semibold text-muted">O que está incluso</th>
-              <th className="px-4 py-3 text-center text-sm font-bold text-strong">AMBULANTE</th>
-              <th className="px-4 py-3 text-center text-sm font-bold text-strong">SOLO</th>
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[0].nome}</th>
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[1].nome}</th>
               <th className="px-4 py-3 text-center text-sm font-bold text-brand-600">
                 <span className="inline-flex items-center gap-1">
-                  <Star size={13} className="fill-brand-500 text-brand-500" /> EQUIPE
+                  <Star size={13} className="fill-brand-500 text-brand-500" /> {PLANOS[2].nome}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold text-strong">EXPANSÃO</th>
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[3].nome}</th>
             </tr>
           </thead>
           <tbody>
@@ -156,9 +147,9 @@ export default function Pricing() {
 
       {/* empurrão psicológico para o upgrade */}
       <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted">
-        A maioria escolhe o <strong className="text-strong">EQUIPE</strong>: é o único que paga a
-        própria mensalidade com <strong className="text-strong">uma comissão calculada certo</strong>.
-        Uma revendedora paga errada por mês já custa mais que os R$ 99.
+        Tem revendedoras? O <strong className="text-strong">EQUIPE</strong> calcula a comissão de
+        cada venda sozinho — <strong className="text-strong">uma comissão paga errada</strong> por
+        mês já pode custar mais que a mensalidade.
       </p>
     </div>
   );

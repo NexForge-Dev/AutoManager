@@ -13,15 +13,15 @@ import {
   MessageCircle,
   NotebookPen,
   PlayCircle,
-  Quote,
   Sparkles,
-  Star,
   Store,
   Timer,
   TrendingUp,
   Users,
   Wallet,
   ShoppingBag,
+  Smartphone,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import Faq from "@/components/landing/Faq";
@@ -29,6 +29,9 @@ import Pricing from "@/components/landing/Pricing";
 import StickyCta from "@/components/landing/StickyCta";
 import LiveDashboard from "@/components/landing/LiveDashboard";
 import Reveal from "@/components/landing/Reveal";
+import Rodape from "@/components/landing/Rodape";
+import { whatsappEmpresa } from "@/lib/empresa";
+import { ORDEM_PLANOS, PLANOS, brlPreco } from "@/lib/plans";
 
 export const metadata = {
   title: "AutoManager — Saiba quanto sua loja vende e lucra, todo dia",
@@ -37,6 +40,17 @@ export const metadata = {
 };
 
 const COMECAR = "/login";
+const MENOR_PRECO = brlPreco(Math.min(...ORDEM_PLANOS.map((id) => PLANOS[id].precoCentavos)));
+const WA_DUVIDA = whatsappEmpresa("Tenho uma dúvida sobre o AutoManager");
+const WA_CTA = whatsappEmpresa("Quero organizar minha loja com o AutoManager");
+
+// fatos verificáveis do produto (sem números inventados)
+const FATOS = [
+  { icon: Timer, t: "Venda em 1 toque", d: "Estoque baixa sozinho" },
+  { icon: Wallet, t: "Comissão calculada sozinha", d: "Por venda e por revendedora" },
+  { icon: Smartphone, t: "Funciona no celular", d: "Instala na tela inicial" },
+  { icon: ShieldCheck, t: "Cada loja isolada", d: "Dados separados e criptografados" },
+];
 
 // landing sempre em dark premium (independente do tema salvo do visitante)
 const TEMA_DARK = {
@@ -90,10 +104,10 @@ const FLUXO = [
 const FAQ_LANDING = [
   { q: "Preciso colocar cartão para testar?", a: "Não. O teste grátis começa sem cartão. Você só decide pagar se gostar — e aí escolhe o plano do tamanho da sua loja." },
   { q: "Funciona no celular?", a: "Funciona e foi feito pensando primeiro no celular. Dá pra adicionar à tela inicial e usar como um aplicativo, inclusive pra registrar venda no balcão." },
-  { q: "Posso cancelar quando quiser?", a: "Sim. Sem fidelidade, sem multa e sem ligação pra te 'segurar'. Cancelou, paramos de cobrar no fim do período e seus dados ficam disponíveis pra exportar." },
+  { q: "Posso cancelar quando quiser?", a: "Sim. Sem fidelidade, sem multa e sem ligação pra te 'segurar'. Cancelou, a cobrança para e seus dados continuam disponíveis pra exportar. E se desistir em até 7 dias depois da primeira cobrança, devolvemos 100% do valor." },
   { q: "Preciso instalar algum programa?", a: "Não. Abre direto no navegador do celular ou do computador. Nada pra baixar, nada pra atualizar." },
   { q: "Serve para o meu tipo de negócio?", a: "Sim. Doces, semijoias, bijuterias, cosméticos, roupas, papelaria, artesanato, pet shop e mais. Você cria suas próprias categorias e deixa o sistema com a cara do seu negócio." },
-  { q: "Preciso entender de tecnologia?", a: "Se você usa WhatsApp, você usa o AutoManager. O cadastro é guiado por poucas perguntas e a maioria registra a primeira venda em menos de 5 minutos." },
+  { q: "Preciso entender de tecnologia?", a: "Se você usa WhatsApp, você usa o AutoManager. O cadastro é guiado por poucas perguntas e dá pra registrar a primeira venda em poucos minutos." },
   { q: "Serve mesmo para quem tem revendedoras?", a: "Esse é o nosso diferencial. Cada revendedora tem acesso próprio, registra a venda pelo celular e a comissão é calculada automaticamente. Você vê quem vende, quanto deve e o ranking." },
   { q: "Meus dados ficam seguros?", a: "Ficam. Cada loja é isolada das outras no banco de dados, tudo trafega criptografado e o backup é automático. Ninguém de outra loja enxerga seus números." },
 ];
@@ -184,25 +198,18 @@ export default function Landing() {
             ))}
           </div>
           <div className="mt-9 grid grid-cols-2 gap-6 lg:grid-cols-4">
-            {[
-              { n: "+1.200", l: "vendas registradas" },
-              { n: "+300", l: "lojistas usando" },
-              { n: "−70%", l: "de erro em comissão" },
-              { n: "+18h", l: "economizadas por mês" },
-            ].map((s, i) => (
-              <Reveal key={s.l} delay={i * 80}>
-                <div className="text-center">
-                  <p className="bg-gradient-to-b from-brand-300 to-brand-600 bg-clip-text text-3xl font-extrabold text-transparent sm:text-4xl">
-                    {s.n}
-                  </p>
-                  <p className="mt-1 text-sm text-muted">{s.l}</p>
+            {FATOS.map(({ icon: Icon, t, d }, i) => (
+              <Reveal key={t} delay={i * 80}>
+                <div className="flex flex-col items-center text-center">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-500/10 text-brand-400">
+                    <Icon size={20} />
+                  </span>
+                  <p className="mt-3 font-bold text-strong">{t}</p>
+                  <p className="mt-0.5 text-sm text-muted">{d}</p>
                 </div>
               </Reveal>
             ))}
           </div>
-          <p className="mt-6 text-center text-xs text-muted/70">
-            * Números ilustrativos da fase inicial — substituir por dados reais conforme a base cresce.
-          </p>
         </div>
       </section>
 
@@ -388,51 +395,6 @@ export default function Landing() {
         </p>
       </section>
 
-      {/* ======================= DEPOIMENTOS ======================= */}
-      <section className="border-y border-white/5 bg-[var(--surface)]/40 py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5">
-          <Reveal>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-brand-500">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={18} className="fill-brand-500 text-brand-500" />
-                ))}
-              </div>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-strong sm:text-4xl">Quem largou o caderno não volta</h2>
-            </div>
-          </Reveal>
-          <div className="mt-12 grid gap-5 lg:grid-cols-3">
-            {[
-              { nome: "Aline R.", loja: "Semijoias · Goiânia", txt: "Eu pagava comissão errada e nem sabia. No primeiro mês descobri que perdia quase R$ 400. Hoje o sistema calcula tudo sozinho." },
-              { nome: "Patrícia M.", loja: "Cosméticos · Sorocaba", txt: "Parei de anotar venda no caderno e no Zap. Minhas 4 revendedoras registram pelo celular e eu vejo tudo num lugar só." },
-              { nome: "Camila S.", loja: "Moda feminina · Recife", txt: "Eu não sabia quais peças davam lucro. Agora vejo o relatório e compro só o que gira. Estoque parado caiu muito." },
-            ].map((d, i) => (
-              <Reveal key={d.nome} delay={i * 90}>
-                <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[var(--bg)] p-6">
-                  <Quote size={26} className="text-brand-500/40" />
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-strong">{d.txt}</p>
-                  <div className="mt-4 flex items-center gap-1 text-brand-500">
-                    {Array.from({ length: 5 }).map((_, k) => (
-                      <Star key={k} size={13} className="fill-brand-500 text-brand-500" />
-                    ))}
-                  </div>
-                  <div className="mt-3 flex items-center gap-2.5">
-                    <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-500/10 font-bold text-brand-400">
-                      {d.nome[0]}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-strong">{d.nome}</p>
-                      <p className="text-xs text-muted">{d.loja}</p>
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-muted/70">Depoimentos ilustrativos — substituir por casos reais.</p>
-        </div>
-      </section>
-
       {/* ======================= PLANOS ======================= */}
       <section id="planos" className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
         <Reveal>
@@ -463,12 +425,20 @@ export default function Landing() {
           <Faq itens={FAQ_LANDING} />
           <div className="mt-8 text-center text-sm text-muted">
             Ficou outra dúvida?{" "}
-            <a
-              href="https://wa.me/?text=Tenho%20uma%20d%C3%BAvida%20sobre%20o%20AutoManager"
-              className="font-semibold text-brand-400 transition hover:text-brand-300 hover:underline"
-            >
-              Fale com a gente no WhatsApp
-            </a>
+            {WA_DUVIDA ? (
+              <a
+                href={WA_DUVIDA}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-brand-400 transition hover:text-brand-300 hover:underline"
+              >
+                Fale com a gente no WhatsApp
+              </a>
+            ) : (
+              <Link href={COMECAR} className="font-semibold text-brand-400 transition hover:text-brand-300 hover:underline">
+                Teste grátis e veja na prática
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -490,7 +460,7 @@ export default function Landing() {
               {[
                 { icon: NotebookPen, t: "Continuar no caderno", custo: "Prejuízo invisível todo mês", ruim: true },
                 { icon: Calculator, t: "Comissão na calculadora", custo: "Erro que sai do seu bolso", ruim: true },
-                { icon: BadgeCheck, t: "Começar no AutoManager", custo: "Grátis pra testar · a partir de R$ 20/mês", ruim: false },
+                { icon: BadgeCheck, t: "Começar no AutoManager", custo: `Grátis pra testar · a partir de ${MENOR_PRECO}/mês`, ruim: false },
               ].map(({ icon: Icon, t, custo, ruim }) => (
                 <div
                   key={t}
@@ -511,12 +481,16 @@ export default function Landing() {
               <Link href={COMECAR} className="btn inline-flex bg-white px-7 py-4 text-base font-bold text-brand-700 transition hover:bg-brand-50 active:scale-[.98]">
                 Criar minha loja grátis <ArrowRight size={18} />
               </Link>
-              <a
-                href="https://wa.me/?text=Quero%20organizar%20minha%20loja%20com%20o%20AutoManager"
-                className="btn inline-flex border border-white/40 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10 active:scale-[.98]"
-              >
-                <MessageCircle size={18} /> Tirar dúvida no WhatsApp
-              </a>
+              {WA_CTA && (
+                <a
+                  href={WA_CTA}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn inline-flex border border-white/40 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10 active:scale-[.98]"
+                >
+                  <MessageCircle size={18} /> Tirar dúvida no WhatsApp
+                </a>
+              )}
             </div>
             <p className="relative mt-4 text-sm text-brand-100">Sem cartão · pronto em 2 minutos · cancela quando quiser</p>
           </div>
@@ -524,21 +498,7 @@ export default function Landing() {
       </section>
 
       {/* ======================= FOOTER ======================= */}
-      <footer className="border-t border-white/5 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-sm text-muted sm:flex-row">
-          <span className="flex items-center gap-2 font-semibold text-brand-500">
-            <Gem size={16} /> AutoManager
-          </span>
-          <span className="text-center text-xs">
-            Estoque, vendas, comissões e revendedoras para a sua loja — em um só lugar.
-          </span>
-          <div className="flex gap-4">
-            <a href="#planos" className="transition hover:text-strong">Planos</a>
-            <a href="#faq" className="transition hover:text-strong">Dúvidas</a>
-            <Link href="/login?modo=entrar" className="transition hover:text-strong">Entrar</Link>
-          </div>
-        </div>
-      </footer>
+      <Rodape ancoras />
 
       <StickyCta />
     </main>

@@ -148,13 +148,24 @@ export function diasDeTrial(a: Assinatura | null): number {
   return Math.max(0, Math.ceil((a.trialAte - Date.now()) / 86_400_000));
 }
 
+// Carência após o fim do ciclo pago (data_fim) antes de cair no piso — cobre o
+// atraso normal da cobrança recorrente do Mercado Pago. Espelha o "3 days" de
+// private.plano_efetivo (migration 0035).
+export const CARENCIA_PAGAMENTO_MS = 3 * 86_400_000;
+
 // Durante o trial valem as capacidades de EXPANSAO.
+// Espelha private.plano_efetivo (supabase/migrations/0035).
 export function planoEfetivo(a: Assinatura | null): PlanoId {
   // sem assinatura carregada: assume o mais restritivo (o banco enforça de qualquer jeito)
   if (!a) return "ambulante";
   // parou de pagar (cancelado/inadimplente): perde as capacidades, cai no piso
   if (a.status === "canceled" || a.status === "past_due") return "ambulante";
-  return trialAtivo(a) ? "expansao" : a.plano;
+  // trial: vigente = EXPANSAO; vencido sem pagamento = piso (não mantém plano pago)
+  if (a.status === "trialing") return trialAtivo(a) ? "expansao" : "ambulante";
+  // ativa, mas o ciclo pago venceu (e passou a carência) sem renovação = inadimplente
+  if (a.status === "active" && a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS < Date.now())
+    return "ambulante";
+  return a.plano;
 }
 
 export function capacidades(a: Assinatura | null): PlanoDef {

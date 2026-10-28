@@ -76,8 +76,28 @@ scripts/          → maintenance scripts (e.g. create the super-admin account)
 
 ## Monetization model (summary)
 
-- **Free**: up to 20 products, no resellers (TikTok hook).
-- **Pro - R$ 49/month** ⭐: unlimited + resellers + commission + restock.
-- **Loja+ - R$ 99/month**: multi-user + reports (price anchoring).
+Source of truth: **`lib/plans.ts`** (UI, guards and landing all read from it; DB limits mirror it).
+Every new store gets a **1-month free trial** (no card) with Expansão capabilities. After that, a
+monthly recurring subscription is charged via **Mercado Pago**.
 
-Goal: 10 customers in 72h via manual DMs on Instagram / niche Facebook groups.
+| Plan | Price | Highlights |
+|---|---|---|
+| **Ambulante** | R$ 20/month | Inventory, one-tap sales, storefront + chat, basic reports. No resellers. |
+| **Solo** | R$ 49/month | Everything above + up to 3 resellers. |
+| **Equipe** ⭐ | R$ 99/month | Internal sellers (up to 3), up to 15 resellers, commission + ranking, sales analytics. |
+| **Expansão** | R$ 199/month | Unlimited resellers, motoboys + deliveries, advanced analytics (trend/stock-out), priority support. |
+
+## Legal pages and company data
+
+- Public pages (pt-BR): **`/termos`** (Terms of Use), **`/privacidade`** (Privacy Policy / LGPD),
+  **`/cancelamento`** (cancellation + 7-day CDC withdrawal right). They are linked from the landing
+  footer, the sign-up screen and the plans page, and are public in `lib/supabase/middleware.ts`.
+- **`lib/empresa.ts`** holds the company identity shown on those pages, in the landing footer and in
+  the WhatsApp buttons: `razaoSocial`, `cnpj`, `emailSuporte`, `whatsappSuporte` (digits only, with
+  country code, e.g. `5511999999999`), `cidadeUf` (also used as jurisdiction) and `encarregadoLgpd`.
+  **Fill them in before selling.** Empty fields are simply hidden (e.g. no WhatsApp button).
+- Password recovery: "Esqueci minha senha" on `/login` sends a Supabase reset e-mail that lands on
+  **`/redefinir-senha`**. Add `<your-domain>/redefinir-senha` to *Auth → URL Configuration →
+  Redirect URLs* in Supabase.
+- SEO: set `NEXT_PUBLIC_APP_URL` (e.g. `https://automanager.com.br`) so `metadataBase`, Open Graph,
+  `robots.txt` and `sitemap.xml` use absolute URLs.

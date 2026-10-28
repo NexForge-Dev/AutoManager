@@ -120,8 +120,10 @@ Há ainda um **superadmin** do produto (suporte), fora das lojas — ver §12.
 4. **Expansão — R$ 199/mês** — + motoboys/entregas, revendedoras ilimitadas, analytics avançado (tendência + ruptura).
 
 Toda org nova nasce em **trial com acesso Expansão**. No **onboarding**, o dono escolhe o
-plano e ganha **1 mês grátis** (a rota `POST /api/onboarding/plano` grava o plano com
-`status = trialing` e `trial_ate = hoje + 30 dias`, via service role após checar que é o dono).
+plano e ganha **1 mês grátis**: o trial (1 mês) nasce com a org (`0035`) e a rota
+`POST /api/onboarding/plano` só **troca o plano escolhido**, sem nunca estender `trial_ate`
+(409 se a loja não estiver em trial ou já tiver assinatura no Mercado Pago). Trial vencido sem
+pagamento cai para **Ambulante** (`plano_efetivo`, SQL e `lib/plans.ts`).
 Os limites/permissões são fonte única em **`lib/plans.ts`** (consumidos pelo hook
 `lib/usePlano.ts`) e **espelhados em triggers/funções no banco** (enforcement real: bloqueia revendedora acima do limite, criação de
 vendedor/motoboy fora do plano e criação de entrega fora do Expansão — ver §13). Pagamento pelo
@@ -306,6 +308,8 @@ enforcement de plano: `plano_efetivo()`, `limite_revendedoras()`, `permite_reven
 | `0032_admin_log` | **Trilha de auditoria** do super-admin (`admin_log`, append-only): registra moderar conta e trocar plano. Só o super-admin lê; ninguém atualiza/apaga. |
 | `0033_contas_pagar` | Tabela `conta_pagar` (financeiro: o que **sai**) + RLS por org (leitura da equipe, escrita do dono). Fecha o fluxo de caixa com os recebimentos. |
 | `0034_entrega_pool` | **Pool de entregas** (fluxo "pegar / devolver"): o motoboy também vê as entregas **sem dono** da loja e pode **reivindicá-las** (claim) ou devolvê-las; a trava de escrita garante que ele só deixa a entrega consigo mesmo ou solta (nunca atribui a outro). Realtime ligado. |
+| `0035_seguranca_cobranca` | **Segurança/cobrança:** vínculo de membro só via `app_metadata` (fecha cadastro direto em loja alheia), super-admin por `app_metadata.role`, trial de 1 mês com `trial_usado`, trial vencido → Ambulante, limite de papéis também no UPDATE, códigos de acesso de revendedora movidos p/ `revendedora_convite` (sem acesso do cliente). |
+| `0036_estoque_vendas` | **Estoque/vendas:** `cancelar_venda` (devolve estoque, anula comissão), `entrada_estoque`/`ajustar_estoque` atômicos no banco, trava de linha (`FOR UPDATE`) nas vendas contra venda além do estoque, `CHECK (estoque_atual >= 0)`. |
 
 > **Numeração:** as migrations do chat foram renumeradas (`0017`–`0019`) para não colidir
 > com o fluxo paralelo de aparência/chamados (`0014`/`0016`). Por isso há um **gap no `0015`** —
@@ -391,17 +395,15 @@ supabase/migrations/  → SQL versionado (§9)
 
 O AutoManager tem uma área de **plataforma** separada das lojas, para o time do produto operar
 o SaaS — não é o "admin" de uma loja (esse é o `owner`). Tudo nas rotas `/api/admin/*` roda com
-`service_role` (ignora RLS) **só depois** de confirmar, pelo e-mail da sessão, que quem chama é
-o super-admin.
+`service_role` (ignora RLS) **só depois** de confirmar que quem chama é o super-admin.
 
-- **Quem acessa:** uma única conta, definida em `lib/admin.ts` →
-  `SUPERADMIN_EMAIL = "admin@automanager.com"`. Só esse e-mail vê o item **"Admin"** no menu e
-  abre `/admin`.
-- **Criar a conta (uma vez):** na raiz do projeto, `node scripts/criar-admin.mjs` — cria
-  `admin@automanager.com` com senha provisória **`123mudar`** (precisa do `.env.local` com
-  `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`). Se já existir, **redefine a senha**.
-- **Entrar:** `/login` com esse e-mail → o item **"Admin"** aparece. **Troque a senha** depois
-  (Supabase → Authentication → Users, ou pelo perfil).
+- **Quem acessa:** contas com `app_metadata.role = 'superadmin'` no Supabase Auth (só a
+  service_role grava `app_metadata`; o usuário não consegue se promover). O RLS lê o mesmo claim
+  em `private.eh_admin()` (`0035`). Só essas contas veem o item **"Admin"** e abrem `/admin`.
+- **Criar/promover (uma vez):** na raiz do projeto,
+  `node scripts/criar-admin.mjs --email voce@dominio.com --senha "<senha forte, 12+>"`
+  (precisa do `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`).
+- **Entrar:** `/login` com essa conta (saia e entre de novo após promover, para renovar o JWT).
 
 **O painel `/admin` tem 4 abas:**
 - **Resumo** (`GET /api/admin/overview`): **MRR** (só assinaturas ativas pagas), **ARR** (×12),

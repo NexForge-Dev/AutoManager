@@ -31,29 +31,40 @@ export async function POST(req: Request) {
     { status: 403 }
   );
 
-  // revendedora liberada e ainda não ativada
-  const { data: rev } = await sb
+  // revendedoras liberadas e ainda não ativadas com este e-mail (pode haver mais
+  // de uma loja com o mesmo e-mail: o código decide qual).
+  const { data: candidatas } = await sb
     .from("revendedora")
-    .select("id, nome, org_id, acesso_liberado, user_id, ativa, acesso_codigo, acesso_codigo_expira")
+    .select("id, nome, org_id, acesso_liberado, user_id, ativa")
     .ilike("email", mail)
     .eq("acesso_liberado", true)
     .is("user_id", null)
     .eq("ativa", true)
-    .limit(1)
-    .maybeSingle();
+    .limit(20);
 
+  if (!candidatas || candidatas.length === 0) return naoElegivel;
+
+  // código de convite (tabela revendedora_convite, sem acesso p/ anon/authenticated
+  // — migration 0035): precisa bater e não estar expirado (uso único — apagado no fim).
+  const { data: convites } = await sb
+    .from("revendedora_convite")
+    .select("revendedora_id, codigo, expira")
+    .in(
+      "revendedora_id",
+      candidatas.map((c) => c.id)
+    );
+  const convite = (convites ?? []).find(
+    (c) => (c.codigo || "").toUpperCase() === cod && new Date(c.expira).getTime() >= Date.now()
+  );
+  if (!convite) return naoElegivel;
+  const rev = candidatas.find((c) => c.id === convite.revendedora_id);
   if (!rev) return naoElegivel;
-
-  // código de convite: precisa bater e não estar expirado (uso único — limpo no fim).
-  const expira = rev.acesso_codigo_expira ? new Date(rev.acesso_codigo_expira).getTime() : 0;
-  if (!rev.acesso_codigo || rev.acesso_codigo.toUpperCase() !== cod || expira < Date.now())
-    return naoElegivel;
 
   // o plano atual da loja inclui revendedoras? (Ambulante = 0 -> bloqueia o acesso).
   // espelha private.permite_revendedoras; evita criar login que não vai conseguir entrar.
   const { data: assin } = await sb
     .from("assinatura")
-    .select("plano, status, trial_ate")
+    .select("plano, status, trial_ate, data_fim")
     .eq("org_id", rev.org_id)
     .maybeSingle();
   const assinatura: Assinatura | null = assin
@@ -63,18 +74,24 @@ export async function POST(req: Request) {
         precoCentavos: 0,
         periodo: "mensal",
         dataInicio: null,
-        dataFim: null,
+        dataFim: assin.data_fim ? new Date(assin.data_fim).getTime() : null,
         trialAte: assin.trial_ate ? new Date(assin.trial_ate).getTime() : null,
       }
     : null;
   if (capacidades(assinatura).maxRevendedoras === 0) return naoElegivel;
 
-  // cria o login (role 'revendedora' -> trigger NÃO cria org/usuario)
+  // cria o login. O papel 'revendedora' vai no app_metadata (só a service_role
+  // grava) -> o trigger NÃO cria org/usuario. user_metadata.convite só evita que o
+  // trigger trate a conta como cadastro de loja nova; não dá permissão.
+  // email_confirm: true é seguro aqui: o e-mail foi cadastrado pelo dono E a
+  // pessoa provou posse do código de convite de uso único. Um e-mail que já tem
+  // conta no Auth é recusado pelo GoTrue (não sobrescreve conta existente).
   const { data: created, error: errCreate } = await sb.auth.admin.createUser({
     email: mail,
     password: senha,
     email_confirm: true,
-    user_metadata: { role: "revendedora", nome: rev.nome },
+    user_metadata: { nome: rev.nome, convite: true },
+    app_metadata: { role: "revendedora" },
   });
   if (errCreate) {
     const dup = /already|exists|registered/i.test(errCreate.message);
@@ -89,13 +106,18 @@ export async function POST(req: Request) {
   // vincula o login à revendedora e consome o código (uso único)
   const { error: errLink } = await sb
     .from("revendedora")
-    .update({ user_id: created.user.id, acesso_codigo: null, acesso_codigo_expira: null })
+    .update({ user_id: created.user.id })
     .eq("id", rev.id);
   if (errLink) {
     // desfaz o usuário órfão se não conseguiu vincular
     await sb.auth.admin.deleteUser(created.user.id).catch(() => {});
     return NextResponse.json({ erro: "Não foi possível concluir a ativação. Tente novamente." }, { status: 500 });
   }
+
+  // consome o código (uso único). Falha aqui não invalida a ativação: com
+  // user_id preenchido a revendedora deixa de ser elegível de qualquer forma.
+  const { error: errConv } = await sb.from("revendedora_convite").delete().eq("revendedora_id", rev.id);
+  if (errConv) console.error("Falha ao apagar convite da revendedora", rev.id, errConv.message);
 
   return NextResponse.json({ ok: true });
 }

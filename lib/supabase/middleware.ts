@@ -34,7 +34,14 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
     path.startsWith("/acesso") || // ativação/login self-service da revendedora
-    path.startsWith("/loja"); // vitrine pública da loja
+    path.startsWith("/loja") || // vitrine pública da loja
+    path.startsWith("/redefinir-senha") || // link de recuperação de senha
+    path.startsWith("/termos") ||
+    path.startsWith("/privacidade") ||
+    path.startsWith("/cancelamento") ||
+    path === "/robots.txt" ||
+    path === "/sitemap.xml" ||
+    path.startsWith("/opengraph-image");
   // rotas de API se auto-protegem (retornam JSON 403); não devem ser redirecionadas
   // para /login. Em especial, o webhook do Mercado Pago chega sem sessão.
   const isApi = path.startsWith("/api");
@@ -42,6 +49,8 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/_next") ||
     path.startsWith("/manifest") ||
     path.startsWith("/icon") ||
+    path.startsWith("/apple-touch-icon") ||
+    path.startsWith("/favicon") ||
     path === "/favicon.ico";
 
   if (!user && !rotaPublica && !isApi && !isAsset) {

@@ -6,6 +6,7 @@ import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import { Plus, X, MessageCircle, BadgeDollarSign, Target, Pencil, KeyRound, Check, Mail } from "lucide-react";
 import type { Revendedora } from "@/lib/types";
+import type { Resultado } from "@/lib/store";
 import { usePlano } from "@/lib/usePlano";
 import { UpgradeModal } from "@/components/UpgradeGate";
 import { planoQueLibera, fmtLimite } from "@/lib/plans";
@@ -22,7 +23,7 @@ function Revendedoras() {
   const { revendedoras, vendas, config, addRevendedora, updateRevendedora, marcarComissaoPaga } =
     useStore();
   const { caps, uso, limiteAtingido } = usePlano();
-  const { prompt, confirm } = useDialog();
+  const { prompt, confirm, alerta } = useDialog();
   const [aberto, setAberto] = useState(false);
   const [upsell, setUpsell] = useState(false);
   const [nome, setNome] = useState("");
@@ -44,10 +45,14 @@ function Revendedoras() {
     return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
   })();
 
-  function pendentePara(id: string) {
-    return vendas
-      .filter((v) => v.revendedoraId === id && v.statusComissao === "pendente")
-      .reduce((a, v) => a + v.comissaoTotal, 0);
+  // vendas com comissão a pagar (as MESMAS que são somadas e depois marcadas)
+  function vendasPendentes(id: string) {
+    return vendas.filter(
+      (v) =>
+        v.revendedoraId === id &&
+        v.statusComissao === "pendente" &&
+        v.statusPagamento !== "cancelada"
+    );
   }
   function vendidoNoMes(id: string) {
     return vendas
@@ -58,15 +63,19 @@ function Revendedoras() {
       .reduce((a, v) => a + v.total, 0);
   }
 
-  function salvar() {
+  async function salvar() {
     if (!nome) return;
-    addRevendedora({
+    const res = await addRevendedora({
       nome,
       whatsapp: whats,
       email: emailNova.trim().toLowerCase() || null,
       comissaoPercent: parseFloat(comissao) || config.comissaoPadrao,
       metaMensal: parseFloat(meta) || 0,
     });
+    if (!res.ok) {
+      alerta({ titulo: "Não foi possível cadastrar", mensagem: res.erro || "Tente novamente." });
+      return;
+    }
     setNome("");
     setWhats("");
     setEmailNova("");
@@ -84,16 +93,20 @@ function Revendedoras() {
       confirmar: "Salvar",
     });
     if (v === null) return;
-    updateRevendedora(id, { metaMensal: parseFloat(v) || 0 });
+    const res = await updateRevendedora(id, { metaMensal: parseFloat(v) || 0 });
+    if (!res.ok) alerta({ titulo: "Não foi possível salvar a meta", mensagem: res.erro || "Tente novamente." });
   }
 
-  async function pagarComissao(id: string, nome: string, valor: number) {
+  // congela a lista de vendas somadas no momento do clique: só elas são pagas
+  async function pagarComissao(id: string, nome: string, vendaIds: string[], valor: number) {
     const ok = await confirm({
       titulo: "Confirmar pagamento",
-      mensagem: `Marcar ${brl(valor)} como pago para ${nome}?`,
+      mensagem: `Marcar ${brl(valor)} (${vendaIds.length} venda(s)) como pago para ${nome}?`,
       confirmar: "Marcar como pago",
     });
-    if (ok) marcarComissaoPaga(id);
+    if (!ok) return;
+    const res = await marcarComissaoPaga(id, vendaIds);
+    if (!res.ok) alerta({ titulo: "Não foi possível marcar como pago", mensagem: res.erro || "Tente novamente." });
   }
 
   return (
@@ -140,7 +153,8 @@ function Revendedoras() {
 
       <div className="space-y-2 stagger">
         {revendedoras.map((r) => {
-          const pend = pendentePara(r.id);
+          const pendVendas = vendasPendentes(r.id);
+          const pend = pendVendas.reduce((a, v) => a + v.comissaoTotal, 0);
           const vendMes = vendidoNoMes(r.id);
           const pct = r.metaMensal > 0 ? Math.min(100, (vendMes / r.metaMensal) * 100) : 0;
           const bateu = r.metaMensal > 0 && vendMes >= r.metaMensal;
@@ -198,7 +212,7 @@ function Revendedoras() {
                 </span>
                 {pend > 0 && (
                   <button
-                    onClick={() => pagarComissao(r.id, r.nome, pend)}
+                    onClick={() => pagarComissao(r.id, r.nome, pendVendas.map((v) => v.id), pend)}
                     className="text-xs btn-primary py-1.5 px-2"
                   >
                     <BadgeDollarSign size={14} /> Pagar
@@ -291,7 +305,7 @@ function AcessoRevendedora({
   onUpdate,
 }: {
   r: Revendedora;
-  onUpdate: (id: string, patch: Partial<Revendedora>) => Promise<void>;
+  onUpdate: (id: string, patch: Partial<Revendedora>) => Promise<Resultado>;
 }) {
   const { liberarAcessoRevendedora, revogarAcessoRevendedora } = useStore();
   const { alerta } = useDialog();
@@ -304,8 +318,12 @@ function AcessoRevendedora({
 
   async function salvarEmail() {
     setSalvando(true);
-    await onUpdate(r.id, { email: email.trim().toLowerCase() || null });
+    const res = await onUpdate(r.id, { email: email.trim().toLowerCase() || null });
     setSalvando(false);
+    if (!res.ok) {
+      alerta({ titulo: "Não foi possível salvar o e-mail", mensagem: res.erro || "Tente novamente." });
+      return;
+    }
     if (email.trim()) setEditando(false);
   }
 

@@ -87,8 +87,18 @@ function parseNumero(bruto: string): number {
     s = s.replace(/\./g, "").replace(",", ".");
   } else if (temVirgula) {
     s = s.replace(",", ".");
+  } else if (temPonto) {
+    // só ponto: "1.500" / "1.234.567" = milhar pt-BR (todo grupo após o 1º com
+    // exatamente 3 dígitos); "12.90" / "12.5" = decimal.
+    const grupos = s.replace(/^-/, "").split(".");
+    // 1º grupo com 1-3 dígitos e sem zero à esquerda ("0.500" segue decimal)
+    if (
+      grupos.length > 1 &&
+      /^[1-9]\d{0,2}$/.test(grupos[0]) &&
+      grupos.slice(1).every((g) => /^\d{3}$/.test(g))
+    )
+      s = s.replace(/\./g, "");
   }
-  // só ponto: já está no formato de número
   return parseFloat(s);
 }
 

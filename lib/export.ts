@@ -2,7 +2,11 @@
 
 export function baixarCSV(nomeArquivo: string, header: string[], linhas: (string | number)[][]) {
   const esc = (v: string | number) => {
-    const s = String(v ?? "");
+    let s = String(v ?? "");
+    // anti "CSV/formula injection": célula de texto que começa com = + - @ (ou
+    // tab/CR) seria interpretada como fórmula pelo Excel. Prefixa com apóstrofo.
+    // Números (inclusive negativos como "-12,50") ficam intactos.
+    if (typeof v !== "number" && /^[=+\-@\t\r]/.test(s) && !/^-?[\d.,]+$/.test(s)) s = "'" + s;
     return `"${s.replace(/"/g, '""')}"`;
   };
   // separador ";" e BOM para Excel pt-BR reconhecer acentos e colunas

@@ -26,10 +26,13 @@ export default function RecebimentosPage() {
   );
 }
 
+// ferramenta de simulação só aparece em desenvolvimento (nunca para o cliente)
+const DEV = process.env.NODE_ENV === "development";
+
 const ORIGEM_LABEL: Record<OrigemRecebimento, string> = {
   mercadopago: "Mercado Pago",
   inter: "Banco Inter",
-  manual: "Teste",
+  manual: DEV ? "Teste" : "Manual",
 };
 
 function tempoRelativo(ms: number): string {
@@ -130,7 +133,8 @@ function Recebimentos() {
         ))}
       </div>
 
-      {/* Teste: enquanto não há banco conectado, simula um recebimento pra ver o fluxo. */}
+      {/* Dev only: simula um recebimento pra ver o fluxo sem banco conectado. */}
+      {DEV && (
       <section className="card space-y-2 border-dashed">
         <div className="flex items-center gap-2 text-sm font-semibold text-muted">
           <FlaskConical size={15} /> Testar o fluxo
@@ -159,6 +163,7 @@ function Recebimentos() {
           </button>
         </div>
       </section>
+      )}
     </div>
   );
 }

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { SUPERADMIN_EMAIL } from "@/lib/admin";
+import { ehSuperadminUser } from "@/lib/admin";
 import { PLANOS, type PlanoId } from "@/lib/plans";
 
 // Visão geral da PLATAFORMA (super-admin): todas as lojas, planos e faturamento.
 // Lê tudo com a service_role (ignora RLS), mas SÓ depois de confirmar que quem
-// chama é o super-admin do AutoManager (e-mail).
+// chama é o super-admin do AutoManager (app_metadata.role).
 
 function admin() {
   return createAdmin(
@@ -22,7 +22,8 @@ async function exigirSuperadmin() {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return null;
-  if ((user.email ?? "").trim().toLowerCase() !== SUPERADMIN_EMAIL) return null;
+  // papel no app_metadata (só a service_role grava) - não mais pelo e-mail
+  if (!ehSuperadminUser(user)) return null;
   return user;
 }
 

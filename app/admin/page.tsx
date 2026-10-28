@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
-import { ehSuperadmin, linkWhatsappSuporte } from "@/lib/admin";
+import { linkWhatsappSuporte } from "@/lib/admin";
 import { brlPreco, ORDEM_PLANOS, PLANOS, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -116,11 +116,10 @@ function dataCurta(iso: string | null) {
 }
 
 function Admin() {
-  const email = useStore((s) => s.email);
   const listarChamados = useStore((s) => s.listarChamados);
   const resolverChamado = useStore((s) => s.resolverChamado);
 
-  const autorizado = ehSuperadmin(email);
+  const autorizado = useStore((s) => s.superadmin);
 
   const [aba, setAba] = useState<"resumo" | "lojas" | "chamados" | "auditoria">("resumo");
   const [chamados, setChamados] = useState<Chamado[]>([]);

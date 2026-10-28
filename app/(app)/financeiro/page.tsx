@@ -46,7 +46,7 @@ function fmtData(ymd: string): string {
 
 function Financeiro() {
   const { contasPagar, vendas, role, marcarContaPaga, removerContaPagar } = useStore();
-  const { confirm } = useDialog();
+  const { confirm, alerta } = useDialog();
   const [aberto, setAberto] = useState(false);
   const [filtro, setFiltro] = useState<"pendentes" | "pagas" | "todas">("pendentes");
 
@@ -84,6 +84,11 @@ function Financeiro() {
       perigo: true,
     });
     if (ok) removerContaPagar(c.id);
+  }
+
+  async function marcarPaga(c: ContaPagar, paga: boolean) {
+    const res = await marcarContaPaga(c.id, paga);
+    if (!res.ok) alerta({ titulo: "Não foi possível atualizar a conta", mensagem: res.erro || "Tente novamente." });
   }
 
   return (
@@ -203,14 +208,14 @@ function Financeiro() {
                 <div className="flex gap-2">
                   {c.status === "pendente" ? (
                     <button
-                      onClick={() => marcarContaPaga(c.id, true)}
+                      onClick={() => marcarPaga(c, true)}
                       className="btn-primary flex-1 py-1.5 text-sm"
                     >
                       <Check size={15} /> Marcar paga
                     </button>
                   ) : (
                     <button
-                      onClick={() => marcarContaPaga(c.id, false)}
+                      onClick={() => marcarPaga(c, false)}
                       className="btn-ghost flex-1 py-1.5 text-sm"
                     >
                       <RotateCcw size={15} /> Reabrir
