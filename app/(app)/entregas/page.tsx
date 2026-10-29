@@ -87,6 +87,10 @@ function Entregas() {
     };
   }, [recarregarEntregas]);
 
+  // hooks antes de qualquer return condicional (regra dos hooks: o plano/papel
+  // carregam depois e mudariam a ordem dos hooks entre renders -> crash)
+  const [aberto, setAberto] = useState(false);
+
   // owner em plano sem entregas vê o pitch de upgrade (entregas só no Expansão)
   if (dono && !caps.allowEntregas) {
     return <PitchEntregas />;
@@ -106,7 +110,6 @@ function Entregas() {
   }
 
   const motoboys = membros.filter((m) => m.role === "motoboy");
-  const [aberto, setAberto] = useState(false);
 
   const ativas = entregas.filter((e) => e.status !== "entregue");
   const concluidas = entregas.filter((e) => e.status === "entregue");

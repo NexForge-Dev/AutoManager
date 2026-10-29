@@ -159,7 +159,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* -------- bottom nav (mobile) -------- */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 surface border-t border-default flex justify-around items-center px-2 py-2">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 surface border-t border-default flex justify-around items-center px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {nav.map((n) => {
           const active = path === n.href;
           const Icon = n.icon;

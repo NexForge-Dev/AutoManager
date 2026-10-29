@@ -53,9 +53,21 @@ export default function LoginPage() {
     try {
       let session;
       if (modo === "criar") {
-        const { data, error } = await supabase.auth.signUp({ email, password: senha });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password: senha,
+          // com confirmação de e-mail ligada no Supabase, o link volta para o "Entrar"
+          options: { emailRedirectTo: `${location.origin}/login?modo=entrar` },
+        });
         if (error) throw error;
         session = data.session;
+        if (!session) {
+          // conta criada, falta confirmar o e-mail: é um aviso, não um erro
+          setAviso("Conta criada! Enviamos um link de confirmação para o seu e-mail (veja também o spam). Depois de confirmar, use \"Entrar\".");
+          setModo("entrar");
+          setLoading(false);
+          return;
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
         if (error) throw error;

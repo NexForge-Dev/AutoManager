@@ -29,7 +29,7 @@ npm run build && npm start
 - Every account (`auth.users`) automatically gets an **org** (store) via the `on_auth_user_created` trigger.
 - All data (products, sales, resellers, inventory) is isolated per org with **RLS**.
 - `SECURITY DEFINER` functions live in the `private` schema (outside the Data API). Security advisors: **clean**.
-- Email confirmation is **disabled** (`mailer_autoconfirm`) so sign-up takes under 2 minutes.
+- Email confirmation is currently **enabled** on the cloud project (`mailer_autoconfirm = false`): configure a custom SMTP in Supabase before launch, or disable "Confirm email" for instant sign-up. See **`LANCAMENTO.md`** (go-live checklist, in Portuguese).
 
 ## How to use (demo flow)
 

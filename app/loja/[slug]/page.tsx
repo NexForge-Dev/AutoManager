@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { aplicarCorMarca } from "@/lib/brand";
 import { aplicarFavicon } from "@/lib/aparencia";
@@ -131,8 +132,9 @@ export default function LojaPage({ params }: { params: { slug: string } }) {
     return (
       <div className="min-h-screen grid place-items-center text-center px-6">
         <div>
-          <div className="text-2xl font-bold">Loja não encontrada</div>
+          <h1 className="text-2xl font-bold">Loja não encontrada</h1>
           <p className="text-muted mt-1">Este link pode estar incorreto ou a loja está fora do ar.</p>
+          <Link href="/" className="btn-primary mt-6 inline-flex">Conhecer o AutoManager</Link>
         </div>
       </div>
     );

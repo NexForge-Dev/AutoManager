@@ -608,7 +608,7 @@ function ProdutoForm({
             <input className="input" inputMode="decimal" value={preco} onChange={(e) => setPreco(e.target.value)} />
           </div>
           <div>
-            <label className="label">Preço "de" (R$)</label>
+            <label className="label">Preço &quot;de&quot; (R$)</label>
             <input
               className="input"
               inputMode="decimal"

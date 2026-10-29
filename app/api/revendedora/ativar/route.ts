@@ -13,9 +13,11 @@ function admin() {
 }
 
 export async function POST(req: Request) {
-  const { email, senha, codigo } = await req.json().catch(() => ({}));
-  const mail = (email || "").trim().toLowerCase();
-  const cod = (codigo || "").trim().toUpperCase();
+  const body = await req.json().catch(() => ({}));
+  // valida os tipos: um campo não-string (ex.: número) derrubava a rota com 500
+  const mail = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const cod = typeof body?.codigo === "string" ? body.codigo.trim().toUpperCase() : "";
+  const senha = typeof body?.senha === "string" ? body.senha : "";
   if (!mail || !senha || senha.length < 6)
     return NextResponse.json({ erro: "Informe o e-mail e uma senha de pelo menos 6 caracteres." }, { status: 400 });
   if (!cod)

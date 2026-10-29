@@ -128,7 +128,7 @@ export default function Landing() {
             <a href="#faq" className="transition hover:text-strong">Dúvidas</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/login?modo=entrar" className="hidden text-sm text-muted transition hover:text-strong sm:block">
+            <Link href="/login?modo=entrar" className="px-2 py-3 text-sm text-muted transition hover:text-strong">
               Entrar
             </Link>
             <Link href={COMECAR} className="btn-primary text-sm">
