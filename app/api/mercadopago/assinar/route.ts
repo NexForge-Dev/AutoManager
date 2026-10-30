@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { criarPreapproval } from "@/lib/mercadopago";
 import type { PlanoId } from "@/lib/plans";
@@ -39,6 +40,9 @@ export async function POST(req: Request) {
     const pre = await criarPreapproval({ plano, email: dono.email, orgId: dono.orgId });
     if (!pre.init_point)
       return NextResponse.json({ erro: "Mercado Pago não retornou o link de pagamento." }, { status: 502 });
+    registrarEvento("plan_selected", dono.orgId, { plan: plano, billing_period: "month" });
+    registrarEvento("checkout_started", dono.orgId, { plan: plano, billing_period: "month" });
+    await enviarMetricas();
     return NextResponse.json({ init_point: pre.init_point, id: pre.id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao iniciar pagamento";

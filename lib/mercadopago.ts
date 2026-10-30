@@ -9,6 +9,7 @@
 
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { PLANOS, type PlanoId } from "./plans";
+import { propsPlano, registrarEvento } from "./metricas/servidor";
 
 const MP_BASE = "https://api.mercadopago.com";
 
@@ -239,7 +240,7 @@ export async function aplicarPreapproval(p: Preapproval): Promise<PlanoId | null
     // assinatura atual (p/ idempotência e p/ não cobrar dois planos ao trocar)
     const { data: atual, error: eSel } = await admin
       .from("assinatura")
-      .select("provider_assinatura_id, status")
+      .select("provider_assinatura_id, status, plano")
       .eq("org_id", ref.orgId)
       .maybeSingle();
     if (eSel) throw new Error(eSel.message);
@@ -254,6 +255,7 @@ export async function aplicarPreapproval(p: Preapproval): Promise<PlanoId | null
           .eq("org_id", ref.orgId)
           .eq("provider_assinatura_id", p.id);
         if (error) throw new Error(error.message);
+        registrarEvento("plan_activated", ref.orgId, propsPlano(ref.plano), `retomada:${p.id}:${Date.now()}`);
       }
       return ref.plano;
     }
@@ -276,6 +278,14 @@ export async function aplicarPreapproval(p: Preapproval): Promise<PlanoId | null
       .eq("org_id", ref.orgId);
     if (error) throw new Error(error.message);
 
+    // Painel NexForge: troca de um plano pago para outro, ou primeira ativação paga.
+    const planoAnterior = atual?.plano as PlanoId | undefined;
+    if (atual?.provider_assinatura_id && planoAnterior && planoAnterior !== ref.plano) {
+      registrarEvento("plan_changed", ref.orgId, { from_plan: planoAnterior, to_plan: ref.plano, billing_period: "month", amount_cents: PLANOS[ref.plano].precoCentavos }, `preapproval:${p.id}`);
+    } else {
+      registrarEvento("plan_activated", ref.orgId, propsPlano(ref.plano), `preapproval:${p.id}`);
+    }
+
     // cancela a assinatura ANTERIOR no MP, se houver outra diferente desta.
     // Em try/catch: conceder o plano novo é prioridade; falha aqui não pode
     // derrubar a ativação (no pior caso o cancelamento é refeito num retry/manual).
@@ -297,6 +307,7 @@ export async function aplicarPreapproval(p: Preapproval): Promise<PlanoId | null
       .eq("org_id", ref.orgId)
       .eq("provider_assinatura_id", p.id);
     if (error) throw new Error(error.message);
+    registrarEvento("plan_canceled", ref.orgId, { plan: ref.plano }, `cancelada:${p.id}`);
     return null;
   }
 
@@ -385,5 +396,6 @@ export async function aplicarPagamentoAutorizado(
     .update({ status: "past_due", updated_at: new Date().toISOString() })
     .eq("provider_assinatura_id", preId);
   if (error) throw new Error(error.message);
+  registrarEvento("payment_failed", atual.org_id as string, {}, `recusa:${ap.payment?.id ?? preId}`);
   return "inadimplente";
 }

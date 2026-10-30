@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { PLANOS, type PlanoId } from "@/lib/plans";
+import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
+
+// Painel NexForge: escolha do plano no onboarding = trial de 30 dias desse plano.
+async function metricasTrial(orgId: string, plano: PlanoId) {
+  registrarEvento("plan_selected", orgId, { plan: plano, billing_period: "month" });
+  registrarEvento("trial_started", orgId, { plan: plano, trial_days: 30 }, "trial");
+  await enviarMetricas();
+}
 
 // Define o plano escolhido no onboarding dentro do TRIAL de 1 mês (grátis) — depois
 // começa a cobrar (o ciclo pago é configurado no Mercado Pago ao fim do trial).
@@ -75,6 +83,7 @@ export async function POST(req: Request) {
       data_fim: null,
     });
     if (eIns) return NextResponse.json({ erro: eIns.message }, { status: 500 });
+    await metricasTrial(dono.orgId, plano);
     return NextResponse.json({ ok: true, plano });
   }
 
@@ -104,5 +113,6 @@ export async function POST(req: Request) {
   const { error } = await sb.from("assinatura").update(dados).eq("org_id", dono.orgId);
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
 
+  await metricasTrial(dono.orgId, plano);
   return NextResponse.json({ ok: true, plano });
 }

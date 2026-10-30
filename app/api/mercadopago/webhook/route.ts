@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enviarMetricas } from "@/lib/metricas/servidor";
 import crypto from "crypto";
 import {
   buscarPreapproval,
@@ -112,6 +113,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: msg }, { status: 500 });
   }
 
+  await enviarMetricas();
   return NextResponse.json({ ok: true });
 }
 

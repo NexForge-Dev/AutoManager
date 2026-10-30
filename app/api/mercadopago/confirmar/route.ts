@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enviarMetricas } from "@/lib/metricas/servidor";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { buscarPreapproval, aplicarPreapproval, lerRef } from "@/lib/mercadopago";
 
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ erro: "Assinatura não pertence a esta loja" }, { status: 403 });
 
     const plano = await aplicarPreapproval(pre);
+    await enviarMetricas();
     return NextResponse.json({ status: pre.status, plano });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao confirmar pagamento";

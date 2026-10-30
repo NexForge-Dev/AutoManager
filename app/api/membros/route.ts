@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { capacidades, limiteDoRecurso, type Assinatura, type PlanoId } from "@/lib/plans";
@@ -131,6 +132,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "Não foi possível vincular o membro à loja. Tente novamente." }, { status: 500 });
   }
 
+  registrarEvento("feature_used", dono.orgId, { feature: "membro_equipe_criado" });
+  await enviarMetricas();
   return NextResponse.json({
     membro: { id: data.user.id, nome: nome ?? null, email, role },
   });
