@@ -77,7 +77,7 @@ function dividir(linha: string, sep: string): string[] {
 }
 
 // "1.234,56" / "1234,5" / "12.50" / "R$ 10" -> number (NaN se vazio/inválido)
-function parseNumero(bruto: string): number {
+export function parseNumero(bruto: string): number {
   let s = bruto.replace(/[^\d.,-]/g, "").trim();
   if (!s) return NaN;
   const temVirgula = s.includes(",");

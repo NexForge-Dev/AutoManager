@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { categoriasDaLoja } from "@/lib/seed";
 import { brl } from "@/lib/analytics";
 import { uploadProdutoImagem } from "@/lib/uploadProdutoImagem";
-import { parseProdutosCSV, CSV_MODELO_HEADER, CSV_MODELO_EXEMPLO, type LinhaImport } from "@/lib/csvProdutos";
+import { parseProdutosCSV, parseNumero, CSV_MODELO_HEADER, CSV_MODELO_EXEMPLO, type LinhaImport } from "@/lib/csvProdutos";
 import { baixarCSV } from "@/lib/export";
 import type { Produto, Variacao } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -428,7 +428,7 @@ function ProdutoForm({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [nome, setNome] = useState(editar?.nome ?? "");
-  const [categoria, setCategoria] = useState(editar?.categoria ?? categorias[0]);
+  const [categoria, setCategoria] = useState(editar?.categoria ?? categorias[0] ?? "");
   const [marca, setMarca] = useState(editar?.marca ?? "");
   const [descricao, setDescricao] = useState(editar?.descricao ?? "");
   const [custo, setCusto] = useState(editar ? String(editar.custo) : "");
@@ -448,7 +448,7 @@ function ProdutoForm({
   // sugere preço pela margem ao digitar custo (só no cadastro novo)
   function onCusto(v: string) {
     setCusto(v);
-    const c = parseFloat(v);
+    const c = parseNumero(v);
     if (!isNaN(c) && !preco && !editar) {
       setPreco((c * (1 + config.margemPadrao / 100)).toFixed(2));
     }
@@ -483,21 +483,34 @@ function ProdutoForm({
   }
 
   async function salvar() {
-    if (!nome || !custo || !preco) return;
+    // aceita vírgula decimal ("12,50") - parseFloat sozinho cortava para 12
+    const custoNum = custo.trim() ? parseNumero(custo) : 0;
+    const precoNum = parseNumero(preco);
+    const precoDeNum = precoDe.trim() ? parseNumero(precoDe) : undefined;
+    const faltando = [
+      !nome.trim() && "nome",
+      !(precoNum > 0) && "preço de venda",
+      isNaN(custoNum) && "custo (número válido)",
+      !categoria && "categoria",
+    ].filter(Boolean);
+    if (faltando.length > 0) {
+      alerta({ titulo: "Faltam dados do produto", mensagem: `Preencha: ${faltando.join(", ")}.` });
+      return;
+    }
     const vars = usaGrade
       ? variacoes
           .filter((v) => v.nome.trim())
           .map((v) => ({ ...v, nome: v.nome.trim() }))
       : [];
     const base = {
-      nome,
+      nome: nome.trim(),
       categoria,
       marca: marca || undefined,
       descricao: descricao || undefined,
-      custo: parseFloat(custo),
-      precoVenda: parseFloat(preco),
-      precoComparativo: precoDe ? parseFloat(precoDe) : undefined,
-      impostoPercent: parseFloat(imposto) || 0,
+      custo: custoNum,
+      precoVenda: precoNum,
+      precoComparativo: precoDeNum != null && !isNaN(precoDeNum) ? precoDeNum : undefined,
+      impostoPercent: parseNumero(imposto) || 0,
       estoqueMinimo: parseInt(minimo) || 5,
       imagens,
     };
