@@ -366,7 +366,7 @@ function LojasView({
     if (plano === l.plano) return;
     const ok = await confirm({
       titulo: `Mudar para ${PLANOS[plano].nome}?`,
-      mensagem: `"${l.nome}" — de ${PLANOS[l.plano].nome} para ${PLANOS[plano].nome}.\n\nA troca é aplicada na hora, sem cobrança pelo Mercado Pago. Se a loja tiver uma assinatura ativa no MP, ela continua valendo lá.`,
+      mensagem: `"${l.nome}" — de ${PLANOS[l.plano].nome} para ${PLANOS[plano].nome}.\n\nA troca é aplicada na hora, sem cobrança. Se a loja tiver uma assinatura ativa no Stripe, ela continua sendo cobrada lá até ser cancelada.`,
       confirmar: "Mudar plano",
     });
     if (!ok) return;

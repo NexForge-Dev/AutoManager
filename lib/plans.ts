@@ -149,7 +149,7 @@ export function diasDeTrial(a: Assinatura | null): number {
 }
 
 // Carência após o fim do ciclo pago (data_fim) antes de cair no piso — cobre o
-// atraso normal da cobrança recorrente do Mercado Pago. Espelha o "3 days" de
+// atraso normal da cobrança recorrente do Stripe (que tenta de novo por alguns dias). Espelha o "3 days" de
 // private.plano_efetivo (migration 0035).
 export const CARENCIA_PAGAMENTO_MS = 3 * 86_400_000;
 

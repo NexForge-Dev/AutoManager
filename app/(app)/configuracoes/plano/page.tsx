@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { usePlano } from "@/lib/usePlano";
 import { fmtLimite, brlPreco, limiteDoRecurso } from "@/lib/plans";
 import Guard from "@/components/Guard";
-import { Sparkles, Check, Lock, Users, UserCog, Truck, BarChart3, ArrowLeft, Crown, Loader2 } from "lucide-react";
+import { Sparkles, Check, Lock, Users, UserCog, Truck, BarChart3, ArrowLeft, Crown, Loader2, CreditCard } from "lucide-react";
 
 export default function PlanoAdminPage() {
   return (
@@ -30,29 +30,31 @@ function PlanoAdmin() {
   const [retorno, setRetorno] = useState<null | { ok: boolean; msg: string }>(null);
   const [confirmando, setConfirmando] = useState(false);
 
-  // confirma o pagamento ao voltar do Mercado Pago (?mp=retorno&preapproval_id=...)
+  const [abrindoPortal, setAbrindoPortal] = useState(false);
+
+  // confirma o pagamento ao voltar do Checkout do Stripe (?checkout=sucesso&session_id=cs_...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("mp") !== "retorno") return;
-    const preId = params.get("preapproval_id");
+    if (params.get("checkout") !== "sucesso") return;
+    const sessionId = params.get("session_id");
     window.history.replaceState({}, "", "/configuracoes/plano"); // evita reprocessar no refresh
 
-    if (!preId) {
+    if (!sessionId) {
       setRetorno({ ok: false, msg: "Pagamento não concluído. Você pode tentar novamente quando quiser." });
       return;
     }
     setConfirmando(true);
-    fetch("/api/mercadopago/confirmar", {
+    fetch("/api/stripe/confirmar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ preapproval_id: preId }),
+      body: JSON.stringify({ session_id: sessionId }),
     })
       .then((r) => r.json().catch(() => ({})))
       .then(async (j) => {
         if (j?.plano) {
           await hydrate();
           setRetorno({ ok: true, msg: "Assinatura confirmada! Seu plano já está ativo." });
-        } else if (j?.status && j.status !== "authorized") {
+        } else if (j?.resultado === "aguardando_pagamento" || (j?.status && j.status !== "active")) {
           setRetorno({
             ok: false,
             msg: "Pagamento em processamento. Assim que for aprovado, seu plano é ativado automaticamente.",
@@ -64,6 +66,23 @@ function PlanoAdmin() {
       .catch(() => setRetorno({ ok: false, msg: "Falha ao confirmar o pagamento." }))
       .finally(() => setConfirmando(false));
   }, [hydrate]);
+
+  // Customer Portal do Stripe: trocar cartão, ver faturas, cancelar
+  async function abrirPortal() {
+    setAbrindoPortal(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j.url) {
+        window.location.href = j.url;
+        return;
+      }
+      setRetorno({ ok: false, msg: j.erro || "Não foi possível abrir o portal de pagamento agora." });
+    } catch {
+      setRetorno({ ok: false, msg: "Falha de conexão. Tente novamente." });
+    }
+    setAbrindoPortal(false);
+  }
 
   if (role !== "owner") {
     return <div className="card text-center text-muted mt-6">Só o dono gerencia a assinatura.</div>;
@@ -85,7 +104,7 @@ function PlanoAdmin() {
       {confirmando && (
         <div className="card flex items-center gap-3 text-sm bg-brand-500/5 border-brand-500/30">
           <Loader2 size={18} className="animate-spin text-brand-500 shrink-0" />
-          Confirmando seu pagamento com o Mercado Pago…
+          Confirmando seu pagamento com o Stripe…
         </div>
       )}
       {retorno && (
@@ -126,6 +145,12 @@ function PlanoAdmin() {
         <Link href="/planos" className="btn-primary w-full">
           <Sparkles size={16} /> {emTrial ? "Escolher meu plano" : "Mudar de plano"}
         </Link>
+        {assinatura?.status && assinatura.status !== "trialing" && (
+          <button onClick={abrirPortal} disabled={abrindoPortal} className="btn-ghost w-full">
+            {abrindoPortal ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+            Gerenciar pagamento, faturas ou cancelar
+          </button>
+        )}
       </section>
 
       {/* uso x limites */}

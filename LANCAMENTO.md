@@ -11,15 +11,14 @@ sem backup.
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase › Project Settings › API | Variáveis de ambiente do host (ex.: Vercel › Settings › Environment Variables) |
 | `SUPABASE_SERVICE_ROLE_KEY` (segredo) | Supabase › Project Settings › API (service_role) | Host (nunca no navegador / nunca no git) |
 | `NEXT_PUBLIC_APP_URL` | Seu domínio final, ex.: `https://automanager.com.br` (sem barra no fim) | Host — é lida **no build**: depois de mudar, faça novo deploy |
-| `MP_ACCESS_TOKEN` (segredo) | Mercado Pago › Suas integrações › sua aplicação › **Credenciais de produção** › Access Token (`APP_USR-...`) | Host |
-| `MP_WEBHOOK_SECRET` (segredo) | Mercado Pago › Suas integrações › Webhooks › "Assinatura secreta" (passo 3) | Host |
+| `STRIPE_SECRET_KEY` (segredo) | Stripe › Developers › API keys › chave **live** (`sk_live_...` ou restrita `rk_live_...`) | Host (Production). No staging/local use `sk_test_...` |
+| `STRIPE_WEBHOOK_SECRET` (segredo) | Stripe › Developers › Webhooks › endpoint (passo 3) › Signing secret (`whsec_...`) | Host |
 | SMTP de e-mail (ex.: Resend, Brevo, Amazon SES) | Conta no provedor + domínio verificado (SPF/DKIM) | Supabase › Authentication › SMTP Settings (passo 4) |
 
-`MP_CLIENT_ID`, `MP_CLIENT_SECRET` e `NEXT_PUBLIC_MP_PUBLIC_KEY` hoje **não são usadas** pelo código.
 `DATABASE_URL` é só para manutenção local — não cadastre no host.
 
 Se faltar alguma variável obrigatória do Supabase, o servidor não sobe e o log diz qual é.
-As de produção que faltarem (APP_URL, MP, webhook, dados da empresa) aparecem como
+As de produção que faltarem (APP_URL, Stripe, webhook, dados da empresa) aparecem como
 `[AutoManager] Configuração de produção ausente: ...` no log do deploy.
 
 ## 2. Dados da empresa (obrigatório por CDC/LGPD)
@@ -29,14 +28,27 @@ Edite **`lib/empresa.ts`** e preencha: `razaoSocial`, `cnpj`, `emailSuporte`, `c
 `/cancelamento` e no rodapé. Campo vazio fica oculto — **não venda com eles vazios**.
 Revise também o texto jurídico das três páginas (de preferência com um advogado).
 
-## 3. Mercado Pago
+## 3. Stripe
 
-1. Use as credenciais de **produção** (não as de teste) no `MP_ACCESS_TOKEN`.
-2. Em Suas integrações › Webhooks, configure a URL
-   `https://SEU-DOMINIO/api/mercadopago/webhook` (modo produção) e marque os eventos:
-   **Planos e assinaturas** (`subscription_preapproval`, `subscription_authorized_payment`) e
-   **Pagamentos** (`payment`).
-3. Copie a "Assinatura secreta" para `MP_WEBHOOK_SECRET` e faça novo deploy.
+1. Conta Stripe **Brasil** (cobra em BRL; Pix/boleto só aparecem para contas BR). Ative os
+   meios de pagamento em Settings › Payment methods — o checkout mostra os que estiverem ligados.
+2. Crie os produtos/preços dos planos: `STRIPE_SECRET_KEY=sk_live_... node scripts/stripe-sync.mjs`
+   (idempotente; usa os valores de `lib/plans.ts` e o lookup_key `automanager_<plano>`).
+   Rode antes com a chave de teste para validar.
+3. Em Developers › Webhooks, crie o endpoint `https://SEU-DOMINIO/api/stripe/webhook` com os eventos:
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+   `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`,
+   `invoice.paid`, `invoice.payment_failed`. Copie o Signing secret para `STRIPE_WEBHOOK_SECRET`.
+4. Em Settings › Billing › Customer portal, ative o portal (atualizar cartão, ver faturas e
+   cancelar assinatura). Trocas de plano são feitas pelo próprio app em `/planos`.
+5. Em Settings › Billing › Subscriptions and emails › "Manage failed payments", deixe as novas
+   tentativas ligadas e, ao esgotá-las, **marcar como unpaid** ou **cancelar**. Durante as tentativas
+   (past_due) a loja mantém o plano por 3 dias após o vencimento; depois cai no Ambulante.
+6. **Assinantes antigos do Mercado Pago:** o app não fala mais com o MP. Antes do deploy, rode no
+   Supabase `select org_id, plano from assinatura where provider = 'mercadopago' and status <> 'canceled';`
+   — para cada loja, cancele a assinatura no painel do MP e peça para assinar de novo em `/planos`
+   (o checkout recusa quem ainda tem assinatura MP ativa, para não cobrar em dobro).
+7. Aplique a migration `0037_stripe.sql` e faça novo deploy.
 
 ## 4. Supabase Auth (e-mails)
 

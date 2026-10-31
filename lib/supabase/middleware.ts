@@ -54,7 +54,7 @@ export async function updateSession(request: NextRequest) {
   // Só as telas do app exigem login. Qualquer outra URL (pública ou inexistente)
   // segue normal: as públicas renderizam e as inexistentes caem no 404, em vez
   // de mandar quem digitou um link errado para a tela de cadastro.
-  // APIs se auto-protegem (retornam JSON 403); o webhook do Mercado Pago chega sem sessão.
+  // APIs se auto-protegem (retornam JSON 403); o webhook do Stripe chega sem sessão.
   const rotaPrivada = ROTAS_PRIVADAS.some((r) => path === r || path.startsWith(r + "/"));
 
   if (!user && rotaPrivada) {

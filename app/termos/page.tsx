@@ -16,7 +16,7 @@ export default function TermosPage() {
   return (
     <LegalLayout
       titulo="Termos de Uso"
-      resumo="Em resumo: o AutoManager é um sistema online de gestão para a sua loja. O 1º mês é grátis; depois, a assinatura é mensal, cobrada pelo Mercado Pago, e você pode cancelar quando quiser. Os dados da sua loja são seus. Leia abaixo as regras completas."
+      resumo="Em resumo: o AutoManager é um sistema online de gestão para a sua loja. O 1º mês é grátis; depois, a assinatura é mensal, cobrada pelo Stripe, e você pode cancelar quando quiser. Os dados da sua loja são seus. Leia abaixo as regras completas."
     >
       <Secao n={1} titulo="Quem somos e o que é este documento">
         <p>
@@ -92,9 +92,10 @@ export default function TermosPage() {
         </ul>
         <p>
           <strong>Assinatura recorrente:</strong> a cobrança é <strong>mensal e automática</strong>,
-          processada pelo <strong>Mercado Pago</strong> (cartão, Pix ou boleto, conforme opções
-          disponíveis no Mercado Pago). Os dados de pagamento são informados diretamente no ambiente
-          do Mercado Pago; o AutoManager não recebe nem armazena o número do seu cartão.
+          processada pelo <strong>Stripe</strong> (cartão e demais meios exibidos no checkout). Os
+          dados de pagamento são informados diretamente no ambiente do Stripe; o AutoManager não
+          recebe nem armazena o número do seu cartão. Ao trocar de plano no meio do ciclo, a diferença
+          é ajustada proporcionalmente na fatura seguinte.
         </p>
         <ul>
           <li>

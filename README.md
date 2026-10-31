@@ -10,13 +10,13 @@ via RLS. Full system documentation (in Portuguese) lives in **`DOCUMENTACAO.md`*
 
 ```bash
 npm install
-cp .env.local.example .env.local   # fill in your Supabase / Mercado Pago keys
+cp .env.local.example .env.local   # fill in your Supabase / Stripe keys
 npm run dev
 # open http://localhost:3000
 ```
 
 > Only `NEXT_PUBLIC_*` variables reach the browser. `SUPABASE_SERVICE_ROLE_KEY`,
-> `MP_ACCESS_TOKEN` and `MP_CLIENT_SECRET` are **server-only** secrets - never commit them.
+> `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are **server-only** secrets - never commit them.
 
 Production build:
 
@@ -50,7 +50,7 @@ npm run build && npm start
 | Auth/session | `@supabase/ssr` (cookies) + `middleware.ts` (refresh + route protection) |
 | Data | Supabase Postgres - `lib/store.ts` (Zustand write-through) reads/writes via `supabase-js` |
 | Business logic | `lib/store.ts` (inventory/commission) + `lib/analytics.ts` (restock/metrics) |
-| Payments | Mercado Pago subscriptions (`lib/mercadopago.ts`, `app/api/mercadopago/*`) |
+| Payments | Stripe subscriptions (`lib/stripe.ts`, `lib/billing/stripeSync.ts`, `app/api/stripe/*`) |
 | Schema | `supabase/migrations/*.sql` (multi-tenant + RLS + bootstrap trigger) |
 
 ### Structure
@@ -61,7 +61,7 @@ app/
   onboarding/     → self-setup
   loja/[slug]/    → public storefront with chat
   admin/          → super-admin panel
-  api/            → server routes (members, admin, Mercado Pago, onboarding)
+  api/            → server routes (members, admin, Stripe billing, onboarding)
 lib/              → types, store, seed, analytics, plans, permissions
 components/       → AppShell (nav), Guard (hydration/onboarding), landing, charts
 supabase/         → production SQL migrations
@@ -78,7 +78,7 @@ scripts/          → maintenance scripts (e.g. create the super-admin account)
 
 Source of truth: **`lib/plans.ts`** (UI, guards and landing all read from it; DB limits mirror it).
 Every new store gets a **1-month free trial** (no card) with Expansão capabilities. After that, a
-monthly recurring subscription is charged via **Mercado Pago**.
+monthly recurring subscription is charged via **Stripe**.
 
 | Plan | Price | Highlights |
 |---|---|---|

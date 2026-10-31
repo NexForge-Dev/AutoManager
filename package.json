@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "stripe:sync": "node --env-file=.env.local scripts/stripe-sync.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",
@@ -16,6 +19,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
+    "stripe": "^23.1.0",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
@@ -27,6 +31,7 @@
     "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

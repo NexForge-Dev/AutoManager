@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlano } from "@/lib/usePlano";
+import { useStore } from "@/lib/store";
 import { ORDEM_PLANOS, PLANOS, brlPreco, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useMetricaAoAbrir } from "@/lib/metricas/cliente";
@@ -26,6 +27,7 @@ function Planos() {
   const ehAtual = (id: PlanoId) =>
     id === planoContratado && assinatura?.status === "active" && planoEfetivo === id;
   const { confirm, alerta } = useDialog();
+  const hydrate = useStore((s) => s.hydrate);
   const [salvando, setSalvando] = useState<PlanoId | null>(null);
 
   async function selecionar(novo: PlanoId) {
@@ -51,21 +53,31 @@ function Planos() {
       if (!ok) return;
     }
 
-    // inicia a assinatura no Mercado Pago e redireciona para o checkout
+    // assina pelo Stripe (redireciona p/ o checkout) ou troca o plano da assinatura atual
     setSalvando(novo);
     try {
-      const res = await fetch("/api/mercadopago/assinar", {
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plano: novo }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.init_point) {
-        await alerta({ titulo: "Não foi possível iniciar o pagamento", mensagem: json.erro || "Tente novamente." });
-        setSalvando(null);
+      if (res.ok && json.url) {
+        window.location.href = json.url; // checkout do Stripe
         return;
       }
-      window.location.href = json.init_point; // checkout do Mercado Pago
+      if (res.ok && json.atualizado) {
+        await hydrate();
+        setSalvando(null);
+        await alerta({
+          titulo: `Plano ${def.nome} ativo`,
+          mensagem: "A diferença de valor é ajustada proporcionalmente na sua próxima fatura.",
+        });
+        router.push("/configuracoes/plano");
+        return;
+      }
+      await alerta({ titulo: "Não foi possível iniciar o pagamento", mensagem: json.erro || "Tente novamente." });
+      setSalvando(null);
     } catch {
       await alerta({ titulo: "Falha de conexão", mensagem: "Não consegui iniciar o pagamento. Tente novamente." });
       setSalvando(null);
@@ -155,13 +167,13 @@ function Planos() {
       <div className="card flex items-start gap-3 text-sm text-muted">
         <ShieldCheck size={18} className="text-brand-500 shrink-0 mt-0.5" />
         <div>
-          Pagamento seguro pelo <b>Mercado Pago</b> - cartão, Pix ou boleto. A cobrança é mensal e
-          recorrente; você cancela quando quiser (
+          Pagamento seguro pelo <b>Stripe</b>. A cobrança é mensal e recorrente; você cancela quando
+          quiser (
           <Link href="/cancelamento" className="font-medium text-brand-500 hover:underline">
             veja como cancelar
           </Link>
-          ) e seus dados nunca são apagados. Ao assinar, você é
-          levado ao ambiente do Mercado Pago para concluir o pagamento.
+          ) e seus dados nunca são apagados. Ao assinar, você é levado ao ambiente seguro do Stripe para
+          concluir o pagamento; o AutoManager não recebe o número do seu cartão.
         </div>
       </div>
     </div>
