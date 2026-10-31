@@ -67,7 +67,7 @@ export default function Pricing() {
       {/* cards de plano */}
       <div className="mt-10 grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {PLANOS.map((p) => {
-          const mensal = p.preco;
+          const mensal = p.preco.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
           return (
             <div
               key={p.nome}

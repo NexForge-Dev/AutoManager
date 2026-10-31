@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { calcularRelatorio, rankingRevendedoras, brl } from "@/lib/analytics";
 import { baixarCSV, dataHora } from "@/lib/export";
 import Guard from "@/components/Guard";
+import { registrarMetrica } from "@/lib/metricas/cliente";
 import CountUp from "@/components/CountUp";
 import { useDialog } from "@/components/Dialog";
 import type { Venda } from "@/lib/types";
@@ -79,10 +80,16 @@ function Relatorios() {
       const d = new Date(now.getFullYear(), 0, 1);
       return { deMs: sod(d), ateMs: eod(now), label: "Este ano" };
     }
+    // campo de data apagado: não deixa virar NaN nos cards
+    if (!de || !ate) {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { deMs: sod(d), ateMs: eod(now), label: "Este mês" };
+    }
+    const br = (iso: string) => iso.split("-").reverse().join("/");
     return {
       deMs: sod(new Date(de + "T00:00:00")),
       ateMs: eod(new Date(ate + "T00:00:00")),
-      label: `${de} a ${ate}`,
+      label: `${br(de)} a ${br(ate)}`,
     };
   }, [preset, de, ate]);
 
@@ -142,6 +149,7 @@ function Relatorios() {
   }
 
   function exportarExcel() {
+    registrarMetrica({ tipo: "recurso", recurso: "relatorio_exportado" });
     const noPeriodo = vendas
       .filter((v) => v.data >= deMs && v.data <= ateMs)
       .sort((a, b) => a.data - b.data);
@@ -248,7 +256,10 @@ function Relatorios() {
           <button onClick={exportarExcel} className="btn-ghost flex-1 py-2 text-sm">
             <FileSpreadsheet size={16} /> Excel
           </button>
-          <button onClick={() => window.print()} className="btn-ghost flex-1 py-2 text-sm">
+          <button onClick={() => {
+            registrarMetrica({ tipo: "recurso", recurso: "relatorio_exportado" });
+            window.print();
+          }} className="btn-ghost flex-1 py-2 text-sm">
             <Printer size={16} /> PDF
           </button>
         </div>

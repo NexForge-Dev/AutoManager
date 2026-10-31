@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
+import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
 import type { EntradaPendente, OrigemRecebimento } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -49,7 +50,7 @@ function tempoRelativo(ms: number): string {
 function Recebimentos() {
   const { entradasPendentes, role, confirmarEntrada, recusarEntrada, simularRecebimento } =
     useStore();
-  const { alerta } = useDialog();
+  const { alerta, confirm } = useDialog();
   const [permissao, setPermissao] = useState<string>(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "indisponivel"
   );
@@ -125,9 +126,17 @@ function Recebimentos() {
               if (!v) alerta({ titulo: "Não foi possível lançar agora", mensagem: "Tente de novo." });
             }}
             onRecusar={async () => {
+              const ok = await confirm({
+                titulo: "Não foi venda da loja?",
+                mensagem: "Este recebimento sai da caixa de entrada e não entra no faturamento.",
+                confirmar: "Sim, descartar",
+                perigo: true,
+              });
+              if (!ok) return;
               setOcupado(e.id);
-              await recusarEntrada(e.id);
+              const res = await recusarEntrada(e.id);
               setOcupado(null);
+              if (!res.ok) alerta({ titulo: "Não foi possível descartar", mensagem: res.erro || "Tente novamente." });
             }}
           />
         ))}
@@ -153,7 +162,7 @@ function Recebimentos() {
           />
           <button
             onClick={async () => {
-              const v = parseFloat(valorTeste.replace(",", "."));
+              const v = parseNumero(valorTeste);
               const r = await simularRecebimento({ valor: v });
               if (r.ok) setValorTeste("");
             }}

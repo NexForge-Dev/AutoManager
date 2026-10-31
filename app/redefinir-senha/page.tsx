@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { CheckCircle2, Gem, KeyRound, Loader2 } from "lucide-react";
 
 type Estado = "verificando" | "pronto" | "invalido" | "salvo";
@@ -43,8 +44,23 @@ export default function RedefinirSenhaPage() {
         return;
       }
 
+      // template de e-mail com token_hash: funciona mesmo abrindo o link em outro
+      // aparelho (o PKCE "code" só troca no navegador que pediu a redefinição)
+      const tokenHash = url.searchParams.get("token_hash");
       const code = url.searchParams.get("code");
-      if (code) {
+      if (tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+        if (error) {
+          if (ativo) {
+            setMotivo(error.message);
+            setEstado("invalido");
+          }
+          return;
+        }
+        url.searchParams.delete("token_hash");
+        url.searchParams.delete("type");
+        window.history.replaceState(null, "", url.pathname + url.search);
+      } else if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         // o client pode já ter trocado o code sozinho (detectSessionInUrl); nesse caso
         // a troca manual falha, mas a sessão existe - conferimos abaixo.
@@ -99,7 +115,8 @@ export default function RedefinirSenhaPage() {
       return;
     }
     setEstado("salvo");
-    setTimeout(() => router.replace("/painel"), 1500);
+    const destino = await destinoPosLogin();
+    setTimeout(() => router.replace(destino), 1500);
   }
 
   return (

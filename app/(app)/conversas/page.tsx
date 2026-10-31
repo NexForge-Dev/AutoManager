@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
+import { registrarMetrica } from "@/lib/metricas/cliente";
 import Guard from "@/components/Guard";
 import { SkeletonList } from "@/components/Skeleton";
 import { MessageCircle, Send, ChevronLeft, Loader2 } from "lucide-react";
@@ -48,6 +49,9 @@ function Conversas() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const deveColar = useRef(true); // só auto-scrolla se o usuário está perto do fim
   const primeira = useRef(true); // primeiro render da conversa = pula direto pro fim
+  // conversa aberta lida pelo callback do realtime (o canal é assinado uma vez só)
+  const selRef = useRef<string | null>(null);
+  selRef.current = sel;
 
   function naoLida(c: Conversa) {
     if (!c.ultima_cliente_em) return false;
@@ -98,8 +102,10 @@ function Conversas() {
       if (data.session) client.realtime.setAuth(data.session.access_token);
     });
 
+    // nome único: channel() devolve um canal homônimo que ainda está saindo
+    // (removeChannel é assíncrono) e a nova assinatura morreria junto
     ch = client
-      .channel("inbox")
+      .channel(`inbox-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversa" }, (p) => {
         const c = p.new as Conversa;
         setConversas((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev]));
@@ -118,9 +124,10 @@ function Conversas() {
           };
           return [atualizada, ...prev.filter((c) => c.id !== m.conversa_id)];
         });
-        if (sel && m.conversa_id === sel) {
+        const aberta = selRef.current;
+        if (aberta && m.conversa_id === aberta) {
           setMsgs((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m as Msg]));
-          if (doCliente) marcarVisto(sel); // já está vendo -> não conta como não lida
+          if (doCliente) marcarVisto(aberta); // já está vendo -> não conta como não lida
         }
       })
       .subscribe();
@@ -128,7 +135,8 @@ function Conversas() {
     return () => {
       client.removeChannel(ch);
     };
-  }, [sel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!sel) return;
@@ -182,6 +190,7 @@ function Conversas() {
         const semTmp = prev.filter((m) => m.id !== tmpId);
         return semTmp.some((x) => x.id === data.id) ? semTmp : [...semTmp, data as Msg];
       });
+      registrarMetrica({ tipo: "recurso", recurso: "chat_vitrine_respondido" });
       await sb.current.from("conversa").update({ ultima_em: new Date().toISOString() }).eq("id", sel);
     } finally {
       setEnviando(false);
@@ -204,7 +213,7 @@ function Conversas() {
           <button
             onClick={() => setSel(null)}
             aria-label="Voltar"
-            className="md:hidden grid place-items-center h-9 w-9 -ml-1 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
+            className="grid place-items-center h-9 w-9 -ml-1 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
           >
             <ChevronLeft />
           </button>

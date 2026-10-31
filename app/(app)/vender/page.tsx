@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
+import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
 import type { Canal, FormaPagamento } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -86,7 +87,7 @@ function Vender() {
     const v = it.variacaoId ? p.variacoes.find((x) => x.id === it.variacaoId) : null;
     return a + (p.precoVenda + (v ? v.precoAjuste : 0)) * it.qtd;
   }, 0);
-  const desconto = Math.min(Math.max(parseFloat(descontoStr) || 0, 0), bruto);
+  const desconto = Math.min(Math.max(parseNumero(descontoStr) || 0, 0), bruto);
   const total = bruto - desconto;
   const rev = revendedoras.find((r) => r.id === revId);
   const comissao = rev ? (total * rev.comissaoPercent) / 100 : 0;
@@ -193,6 +194,9 @@ function Vender() {
           );
         })}
       </div>
+
+      {/* espaço para a barra fixa não cobrir os últimos produtos */}
+      {itens.length > 0 && <div aria-hidden className="h-[55vh]" />}
 
       {/* barra fixa de checkout */}
       {itens.length > 0 && (

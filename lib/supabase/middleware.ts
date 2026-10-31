@@ -1,6 +1,28 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// telas do app (logado). Ao criar uma tela nova em app/(app), inclua aqui.
+export const ROTAS_PRIVADAS = [
+  "/painel",
+  "/vender",
+  "/produtos",
+  "/reposicao",
+  "/financeiro",
+  "/recebimentos",
+  "/relatorios",
+  "/analytics",
+  "/configuracoes",
+  "/planos",
+  "/perfil",
+  "/onboarding",
+  "/conversas",
+  "/entregas",
+  "/revendedoras",
+  "/revenda",
+  "/minha-loja",
+  "/admin",
+];
+
 // Refresca a sessão a cada request e protege rotas privadas.
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -29,31 +51,13 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const rotaPublica =
-    path === "/" ||
-    path.startsWith("/login") ||
-    path.startsWith("/auth") ||
-    path.startsWith("/acesso") || // ativação/login self-service da revendedora
-    path.startsWith("/loja") || // vitrine pública da loja
-    path.startsWith("/redefinir-senha") || // link de recuperação de senha
-    path.startsWith("/termos") ||
-    path.startsWith("/privacidade") ||
-    path.startsWith("/cancelamento") ||
-    path === "/robots.txt" ||
-    path === "/sitemap.xml" ||
-    path.startsWith("/opengraph-image");
-  // rotas de API se auto-protegem (retornam JSON 403); não devem ser redirecionadas
-  // para /login. Em especial, o webhook do Mercado Pago chega sem sessão.
-  const isApi = path.startsWith("/api");
-  const isAsset =
-    path.startsWith("/_next") ||
-    path.startsWith("/manifest") ||
-    path.startsWith("/icon") ||
-    path.startsWith("/apple-touch-icon") ||
-    path.startsWith("/favicon") ||
-    path === "/favicon.ico";
+  // Só as telas do app exigem login. Qualquer outra URL (pública ou inexistente)
+  // segue normal: as públicas renderizam e as inexistentes caem no 404, em vez
+  // de mandar quem digitou um link errado para a tela de cadastro.
+  // APIs se auto-protegem (retornam JSON 403); o webhook do Mercado Pago chega sem sessão.
+  const rotaPrivada = ROTAS_PRIVADAS.some((r) => path === r || path.startsWith(r + "/"));
 
-  if (!user && !rotaPublica && !isApi && !isAsset) {
+  if (!user && rotaPrivada) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

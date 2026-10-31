@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
+import { registrarMetrica } from "@/lib/metricas/cliente";
 import { aplicarAparencia, TEMAS_BASE, RAIOS } from "@/lib/aparencia";
 import { uploadLogo, uploadCapa } from "@/lib/uploadLogo";
 import { brl } from "@/lib/analytics";
@@ -103,7 +104,8 @@ function MinhaLoja() {
       }
       setSlug(s);
     }
-    await setConfig({ lojaAtiva: ativar });
+    const r = await setConfig({ lojaAtiva: ativar });
+    if (ativar && r?.ok !== false) registrarMetrica({ tipo: "recurso", recurso: "loja_online_publicada" });
   }
 
   async function salvarSlug() {
@@ -131,10 +133,13 @@ function MinhaLoja() {
     });
   }
 
+  // o seletor de cor dispara a cada movimento: só grava quando o usuário para
+  const corTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function escolherCor(hex: string | null) {
     setCor(hex);
     previewAparencia({ cor: hex });
-    persistir({ corMarca: hex });
+    if (corTimer.current) clearTimeout(corTimer.current);
+    corTimer.current = setTimeout(() => persistir({ corMarca: hex }), 400);
   }
 
   function escolherTema(key: string | null) {
@@ -210,8 +215,15 @@ function MinhaLoja() {
     if (salvoTimer.current) clearTimeout(salvoTimer.current);
     salvoTimer.current = setTimeout(() => setSalvoVisivel(false), 1600);
   }
-  function persistir(patch: Record<string, any>) {
-    setConfig(patch as any);
+  async function persistir(patch: Record<string, any>) {
+    // onBlur sem alteração não grava nem mostra "Salvo"
+    const atual = useStore.getState().config as Record<string, any>;
+    if (Object.keys(patch).every((k) => (atual[k] ?? null) === (patch[k] ?? null))) return;
+    const res = await setConfig(patch as any);
+    if (!res.ok) {
+      alerta({ titulo: "Não foi possível salvar", mensagem: res.erro || "Tente novamente." });
+      return;
+    }
     flashSalvo();
   }
 

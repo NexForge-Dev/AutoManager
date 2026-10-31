@@ -215,8 +215,16 @@ function Produtos() {
                   {p.marca ? <span className="text-muted font-normal"> · {p.marca}</span> : null}
                 </div>
                 <div className="text-xs text-muted truncate">
-                  {p.categoria} · {brl(p.precoVenda)} · margem{" "}
-                  {p.custo > 0 ? (((p.precoVenda - p.custo) / p.custo) * 100).toFixed(0) : "-"}%
+                  {p.categoria} · {brl(p.precoVenda)}
+                  {podeEditar && (
+                    <>
+                      {" "}· margem{" "}
+                      {p.custo > 0 && p.precoVenda > 0
+                        ? (((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)
+                        : "-"}
+                      %
+                    </>
+                  )}
                   {temGrade && (
                     <span className="ml-1 inline-flex items-center gap-0.5 text-brand-500">
                       <Layers size={11} /> {p.variacoes.length}
@@ -442,6 +450,10 @@ function ProdutoForm({
   const [imagens, setImagens] = useState<string[]>(editar?.imagens ?? []);
   const [usaGrade, setUsaGrade] = useState((editar?.variacoes.length ?? 0) > 0);
   const [variacoes, setVariacoes] = useState<Variacao[]>(editar?.variacoes ?? []);
+  // texto digitado no "±R$" de cada variação (deixa digitar "-", "1," etc.)
+  const [ajustesTxt, setAjustesTxt] = useState<string[]>(
+    (editar?.variacoes ?? []).map((v) => (v.precoAjuste ? String(v.precoAjuste).replace(".", ",") : ""))
+  );
   const [enviando, setEnviando] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
@@ -474,12 +486,14 @@ function ProdutoForm({
       ...v,
       { id: "", nome: "", sku: "", estoqueAtual: 0, precoAjuste: 0, ativo: true },
     ]);
+    setAjustesTxt((a) => [...a, ""]);
   }
   function setVar(i: number, patch: Partial<Variacao>) {
     setVariacoes((v) => v.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   }
   function rmVar(i: number) {
     setVariacoes((v) => v.filter((_, idx) => idx !== i));
+    setAjustesTxt((a) => a.filter((_, idx) => idx !== i));
   }
 
   async function salvar() {
@@ -511,7 +525,10 @@ function ProdutoForm({
       precoVenda: precoNum,
       precoComparativo: precoDeNum != null && !isNaN(precoDeNum) ? precoDeNum : undefined,
       impostoPercent: parseNumero(imposto) || 0,
-      estoqueMinimo: parseInt(minimo) || 5,
+      estoqueMinimo: (() => {
+        const m = parseInt(minimo);
+        return isNaN(m) || m < 0 ? 5 : m; // 0 é válido (sem alerta)
+      })(),
       imagens,
     };
     setSalvando(true);
@@ -672,8 +689,12 @@ function ProdutoForm({
                     className="input col-span-2 py-1.5 text-sm"
                     inputMode="decimal"
                     placeholder="±R$"
-                    value={v.precoAjuste || ""}
-                    onChange={(e) => setVar(i, { precoAjuste: parseFloat(e.target.value) || 0 })}
+                    value={ajustesTxt[i] ?? ""}
+                    onChange={(e) => {
+                      const t = e.target.value;
+                      setAjustesTxt((a) => a.map((x, idx) => (idx === i ? t : x)));
+                      setVar(i, { precoAjuste: parseNumero(t) || 0 });
+                    }}
                   />
                   <button onClick={() => rmVar(i)} className="col-span-1 text-red-500 flex justify-center">
                     <Trash2 size={15} />

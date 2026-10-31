@@ -7,10 +7,12 @@ import { usePlano } from "@/lib/usePlano";
 import { planoQueLibera } from "@/lib/plans";
 import { UpgradeBlock } from "@/components/UpgradeGate";
 import Guard from "@/components/Guard";
+import { useMetricaAoAbrir } from "@/lib/metricas/cliente";
 import CountUp from "@/components/CountUp";
 import { PieChart, TrendingUp, TrendingDown, ShoppingBag, AlertTriangle, Sparkles } from "lucide-react";
 
 export default function AnalyticsPage() {
+  useMetricaAoAbrir({ tipo: "recurso", recurso: "analytics_visto" });
   return (
     <Guard>
       <Analytics />
@@ -56,7 +58,7 @@ function Analytics() {
       ) : (
         <>
           {/* KPIs */}
-          <div className={`grid gap-2 stagger ${caps.allowAdvancedAnalytics ? "grid-cols-3" : "grid-cols-2"}`}>
+          <div className={`grid gap-2 stagger ${caps.allowAdvancedAnalytics ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
             <Kpi label="Ticket médio" valor={<CountUp value={a.ticketMedio} format={brl} />} />
             <Kpi label="Itens/venda" valor={<CountUp value={a.itensPorVenda} format={(n) => n.toFixed(1)} />} />
             {caps.allowAdvancedAnalytics && (
@@ -166,8 +168,8 @@ function Kpi({
   icon?: any;
 }) {
   return (
-    <div className="card py-3 text-center">
-      <div className={`text-lg font-bold flex items-center justify-center gap-1 ${cor || ""}`}>
+    <div className="card py-3 px-2 text-center min-w-0">
+      <div className={`text-base sm:text-lg font-bold flex items-center justify-center gap-1 whitespace-nowrap overflow-hidden ${cor || ""}`}>
         {Icon && <Icon size={15} />} {valor}
       </div>
       <div className="text-[11px] text-muted">{label}</div>
@@ -216,11 +218,14 @@ function BarsMes({ data }: { data: { mes: string; total: number }[] }) {
     <div className="flex items-end justify-between gap-2 h-32">
       {data.map((d, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group">
-          <div className="text-[10px] text-muted">{d.total > 0 ? brl(d.total).replace("R$", "").trim() : ""}</div>
-          <div
-            className="w-full rounded-t-lg bg-brand-600 min-h-[2px] bar-grow-y transition-colors group-hover:bg-brand-500"
-            style={{ height: `${(d.total / max) * 100}%`, animationDelay: `${i * 60}ms` }}
-          />
+          <div className="text-[10px] text-muted whitespace-nowrap">{d.total > 0 ? brl(d.total).replace("R$", "").trim() : ""}</div>
+          {/* a barra cresce dentro do próprio espaço (sem empurrar o rótulo para fora) */}
+          <div className="w-full flex-1 flex items-end min-h-0">
+            <div
+              className="w-full rounded-t-lg bg-brand-600 min-h-[2px] bar-grow-y transition-colors group-hover:bg-brand-500"
+              style={{ height: `${(d.total / max) * 100}%`, animationDelay: `${i * 60}ms` }}
+            />
+          </div>
           <div className="text-[11px] text-muted">{d.mes}</div>
         </div>
       ))}

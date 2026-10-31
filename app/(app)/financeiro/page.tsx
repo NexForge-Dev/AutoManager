@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
+import { parseNumero } from "@/lib/csvProdutos";
 import { brl, resumoContas } from "@/lib/analytics";
 import type { ContaPagar } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -83,7 +84,9 @@ function Financeiro() {
       confirmar: "Excluir",
       perigo: true,
     });
-    if (ok) removerContaPagar(c.id);
+    if (!ok) return;
+    const res = await removerContaPagar(c.id);
+    if (!res.ok) alerta({ titulo: "Não foi possível excluir a conta", mensagem: res.erro || "Tente novamente." });
   }
 
   async function marcarPaga(c: ContaPagar, paga: boolean) {
@@ -262,7 +265,7 @@ function ContaForm({ onClose }: { onClose: () => void }) {
     setSalvando(true);
     const res = await addContaPagar({
       descricao,
-      valor: parseFloat(valor.replace(",", ".")),
+      valor: parseNumero(valor),
       vencimento,
       categoria,
       fornecedor,

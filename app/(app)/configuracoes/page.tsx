@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
+import { parseNumero } from "@/lib/csvProdutos";
 import { SEGMENTOS, categoriasDaLoja } from "@/lib/seed";
 import { aplicarAparencia, TEMAS_BASE, RAIOS } from "@/lib/aparencia";
 import { FONTES } from "@/lib/fontes";
@@ -109,7 +110,8 @@ function Configuracoes() {
     try {
       const url = await uploadLogo(orgId, file);
       setLogoUrl(url);
-      await setConfig({ logoUrl: url });
+      const res = await setConfig({ logoUrl: url });
+      if (!res.ok) throw new Error(res.erro);
     } catch (err: any) {
       alerta({ titulo: "Não foi possível enviar a logo", mensagem: err?.message || "erro" });
     } finally {
@@ -119,19 +121,23 @@ function Configuracoes() {
 
   async function salvar() {
     setSalvando(true);
-    await setConfig({
+    const res = await setConfig({
       nomeLoja: nomeLoja || "Minha Loja",
       segmento,
       canais: canais.length ? canais : ["whatsapp"],
       usaRevendedoras: usaRev,
-      margemPadrao: parseFloat(margem) || 0,
-      comissaoPadrao: parseFloat(comissao) || 0,
+      margemPadrao: parseNumero(margem) || 0,
+      comissaoPadrao: parseNumero(comissao) || 0,
       corMarca: cor,
       temaBase,
       appFonte,
       appRaio,
     });
     setSalvando(false);
+    if (!res.ok) {
+      alerta({ titulo: "Não foi possível salvar", mensagem: res.erro || "Tente novamente." });
+      return;
+    }
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2000);
   }

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
+import { parseNumero } from "@/lib/csvProdutos";
 import { createClient } from "@/lib/supabase/client";
 import { brl } from "@/lib/analytics";
 import type { Entrega, StatusEntrega } from "@/lib/types";
@@ -75,7 +76,7 @@ function Entregas() {
       if (cancelado) return;
       if (data.session) client.realtime.setAuth(data.session.access_token);
       ch = client
-        .channel("entregas-live")
+        .channel(`entregas-live-${Math.random().toString(36).slice(2)}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "entrega" }, () => {
           recarregarEntregas();
         })
@@ -642,14 +643,17 @@ function NovaEntrega({
         <button
           disabled={salvando}
           onClick={async () => {
-            if (!cliente && !endereco) return;
+            if (!cliente && !endereco) {
+              setErro("Informe o cliente ou o endereço da entrega.");
+              return;
+            }
             setErro(null);
             setSalvando(true);
             const r = await onSalvar({
               clienteNome: cliente,
               endereco,
               telefone: telefone || undefined,
-              taxa: parseFloat(taxa) || 0,
+              taxa: parseNumero(taxa) || 0,
               motoboyId: motoboyId || null,
               observacao: obs || undefined,
             });

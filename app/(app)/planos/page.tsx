@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { usePlano } from "@/lib/usePlano";
 import { ORDEM_PLANOS, PLANOS, brlPreco, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
+import { useMetricaAoAbrir } from "@/lib/metricas/cliente";
 import { useDialog } from "@/components/Dialog";
 import { Check, Sparkles, Star, Loader2, ArrowLeft, ShieldCheck } from "lucide-react";
 
 export default function PlanosPage() {
+  useMetricaAoAbrir({ tipo: "planos_vistos" });
   return (
     <Guard>
       <Planos />
@@ -18,12 +20,16 @@ export default function PlanosPage() {
 
 function Planos() {
   const router = useRouter();
-  const { planoContratado, emTrial, diasTrial, uso } = usePlano();
+  const { assinatura, planoContratado, planoEfetivo, emTrial, diasTrial, uso } = usePlano();
+  // "plano atual" = pagando e com o plano valendo; trial vencido, cancelado ou
+  // inadimplente precisa poder recontratar o mesmo plano
+  const ehAtual = (id: PlanoId) =>
+    id === planoContratado && assinatura?.status === "active" && planoEfetivo === id;
   const { confirm, alerta } = useDialog();
   const [salvando, setSalvando] = useState<PlanoId | null>(null);
 
   async function selecionar(novo: PlanoId) {
-    if (novo === planoContratado && !emTrial) return;
+    if (ehAtual(novo)) return;
     const def = PLANOS[novo];
 
     // aviso de downgrade quando o uso atual estoura o novo limite
@@ -89,7 +95,7 @@ function Planos() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start stagger">
         {ORDEM_PLANOS.map((id) => {
           const p = PLANOS[id];
-          const atual = id === planoContratado && !emTrial;
+          const atual = ehAtual(id);
           return (
             <div
               key={id}

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
+import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -64,13 +65,16 @@ function Revendedoras() {
   }
 
   async function salvar() {
-    if (!nome) return;
+    if (!nome.trim()) {
+      alerta({ titulo: "Falta o nome", mensagem: "Informe o nome da revendedora." });
+      return;
+    }
     const res = await addRevendedora({
       nome,
       whatsapp: whats,
       email: emailNova.trim().toLowerCase() || null,
-      comissaoPercent: parseFloat(comissao) || config.comissaoPadrao,
-      metaMensal: parseFloat(meta) || 0,
+      comissaoPercent: parseNumero(comissao) || config.comissaoPadrao,
+      metaMensal: parseNumero(meta) || 0,
     });
     if (!res.ok) {
       alerta({ titulo: "Não foi possível cadastrar", mensagem: res.erro || "Tente novamente." });
@@ -93,7 +97,7 @@ function Revendedoras() {
       confirmar: "Salvar",
     });
     if (v === null) return;
-    const res = await updateRevendedora(id, { metaMensal: parseFloat(v) || 0 });
+    const res = await updateRevendedora(id, { metaMensal: parseNumero(v) || 0 });
     if (!res.ok) alerta({ titulo: "Não foi possível salvar a meta", mensagem: res.erro || "Tente novamente." });
   }
 
@@ -169,7 +173,7 @@ function Revendedoras() {
                 </div>
                 {r.whatsapp && (
                   <a
-                    href={`https://wa.me/${r.whatsapp.replace(/\D/g, "")}`}
+                    href={`https://wa.me/${waNumero(r.whatsapp)}`}
                     target="_blank"
                     className="text-green-600"
                   >
@@ -429,4 +433,10 @@ function AcessoRevendedora({
       )}
     </div>
   );
+}
+
+// wa.me exige o código do país: "DDD + número" (10-11 dígitos) ganha o 55
+function waNumero(tel: string) {
+  const d = tel.replace(/\D/g, "");
+  return d.length === 10 || d.length === 11 ? `55${d}` : d;
 }

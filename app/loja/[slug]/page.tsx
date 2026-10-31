@@ -48,16 +48,24 @@ export default function LojaPage({ params }: { params: { slug: string } }) {
   const [filtroCat, setFiltroCat] = useState<string | null>(null);
   const [naoLidas, setNaoLidas] = useState(0);
   const [aba, setAba] = useState<"inicio" | "sobre" | "contato">("inicio");
+  const [falhaRede, setFalhaRede] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
-    sb.current.rpc("loja_publica", { p_slug: params.slug }).then(({ data }) => {
+    setFalhaRede(false);
+    sb.current.rpc("loja_publica", { p_slug: params.slug }).then(({ data, error }) => {
+      // erro de rede/servidor não é "loja não existe": oferece tentar de novo
+      if (error) {
+        setFalhaRede(true);
+        return;
+      }
       const d = (data as Loja) ?? null;
       setLoja(d);
       if (d?.cor_marca) aplicarCorMarca(d.cor_marca);
       if (d?.fonte) setFontStack(carregarFonte(d.fonte));
       if (d) aplicarFavicon(d.logo_url, d.nome); // ícone/título da aba = logo e nome da loja
     });
-  }, [params.slug]);
+  }, [params.slug, tentativa]);
 
   // badge de não lidas: se o cliente já conversou aqui, conta mensagens da LOJA
   // chegadas depois da última vez que ele abriu o chat (mesmo com o chat fechado).
@@ -120,6 +128,19 @@ export default function LojaPage({ params }: { params: { slug: string } }) {
     setNaoLidas(0);
     setChat(false);
   }
+
+  if (falhaRede)
+    return (
+      <div className="min-h-screen grid place-items-center text-center px-6">
+        <div>
+          <h1 className="text-2xl font-bold">Não foi possível carregar a loja</h1>
+          <p className="text-muted mt-1">Confira sua conexão com a internet e tente de novo.</p>
+          <button onClick={() => setTentativa((t) => t + 1)} className="btn-primary mt-6 inline-flex">
+            Tentar de novo
+          </button>
+        </div>
+      </div>
+    );
 
   if (loja === undefined)
     return (
@@ -462,7 +483,14 @@ function ChatWidget({
       assinarRealtime(convId);
       setIniciado(true);
     } catch (e: any) {
-      alert("Não foi possível iniciar o chat: " + (e?.message || e));
+      const msg = String(e?.message || e);
+      alert(
+        /anonymous sign-ins are disabled/i.test(msg)
+          ? "O chat desta loja está indisponível no momento. Tente pelo WhatsApp ou mais tarde."
+          : /fetch|network/i.test(msg)
+            ? "Sem conexão. Confira sua internet e tente de novo."
+            : "Não foi possível iniciar o chat. Tente de novo em instantes."
+      );
     } finally {
       setCarregando(false);
     }
@@ -478,7 +506,7 @@ function ChatWidget({
       .select("id, autor_tipo, texto")
       .single();
     if (error) {
-      alert("Erro ao enviar: " + error.message);
+      alert("Não foi possível enviar a mensagem. Tente de novo.");
       setTexto(t);
       return;
     }
@@ -496,7 +524,7 @@ function ChatWidget({
       <div className="surface w-full max-w-md md:rounded-3xl rounded-t-3xl flex flex-col h-[80vh] md:h-[600px]">
         <header className="flex items-center justify-between p-4 border-b border-default">
           <div className="font-semibold">{nomeLoja}</div>
-          <button onClick={onClose}>
+          <button onClick={onClose} aria-label="Fechar chat">
             <X />
           </button>
         </header>

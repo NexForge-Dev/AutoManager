@@ -3,20 +3,41 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useStore } from "@/lib/store";
-import { homeDe } from "@/lib/permissoes";
+import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { registrarMetrica } from "@/lib/metricas/cliente";
 import { Gem, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const hydrate = useStore((s) => s.hydrate);
   const [modo, setModo] = useState<"entrar" | "criar">("criar");
   // Abre direto em "Entrar" quando vem da landing via /login?modo=entrar
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("modo") === "entrar") {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("modo") === "entrar") {
       setModo("entrar");
     }
+    // plano clicado na landing (/login?plano=...): o onboarding já abre com ele marcado
+    const plano = q.get("plano");
+    if (plano) {
+      try {
+        sessionStorage.setItem("am_plano_landing", plano);
+      } catch {}
+    }
   }, []);
+  // já logado (conta real, não o anônimo do chat da loja): pula o formulário
+  useEffect(() => {
+    let ativo = true;
+    createClient()
+      .auth.getUser()
+      .then(async ({ data }) => {
+        if (!ativo || !data.user || data.user.is_anonymous) return;
+        const destino = await destinoPosLogin();
+        if (ativo) router.replace(destino);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [router]);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -60,6 +81,7 @@ export default function LoginPage() {
           options: { emailRedirectTo: `${location.origin}/login?modo=entrar` },
         });
         if (error) throw error;
+        if (data.user) registrarMetrica({ tipo: "cadastro", userId: data.user.id });
         session = data.session;
         if (!session) {
           // conta criada, falta confirmar o e-mail: é um aviso, não um erro
@@ -80,21 +102,8 @@ export default function LoginPage() {
         return;
       }
 
-      // revendedora (login self-service) vai direto pro painel dela
-      const { data: rev } = await supabase.rpc("revendedora_me");
-      if (rev) {
-        router.replace("/revenda");
-        return;
-      }
-
-      await hydrate();
-      const { config, role } = useStore.getState();
-      // dono ainda sem onboarding vai configurar; membros já entram no painel do papel
-      if (!config.onboardingCompleto && role === "owner") {
-        router.replace("/onboarding");
-      } else {
-        router.replace(homeDe(role));
-      }
+      registrarMetrica({ tipo: "sessao" });
+      router.replace(await destinoPosLogin());
     } catch (err: any) {
       setErro(traduzErro(err?.message || "Erro ao autenticar"));
       setLoading(false);
@@ -104,9 +113,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid place-items-center px-5 bg-[var(--bg)]">
       <div className="w-full max-w-sm reveal">
-        <div className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-6">
+        <Link href="/" className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-6">
           <Gem className="text-brand-600" /> AutoManager
-        </div>
+        </Link>
         <div className="card space-y-4">
           <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
             <button

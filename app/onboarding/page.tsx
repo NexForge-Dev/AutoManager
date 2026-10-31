@@ -5,6 +5,17 @@ import { useStore } from "@/lib/store";
 import { SEGMENTOS } from "@/lib/seed";
 import type { Canal } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
+import { registrarMetrica, type Etapa } from "@/lib/metricas/cliente";
+
+// Passos desta tela -> etapas do funil no Painel NexForge ("descricao" faz parte de "loja").
+const ETAPA_METRICA: Record<string, Etapa> = {
+  nome: "loja",
+  conteudo: "segmento",
+  plano: "plano",
+  revendedoras: "revendedoras",
+  lucro: "margem",
+  contato: "contato",
+};
 import {
   fmtLimite,
   planoDef,
@@ -64,6 +75,13 @@ export default function Onboarding() {
   const [descricao, setDescricao] = useState("");
   const [segmento, setSegmento] = useState("semijoias");
   const [planoEscolhido, setPlanoEscolhido] = useState<PlanoId>(planoContratado || "solo");
+  // plano escolhido na landing (guardado pelo /login?plano=...)
+  useEffect(() => {
+    try {
+      const p = sessionStorage.getItem("am_plano_landing");
+      if (p && p in PLANOS) setPlanoEscolhido(p as PlanoId);
+    } catch {}
+  }, []);
   const [qtdRev, setQtdRev] = useState("1-3");
   const [margem, setMargem] = useState(100);
   const [comissao, setComissao] = useState(30);
@@ -109,7 +127,7 @@ export default function Onboarding() {
     const canais: Canal[] = ["whatsapp"];
     if (instagram.trim()) canais.push("instagram");
 
-    await setConfig({
+    const cfg = await setConfig({
       nomeLoja: nomeLoja || "Minha Loja",
       lojaDescricao: descricao.trim() || null,
       segmento,
@@ -123,20 +141,26 @@ export default function Onboarding() {
       lojaTiktok: tiktok.trim() || null,
       lojaEmail: email.trim() || null,
     });
+    if (!cfg.ok) throw new Error(cfg.erro || "Não foi possível salvar os dados da loja.");
 
-    // define o plano escolhido como trial de 1 mês (grátis)
-    try {
-      await fetch("/api/onboarding/plano", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plano: planoEscolhido }),
-      });
-      await hydrate(); // recarrega a assinatura pro painel já refletir o trial
-    } catch {
-      /* segue mesmo se falhar — o plano pode ser ajustado depois */
+    // define o plano escolhido como trial de 1 mês (grátis); a rota é idempotente,
+    // então "tentar de novo" pode repetir sem estender o trial
+    const res = await fetch("/api/onboarding/plano", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plano: planoEscolhido }),
+    });
+    // 409 = a loja já tem plano definido (assinatura paga ou cortesia do admin): segue o onboarding
+    if (!res.ok && res.status !== 409) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.erro || "Não foi possível ativar o teste grátis.");
     }
+    await hydrate(); // recarrega a assinatura pro painel já refletir o trial
 
-    await completarOnboarding();
+    const fim = await completarOnboarding();
+    if (!fim.ok) throw new Error(fim.erro || "Não foi possível concluir a configuração.");
+    registrarMetrica({ tipo: "etapa", etapa: "contato" });
+    registrarMetrica({ tipo: "onboarding" });
   }
 
   // Passos da tela de carregamento — personalizados pelas respostas.
@@ -160,6 +184,8 @@ export default function Onboarding() {
   }
 
   const next = () => {
+    const etapa = ETAPA_METRICA[steps[step]];
+    if (etapa) registrarMetrica({ tipo: "etapa", etapa });
     setDir("fwd");
     setStep((s) => Math.min(s + 1, totalSteps - 1));
   };
@@ -482,6 +508,8 @@ function GeneratingScreen({
   const [feitos, setFeitos] = useState(0); // quantos concluídos
   const [pronto, setPronto] = useState(false);
   const iniciado = useRef(false); // evita rodar 2x (StrictMode em dev)
+  const [erro, setErro] = useState<string | null>(null);
+  const [tentando, setTentando] = useState(false);
 
   // confete da comemoração final (gerado uma vez, renderizado só quando pronto).
   // Delay NEGATIVO faz cada peça já começar no meio da queda → a tela inteira
@@ -502,20 +530,44 @@ function GeneratingScreen({
   useEffect(() => {
     if (iniciado.current) return; // roda exatamente uma vez
     iniciado.current = true;
-    const trabalho = executar().catch(() => {}); // grava no store em paralelo
+    // grava no store em paralelo; a falha vira tela de erro (não segue pro painel,
+    // senão o próximo login cairia de novo no onboarding)
+    const trabalho = executar().then(
+      () => null,
+      (e: any) => String(e?.message || e)
+    );
     (async () => {
       for (let i = 0; i < passos.length; i++) {
         setAtual(i);
         await sleep(passos[i].ms);
         setFeitos(i + 1);
       }
-      await trabalho; // garante que o backend terminou antes de seguir
+      const falha = await trabalho; // garante que o backend terminou antes de seguir
+      if (falha) {
+        setErro(falha);
+        return;
+      }
       setPronto(true);
       await sleep(2200); // deixa o confete aparecer antes de ir pro painel
       onConcluir();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function tentarDeNovo() {
+    setTentando(true);
+    try {
+      await executar();
+      setErro(null);
+      setPronto(true);
+      await sleep(2200);
+      onConcluir();
+    } catch (e: any) {
+      setErro(String(e?.message || e));
+    } finally {
+      setTentando(false);
+    }
+  }
 
   const pct = pronto ? 100 : Math.round((feitos / total) * 100);
   const passoAtual = passos[Math.min(atual, total - 1)];
@@ -562,6 +614,15 @@ function GeneratingScreen({
             {pronto ? `${loja} está no ar.` : passoAtual.sub}
           </p>
         </div>
+
+        {erro && (
+          <div className="w-full mt-4 space-y-3" role="alert">
+            <p className="text-sm text-red-500">{erro}</p>
+            <button onClick={tentarDeNovo} disabled={tentando} className="btn-primary w-full disabled:opacity-60">
+              {tentando ? <Loader2 className="animate-spin" size={18} /> : "Tentar de novo"}
+            </button>
+          </div>
+        )}
 
         {/* barra de carregamento */}
         <div className="w-full mt-6">

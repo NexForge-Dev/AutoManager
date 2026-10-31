@@ -175,10 +175,10 @@ body {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.reveal { animation: ui-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.reveal { animation: ui-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 /* stagger: filhos diretos surgem em sequência (até 12 itens) */
-.stagger > * { animation: ui-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stagger > * { animation: ui-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 .stagger > *:nth-child(1) { animation-delay: 0.04s; }
 .stagger > *:nth-child(2) { animation-delay: 0.09s; }
 .stagger > *:nth-child(3) { animation-delay: 0.14s; }
@@ -203,7 +203,10 @@ body {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.page-enter { animation: ui-page-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* `backwards`, não `both`: um transform que fica aplicado depois da animação
+   faz todo `position: fixed` lá dentro (modais, barra do carrinho) se posicionar
+   pelo conteúdo e não pela tela. */
+.page-enter { animation: ui-page-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 /* ---- modais: backdrop + painel ---- */
 @keyframes ui-backdrop-in { from { opacity: 0; } to { opacity: 1; } }

@@ -3,9 +3,12 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { sugestoesReposicao } from "@/lib/analytics";
 import Guard from "@/components/Guard";
+import { useMetricaAoAbrir } from "@/lib/metricas/cliente";
+import { useDialog } from "@/components/Dialog";
 import { TrendingUp, PackagePlus, CheckCircle2, Loader2 } from "lucide-react";
 
 export default function ReposicaoPage() {
+  useMetricaAoAbrir({ tipo: "recurso", recurso: "reposicao_consultada" });
   return (
     <Guard>
       <Reposicao />
@@ -23,12 +26,14 @@ function Reposicao() {
   const { produtos, vendas, entradaEstoque } = useStore();
   const sugestoes = sugestoesReposicao(produtos, vendas);
   const [processando, setProcessando] = useState<Set<string>>(new Set());
+  const { alerta } = useDialog();
 
   async function darEntrada(id: string, qtd: number) {
     if (processando.has(id)) return; // trava duplo clique
     setProcessando((s) => new Set(s).add(id));
     try {
-      await entradaEstoque(id, qtd);
+      const res = await entradaEstoque(id, qtd);
+      if (!res.ok) alerta({ titulo: "Não foi possível dar entrada", mensagem: res.erro || "Tente novamente." });
     } finally {
       setProcessando((s) => {
         const n = new Set(s);

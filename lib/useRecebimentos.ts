@@ -45,7 +45,7 @@ export function useRecebimentosPendentes(): number {
       if (data.session) client.realtime.setAuth(data.session.access_token);
 
       ch = client
-        .channel("recebimentos-badge")
+        .channel(`recebimentos-badge-${Math.random().toString(36).slice(2)}`)
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "entrada_pendente", filter: `org_id=eq.${orgId}` },

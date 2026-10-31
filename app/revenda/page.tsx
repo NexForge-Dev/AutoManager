@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
+import { parseNumero } from "@/lib/csvProdutos";
 import { Gem, Loader2, Plus, Minus, ShoppingBag, LogOut, ClipboardList, Check, X } from "lucide-react";
 
 type Variacao = { id: string; nome: string; preco_ajuste: number; estoque_atual: number };
@@ -33,6 +34,8 @@ export default function RevendaPage() {
   const router = useRouter();
   const sb = useRef(createClient());
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [falha, setFalha] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
   const [aba, setAba] = useState<"vender" | "vendas">("vender");
   const [catalogo, setCatalogo] = useState<Prod[]>([]);
   const [vendas, setVendas] = useState<any[]>([]);
@@ -47,28 +50,48 @@ export default function RevendaPage() {
   }
 
   useEffect(() => {
+    setFalha(false);
     (async () => {
-      const { data: { user } } = await sb.current.auth.getUser();
-      if (!user) {
-        router.replace("/acesso");
-        return;
+      try {
+        const { data: { user } } = await sb.current.auth.getUser();
+        if (!user) {
+          router.replace("/acesso");
+          return;
+        }
+        const { data, error } = await sb.current.rpc("revendedora_me");
+        if (error) throw error;
+        if (!data) {
+          router.replace("/acesso");
+          return;
+        }
+        const m = data as Me;
+        setMe(m);
+        if (m.cor_marca) aplicarCorMarca(m.cor_marca);
+        await carregar();
+      } catch {
+        // sem rede: não deixa o spinner girando para sempre
+        setFalha(true);
       }
-      const { data } = await sb.current.rpc("revendedora_me");
-      if (!data) {
-        router.replace("/acesso");
-        return;
-      }
-      const m = data as Me;
-      setMe(m);
-      if (m.cor_marca) aplicarCorMarca(m.cor_marca);
-      await carregar();
     })();
-  }, [router]);
+  }, [router, tentativa]);
 
   async function sair() {
     await sb.current.auth.signOut();
     router.replace("/acesso");
   }
+
+  if (falha && me === undefined)
+    return (
+      <div className="min-h-screen grid place-items-center text-center px-6">
+        <div>
+          <h1 className="text-xl font-bold">Não foi possível carregar</h1>
+          <p className="text-muted mt-1">Confira sua conexão com a internet e tente de novo.</p>
+          <button onClick={() => setTentativa((t) => t + 1)} className="btn-primary mt-6 inline-flex">
+            Tentar de novo
+          </button>
+        </div>
+      </div>
+    );
 
   if (me === undefined)
     return (
@@ -166,7 +189,7 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
   }
 
   const bruto = useMemo(() => carrinho.reduce((a, i) => a + i.preco * i.qtd, 0), [carrinho]);
-  const desc = Math.min(Math.max(parseFloat(desconto.replace(",", ".")) || 0, 0), bruto);
+  const desc = Math.min(Math.max(parseNumero(desconto) || 0, 0), bruto);
   const total = bruto - desc;
   const comissao = (total * me.comissao_percent) / 100;
 

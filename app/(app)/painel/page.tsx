@@ -180,7 +180,7 @@ function Painel() {
 
       {/* alerta reposição */}
       {m.qtdReposicao > 0 && (
-        <a href="/reposicao" className="card flex items-center gap-3 bg-amber-500/10 border-amber-500/30">
+        <Link href="/reposicao" className="card flex items-center gap-3 bg-amber-500/10 border-amber-500/30">
           <AlertTriangle className="text-amber-500 shrink-0" />
           <div>
             <div className="font-semibold text-amber-500">
@@ -188,7 +188,7 @@ function Painel() {
             </div>
             <div className="text-sm text-amber-500/80">Toque para ver o que comprar →</div>
           </div>
-        </a>
+        </Link>
       )}
 
       {/* gráfico */}
@@ -233,10 +233,10 @@ function Painel() {
       )}
 
       {vendas.length === 0 && (
-        <a href="/vender" className="card text-center block bg-brand-500/10 border-brand-500/30">
+        <Link href="/vender" className="card text-center block bg-brand-500/10 border-brand-500/30">
           <div className="font-semibold text-brand-500">Registre sua primeira venda 🎉</div>
           <div className="text-sm text-brand-500/80 mt-1">É 1 toque. Toque aqui pra começar.</div>
-        </a>
+        </Link>
       )}
 
       {/* suporte: reportar problema / abrir ticket */}

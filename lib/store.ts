@@ -22,6 +22,7 @@ import type {
 } from "./types";
 import type { Assinatura, PlanoId } from "./plans";
 import { ehSuperadminUser } from "./admin";
+import { registrarMetrica } from "./metricas/cliente";
 
 function uid() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -263,9 +264,9 @@ interface State {
 
   hydrate: () => Promise<void>;
 
-  setConfig: (c: Partial<Config>) => Promise<void>;
+  setConfig: (c: Partial<Config>) => Promise<Resultado>;
   definirSlug: (slug: string) => Promise<{ ok: boolean; erro?: string }>;
-  completarOnboarding: () => Promise<void>;
+  completarOnboarding: () => Promise<Resultado>;
 
   criarMembro: (args: {
     nome: string;
@@ -331,11 +332,11 @@ interface State {
     observacao?: string | null;
   }) => Promise<{ ok: boolean; erro?: string }>;
   marcarContaPaga: (id: string, paga: boolean) => Promise<Resultado>;
-  removerContaPagar: (id: string) => Promise<void>;
+  removerContaPagar: (id: string) => Promise<Resultado>;
 
   // caixa de entrada de recebimentos
   confirmarEntrada: (entradaId: string) => Promise<Venda | null>;
-  recusarEntrada: (entradaId: string) => Promise<void>;
+  recusarEntrada: (entradaId: string) => Promise<Resultado>;
   simularRecebimento: (args: { valor: number; descricao?: string }) => Promise<{ ok: boolean; erro?: string }>;
 
   // suporte / chamados
@@ -580,9 +581,10 @@ export const useStore = create<State>()((set, get) => {
     },
 
     setConfig: async (c) => {
+      const anterior = get().config;
       set((s) => ({ config: { ...s.config, ...c } }));
       const { orgId } = get();
-      if (!orgId) return;
+      if (!orgId) return { ok: true };
       const patch: any = {};
       if (c.nomeLoja !== undefined) patch.nome = c.nomeLoja;
       if (c.segmento !== undefined) patch.segmento = c.segmento;
@@ -610,7 +612,7 @@ export const useStore = create<State>()((set, get) => {
       if (c.lojaFacebook !== undefined) patch.loja_facebook = c.lojaFacebook;
       if (c.lojaTiktok !== undefined) patch.loja_tiktok = c.lojaTiktok;
 
-      const { error } = await sb().from("org").update(patch).eq("id", orgId);
+      let { error } = await sb().from("org").update(patch).eq("id", orgId);
       // resiliência: se as colunas de aparência ainda não existem no banco
       // (migrations 0014/0020 não aplicadas), salva o resto sem elas em vez de falhar tudo.
       if (error && /tema_base|app_fonte|app_raio|loja_capa_url|column/i.test(error.message)) {
@@ -618,8 +620,16 @@ export const useStore = create<State>()((set, get) => {
         delete patch.app_fonte;
         delete patch.app_raio;
         delete patch.loja_capa_url;
-        await sb().from("org").update(patch).eq("id", orgId);
+        ({ error } = await sb().from("org").update(patch).eq("id", orgId));
       }
+      if (error) {
+        // desfaz só os campos deste patch (outro setConfig pode ter vindo no meio)
+        const volta: Partial<Config> = {};
+        for (const k of Object.keys(c) as (keyof Config)[]) (volta as any)[k] = anterior[k];
+        set((s) => ({ config: { ...s.config, ...volta } }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     definirSlug: async (slug) => {
@@ -713,6 +723,7 @@ export const useStore = create<State>()((set, get) => {
           : error.message;
         return { ok: false, erro };
       }
+      registrarMetrica({ tipo: "recurso", recurso: "entrega_criada" });
       return { ok: true };
     },
 
@@ -809,7 +820,13 @@ export const useStore = create<State>()((set, get) => {
     completarOnboarding: async () => {
       set((s) => ({ config: { ...s.config, onboardingCompleto: true } }));
       const { orgId } = get();
-      if (orgId) await sb().from("org").update({ onboarding_completo: true }).eq("id", orgId);
+      if (!orgId) return { ok: true };
+      const { error } = await sb().from("org").update({ onboarding_completo: true }).eq("id", orgId);
+      if (error) {
+        set((s) => ({ config: { ...s.config, onboardingCompleto: false } }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     addProduto: async (p) => {
@@ -893,6 +910,7 @@ export const useStore = create<State>()((set, get) => {
           motivo: "Estoque inicial",
         });
       }
+      registrarMetrica({ tipo: "recurso", recurso: "produto_cadastrado" });
       return { ok: true };
     },
 
@@ -950,6 +968,7 @@ export const useStore = create<State>()((set, get) => {
         set((s) => ({ produtos: s.produtos.filter((p) => !ids.has(p.id)) }));
         return { ok: false, inseridos: 0, erro: error.message };
       }
+      registrarMetrica({ tipo: "recurso", recurso: "produto_cadastrado", quantidade: novos.length });
 
       const comEstoque = novos.filter((p) => p.estoqueAtual > 0);
       if (comEstoque.length > 0) {
@@ -1243,6 +1262,7 @@ export const useStore = create<State>()((set, get) => {
             : erroAmigavel(error.message),
         };
       }
+      registrarMetrica({ tipo: "recurso", recurso: "revendedora_adicionada" });
       return { ok: true };
     },
 
@@ -1425,6 +1445,8 @@ export const useStore = create<State>()((set, get) => {
         return null;
       }
 
+      registrarMetrica({ tipo: "recurso", recurso: revendedoraId ? "venda_revendedora" : "venda_registrada" });
+
       // o banco é a fonte da verdade: sobrescreve totais/comissão/lucro do otimista
       const r = res as any;
       const confirmada: Venda = r
@@ -1594,6 +1616,7 @@ export const useStore = create<State>()((set, get) => {
         set((s) => ({ contasPagar: s.contasPagar.filter((x) => x.id !== id) }));
         return { ok: false, erro: error.message };
       }
+      registrarMetrica({ tipo: "recurso", recurso: "conta_a_pagar" });
       return { ok: true };
     },
 
@@ -1626,7 +1649,11 @@ export const useStore = create<State>()((set, get) => {
       const anterior = get().contasPagar.find((c) => c.id === id);
       set((s) => ({ contasPagar: s.contasPagar.filter((c) => c.id !== id) }));
       const { error } = await sb().from("conta_pagar").delete().eq("id", id);
-      if (error && anterior) set((s) => ({ contasPagar: [...s.contasPagar, anterior] }));
+      if (error) {
+        if (anterior) set((s) => ({ contasPagar: [...s.contasPagar, anterior] }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     // "Sim, foi venda da loja": transforma o recebimento numa venda avulsa (sem itens,
@@ -1681,6 +1708,7 @@ export const useStore = create<State>()((set, get) => {
         return null;
       }
 
+      registrarMetrica({ tipo: "recurso", recurso: "recebimento_confirmado" });
       return venda;
     },
 
@@ -1702,6 +1730,8 @@ export const useStore = create<State>()((set, get) => {
             ? st.entradasPendentes
             : [anterior, ...st.entradasPendentes],
         }));
+      if (error) return { ok: false, erro: erroAmigavel(error.message) };
+      return { ok: true };
     },
 
     // Cria um recebimento de teste (enquanto não há banco conectado de verdade),

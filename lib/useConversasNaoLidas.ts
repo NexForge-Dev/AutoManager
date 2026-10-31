@@ -44,7 +44,7 @@ export function useConversasNaoLidas(): number {
       if (data.session) client.realtime.setAuth(data.session.access_token);
 
       ch = client
-        .channel("inbox-badge")
+        .channel(`inbox-badge-${Math.random().toString(36).slice(2)}`)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensagem" }, (p) => {
           const m = p.new as any;
           if (m.autor_tipo !== "cliente") return;

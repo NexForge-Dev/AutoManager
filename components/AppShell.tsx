@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
@@ -20,6 +21,8 @@ import {
   ShieldCheck,
   Inbox,
   Wallet,
+  Menu,
+  X,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
@@ -79,7 +82,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const recebimentosPendentes = useRecebimentosPendentes();
 
   const navDesktop = ITENS.filter((it) => visivel(it, role, caps, admin));
-  const nav = ITENS.filter((it) => visivel(it, role, caps, admin) && it.mobile).slice(0, 5);
+  // bottom nav tem 5 vagas: se o papel tem mais telas que isso, 4 fixas + "Mais"
+  // (senão Perfil/sair, Financeiro, Conversas etc. ficam inacessíveis no celular)
+  const mobileFixos = navDesktop.filter((it) => it.mobile);
+  const precisaMais = navDesktop.length > 5;
+  const nav = precisaMais ? mobileFixos.slice(0, 4) : navDesktop.slice(0, 5);
+  const resto = navDesktop.filter((it) => !nav.includes(it));
+  const badgeDe = (href: string) =>
+    href === "/conversas" ? conversasNaoLidas : href === "/recebimentos" ? recebimentosPendentes : 0;
+  const badgeMais = resto.reduce((t, it) => t + badgeDe(it.href), 0);
+  const [maisAberto, setMaisAberto] = useState(false);
+  useEffect(() => setMaisAberto(false), [path]);
 
   return (
     <DialogProvider>
@@ -159,7 +172,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* -------- bottom nav (mobile) -------- */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 surface border-t border-default flex justify-around items-center px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 surface border-t border-default flex justify-around items-center px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {nav.map((n) => {
           const active = path === n.href;
           const Icon = n.icon;
@@ -200,7 +213,72 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        {precisaMais && (
+          <button
+            type="button"
+            onClick={() => setMaisAberto(true)}
+            aria-expanded={maisAberto}
+            className={`relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-90 ${
+              resto.some((it) => it.href === path) ? "text-brand-500" : "text-muted"
+            }`}
+          >
+            <Menu size={22} />
+            <span className="text-[11px] font-medium">Mais</span>
+            <span className="h-1 w-1" />
+            {badgeMais > 0 && (
+              <span className="absolute top-0 right-1.5 text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center bg-red-500 text-white">
+                {badgeMais > 99 ? "99+" : badgeMais}
+              </span>
+            )}
+          </button>
+        )}
       </nav>
+
+      {/* -------- "Mais" (mobile): demais telas -------- */}
+      {maisAberto && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/40 flex items-end modal-backdrop"
+          onClick={() => setMaisAberto(false)}
+        >
+          <div
+            className="surface w-full rounded-t-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] modal-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="font-bold">Menu</span>
+              <button onClick={() => setMaisAberto(false)} aria-label="Fechar menu" className="p-1 text-muted">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {resto.map((n) => {
+                const Icon = n.icon;
+                const active = path === n.href;
+                const badge = badgeDe(n.href);
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    onClick={() => setMaisAberto(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative flex flex-col items-center gap-1 rounded-2xl py-3 px-1 text-center transition active:scale-95 ${
+                      active ? "bg-brand-600 text-white" : "surface-alt"
+                    }`}
+                  >
+                    <Icon size={22} />
+                    <span className="text-xs font-medium leading-tight">{n.label}</span>
+                    {badge > 0 && (
+                      <span className="absolute top-1.5 right-1.5 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center bg-red-500 text-white">
+                        {badge > 99 ? "99+" : badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </DialogProvider>
   );
