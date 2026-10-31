@@ -12,7 +12,7 @@ async function metricasTrial(orgId: string, plano: PlanoId) {
 }
 
 // Define o plano escolhido no onboarding dentro do TRIAL de 1 mês (grátis) — depois
-// começa a cobrar (o ciclo pago é configurado no Mercado Pago ao fim do trial).
+// começa a cobrar (o dono assina pelo Stripe em /planos).
 // Só o DONO (owner) da org pode definir, e a escrita usa service_role (a tabela
 // `assinatura` não é gravável via RLS pelo usuário comum).
 //

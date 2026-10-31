@@ -42,7 +42,7 @@ contra o banco real**.
 | Módulo | Status | Observação |
 |---|---|---|
 | **Planos & assinatura** (Ambulante/Solo/Equipe/Expansão) + trial + enforcement | ✅ Pronto | Tabela `assinatura`, limites em `lib/plans.ts`, triggers no banco |
-| **Pagamento (Mercado Pago)** — checkout + webhook (assinatura + recebimentos) | ✅ Integrado | `/planos` → checkout; `api/mercadopago/*`; webhook valida `x-signature` |
+| **Pagamento (Stripe)** — checkout, troca de plano, portal e webhook | ✅ Integrado | `/planos` → Checkout; `api/stripe/*`; webhook valida `stripe-signature` |
 | **Caixa de recebimentos** (`/recebimentos`) — confirma "foi venda?" → vira venda | ✅ Pronto | Tabela `entrada_pendente`, webhook MP grava, dono confirma (atômico/idempotente) |
 | **Financeiro / contas a pagar** (`/financeiro`) — o que sai + a receber + saldo projetado | ✅ Pronto | Tabela `conta_pagar`; fecha o fluxo de caixa (a receber − a pagar) |
 | **Painel da plataforma** (super-admin): MRR/ARR, lojas, moderar contas, trocar plano | ✅ Pronto | `/admin` (resumo/lojas/chamados/**auditoria**) + `api/admin/*` |
@@ -72,13 +72,14 @@ contra o banco real**.
 ### Pendências conhecidas / próximos passos
 - **Segurança operacional:** rotacionar o token de management `sbp_…` e a `service_role`
   usados em desenvolvimento (foram digitados em texto puro durante o build).
-- **Webhook do MP:** definir `MP_WEBHOOK_SECRET` em produção (sem ele, a validação de
-  assinatura é pulada por retrocompat — ver §13).
+- **Webhook do Stripe:** definir `STRIPE_WEBHOOK_SECRET` (sem ele o webhook responde 503 e
+  renovações/cancelamentos não chegam — ver §13).
 - **Cobrança pós-trial:** o onboarding concede 1 mês grátis (trial do plano escolhido); a
-  assinatura recorrente no Mercado Pago ainda é iniciada na tela de Plano (checkout). Falta
+  assinatura recorrente no Stripe ainda é iniciada na tela de Plano (checkout). Falta
   um lembrete/CTA ao fim do trial para o cliente confirmar o pagamento e não perder o acesso.
-- **Recebimentos:** só o Mercado Pago grava entradas hoje; integração com o **Banco Inter**
-  (origem `inter`) está modelada mas não conectada. A tela tem um modo "Testar o fluxo"
+- **Recebimentos:** nenhum provedor grava entradas automaticamente hoje (a integração com o
+  Mercado Pago saiu na migração para o Stripe); o **Banco Inter** (origem `inter`) está modelado
+  mas não conectado. A tela tem um modo "Testar o fluxo"
   para simular entradas enquanto não há banco conectado.
 - **Prova social da landing:** números/depoimentos estão marcados como ilustrativos —
   substituir por dados reais conforme a base cresce.
@@ -122,12 +123,12 @@ Há ainda um **superadmin** do produto (suporte), fora das lojas — ver §12.
 Toda org nova nasce em **trial com acesso Expansão**. No **onboarding**, o dono escolhe o
 plano e ganha **1 mês grátis**: o trial (1 mês) nasce com a org (`0035`) e a rota
 `POST /api/onboarding/plano` só **troca o plano escolhido**, sem nunca estender `trial_ate`
-(409 se a loja não estiver em trial ou já tiver assinatura no Mercado Pago). Trial vencido sem
+(409 se a loja não estiver em trial ou já tiver assinatura paga). Trial vencido sem
 pagamento cai para **Ambulante** (`plano_efetivo`, SQL e `lib/plans.ts`).
 Os limites/permissões são fonte única em **`lib/plans.ts`** (consumidos pelo hook
 `lib/usePlano.ts`) e **espelhados em triggers/funções no banco** (enforcement real: bloqueia revendedora acima do limite, criação de
 vendedor/motoboy fora do plano e criação de entrega fora do Expansão — ver §13). Pagamento pelo
-**Mercado Pago**; a troca de plano efetiva acontece via webhook (RPC `mudar_plano` está revogada
+**Stripe**; a troca de plano efetiva acontece via webhook/rota de checkout (RPC `mudar_plano` está revogada
 para o cliente desde `0021`, e o super-admin pode trocar manualmente em `/admin`).
 
 **Plano efetivo** (`planoEfetivo` em `lib/plans.ts` e `private.plano_efetivo` no banco):
@@ -161,7 +162,7 @@ Navegação e rotas se adaptam ao papel e às **capacidades do plano**
 | `/analytics` | Inteligência: receita por produto, mix de canal, tendência mensal, ruptura. |
 | `/relatorios` | Relatórios + exportação. |
 | `/minha-loja` | **Construtor da loja online** (ver §6). |
-| `/planos` | Escolha/assinatura de plano (checkout Mercado Pago). |
+| `/planos` | Escolha/assinatura de plano (Checkout do Stripe; quem já assina troca o plano na hora). |
 | `/configuracoes` | Loja, identidade, **categorias**, aparência, equipe de acesso, atalho da loja. |
 | `/configuracoes/plano` | Assinatura: plano atual, status, **uso × limites**. |
 | `/admin` | **Superadmin** do produto: 4 abas — **Resumo** (MRR/ARR, lojas por status, mix de planos), **Lojas** (moderar conta + trocar plano), **Chamados** de suporte e **Auditoria** (trilha append-only das ações sensíveis) — ver §12. |
@@ -181,9 +182,10 @@ Navegação e rotas se adaptam ao papel e às **capacidades do plano**
 | `POST /api/membros` | Dono cria/remove login de vendedor/motoboy (valida que quem chama é owner + plano). |
 | `POST /api/onboarding/plano` | Dono define no onboarding o plano escolhido como **trial de 30 dias** (1º mês grátis). Service role após checar owner. |
 | `POST /api/revendedora/ativar` | Revendedora ativa o acesso com o e-mail liberado + **código de convite** + senha escolhida (§7). |
-| `POST /api/mercadopago/assinar` | Inicia o checkout de assinatura no Mercado Pago. |
-| `POST /api/mercadopago/confirmar` | Pós-checkout: re-consulta a preapproval e aplica o plano na hora (valida que é da org do dono). |
-| `POST,GET /api/mercadopago/webhook` | Notificações do MP — **preapproval** (aplica plano) e **payment** (grava recebimento). Re-consulta o ID na API do MP e valida `x-signature` (ver §13). |
+| `POST /api/stripe/checkout` | Sem assinatura viva: cria a Checkout Session e devolve `{ url }`. Já assina: troca o preço da assinatura existente (proporcional) e devolve `{ atualizado }`. |
+| `POST /api/stripe/confirmar` | Pós-checkout: relê a sessão/assinatura no Stripe e aplica o plano na hora (valida que é da org do dono). |
+| `POST /api/stripe/portal` | Abre o Customer Portal do Stripe (cartão, faturas, cancelar). |
+| `POST /api/stripe/webhook` | Eventos do Stripe (checkout, subscription.*, invoice.*). Valida `stripe-signature`, é idempotente (`stripe_evento`) e relê a assinatura na API (ver §13). |
 | `GET /api/admin/overview` | Super-admin: agregados da plataforma (MRR/ARR, lojas, planos). Service role após checar o e-mail. |
 | `POST /api/admin/plano` | Super-admin: troca manual de plano de uma loja (cortesia/suporte; sem cobrança no MP). |
 | `POST /api/admin/usuario` | Super-admin: moderar conta da loja — `desativar`/`banir`/`reativar` (ban no `auth.users`) ou `deletar` (apaga org + contas). Nunca age sobre o próprio super-admin. |
@@ -332,10 +334,10 @@ npm run dev                         # http://localhost:3000
 - `NEXT_PUBLIC_SUPABASE_URL` - URL do projeto.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - chave pública (segura no browser).
 - `SUPABASE_SERVICE_ROLE_KEY` - **secreta, só no servidor** (rotas `/api`). Nunca commitar.
-- **Mercado Pago:** `MP_ACCESS_TOKEN` e `MP_CLIENT_SECRET` (secretos, server-only), `MP_CLIENT_ID`,
-  `NEXT_PUBLIC_MP_PUBLIC_KEY`, `NEXT_PUBLIC_APP_URL` (domínio público).
-- `MP_WEBHOOK_SECRET` - segredo do webhook do MP. Se ausente, a validação de `x-signature` é
-  **pulada** (retrocompat) — **defina em produção** para rejeitar notificações forjadas (§13).
+- **Stripe:** `STRIPE_SECRET_KEY` (secreta, server-only; `sk_test_` no local) e
+  `NEXT_PUBLIC_APP_URL` (domínio público, usado nas URLs de retorno).
+- `STRIPE_WEBHOOK_SECRET` - segredo do endpoint do webhook. Sem ele o webhook falha fechado (503)
+  em qualquer ambiente (§13).
 
 Build de produção: `npm run build && npm start`.
 
@@ -354,7 +356,7 @@ app/
   loja/[slug] (vitrine), acesso, revenda      público/externo
   api/
     membros, revendedora/ativar, onboarding/plano (trial 1º mês grátis)
-    mercadopago/{assinar,confirmar,webhook}
+    stripe/{checkout,confirmar,portal,webhook}
     admin/{overview,plano,usuario,logs}       super-admin (service role)
 lib/
   store.ts        → estado global (Zustand) + acesso ao Supabase (chama as RPCs atômicas)
@@ -371,7 +373,8 @@ lib/
   uploadLogo.ts / uploadProdutoImagem.ts → upload p/ os buckets lojas/produtos
   useConversasNaoLidas.ts → contador de chat não lido (badge do menu)
   useRecebimentos.ts → Realtime da caixa de recebimentos + badge + notificação
-  mercadopago.ts  → integração de pagamento (preapproval + recebimentos)
+  stripe.ts       → cliente Stripe, preços, store do webhook
+  billing/stripeSync.ts → sincronização assinatura Stripe -> tabela assinatura (testada)
   supabase/       → client.ts, server.ts, middleware.ts (sessão/proteção)
 components/
   AppShell.tsx    → navegação (sidebar desktop + bottom nav mobile) + badges + transição de rota
@@ -460,9 +463,9 @@ grade/variações na reposição e do papel/role no onboarding.
   `loja`), com `org_id` batendo a conversa e **cap de texto** (4000 no banco, 2000 na policy).
 - **Upload** (`0028` + `lib/imagem.ts`): buckets `lojas`/`produtos` limitados a
   **5 MB** e a `jpeg/png/webp/gif` (bloqueia SVG inline) — validado no cliente **e** no servidor.
-- **Webhook** (`mercadopago/webhook`): valida a assinatura `x-signature` do MP (HMAC, manifesto
-  `id;request-id;ts`) quando `MP_WEBHOOK_SECRET` está definido, e **re-consulta** o ID na API do
-  MP antes de aplicar plano/recebimento — uma notificação forjada não ativa nada.
+- **Webhook** (`stripe/webhook`): valida `stripe-signature` com `STRIPE_WEBHOOK_SECRET` (falha
+  fechado sem ele), é idempotente por id de evento e **relê** a assinatura na API do Stripe antes
+  de gravar — evento forjado ou fora de ordem não ativa nem cancela nada.
 
 **Lote 4 — baixos: robustez.** Realtime mais resiliente (re-subscribe/reconexão) e **estoque
 não-negativo** como defesa adicional na baixa.

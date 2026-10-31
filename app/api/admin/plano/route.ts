@@ -7,7 +7,7 @@ import { registrarAdminLog } from "@/lib/adminAudit";
 
 // Troca MANUAL de plano de uma loja pelo super-admin (cortesia / suporte).
 // Altera direto a tabela `assinatura` via service_role (ignora RLS), SÓ depois
-// de confirmar que quem chama é o super-admin. Não cria cobrança no Mercado Pago.
+// de confirmar que quem chama é o super-admin. Não cria cobrança no Stripe.
 
 function admin() {
   return createAdmin(

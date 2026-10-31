@@ -141,7 +141,7 @@ function Recebimentos() {
         </div>
         <p className="text-xs text-muted">
           Simule um recebimento pra ver como fica. Em produção, quem cria essas entradas é o
-          webhook do provedor (Mercado Pago, Inter…).
+          webhook do provedor (ex.: Inter).
         </p>
         <div className="flex gap-2">
           <input

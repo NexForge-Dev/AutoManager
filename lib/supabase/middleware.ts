@@ -43,7 +43,7 @@ export async function updateSession(request: NextRequest) {
     path === "/sitemap.xml" ||
     path.startsWith("/opengraph-image");
   // rotas de API se auto-protegem (retornam JSON 403); não devem ser redirecionadas
-  // para /login. Em especial, o webhook do Mercado Pago chega sem sessão.
+  // para /login. Em especial, o webhook do Stripe chega sem sessão.
   const isApi = path.startsWith("/api");
   const isAsset =
     path.startsWith("/_next") ||

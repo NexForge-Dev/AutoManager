@@ -53,7 +53,7 @@ export default function CancelamentoPage() {
         <ul>
           <li>
             O reembolso é <strong>integral</strong> (100% do valor pago), pelo mesmo meio de pagamento
-            usado no Mercado Pago.
+            usado na assinatura.
           </li>
           <li>
             Processamos o pedido em até <strong>5 dias úteis</strong>. O prazo para o valor aparecer
@@ -72,9 +72,9 @@ export default function CancelamentoPage() {
         <p>Use qualquer um destes caminhos:</p>
         <ul>
           <li>
-            <strong>Pelo Mercado Pago:</strong> no app ou site do Mercado Pago, acesse{" "}
-            <em>Assinaturas</em>, escolha a assinatura do AutoManager e toque em{" "}
-            <em>Cancelar assinatura</em>. O cancelamento é refletido automaticamente na sua conta.
+            <strong>Pelo próprio AutoManager:</strong> em <em>Configurações → Assinatura</em>, toque em{" "}
+            <em>Gerenciar pagamento, faturas ou cancelar</em> e escolha <em>Cancelar assinatura</em> no
+            ambiente seguro do Stripe. O cancelamento é refletido automaticamente na sua conta.
           </li>
           <li>
             <strong>Falando com a gente</strong>, a partir do e-mail da conta, informando o nome da

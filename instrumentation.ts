@@ -26,10 +26,12 @@ export async function register() {
 
   const avisos: string[] = [];
   if (vazio("NEXT_PUBLIC_APP_URL") || /localhost|127\.0\.0\.1/.test(process.env.NEXT_PUBLIC_APP_URL ?? ""))
-    avisos.push("NEXT_PUBLIC_APP_URL (domínio público https://...; usado no SEO e nas URLs do Mercado Pago)");
-  if (vazio("MP_ACCESS_TOKEN")) avisos.push("MP_ACCESS_TOKEN (sem ele ninguém consegue assinar um plano)");
-  if (vazio("MP_WEBHOOK_SECRET"))
-    avisos.push("MP_WEBHOOK_SECRET (sem ele o webhook do Mercado Pago rejeita todas as notificações)");
+    avisos.push("NEXT_PUBLIC_APP_URL (domínio público https://...; usado no SEO e nas URLs de retorno do Stripe)");
+  if (vazio("STRIPE_SECRET_KEY")) avisos.push("STRIPE_SECRET_KEY (sem ela ninguém consegue assinar um plano)");
+  else if (/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY ?? ""))
+    avisos.push("STRIPE_SECRET_KEY é de TESTE (sk_test_/rk_test_): nenhuma cobrança real acontece");
+  if (vazio("STRIPE_WEBHOOK_SECRET"))
+    avisos.push("STRIPE_WEBHOOK_SECRET (sem ele o webhook do Stripe rejeita tudo e renovações/cancelamentos não chegam)");
   for (const a of avisos) console.error(`[AutoManager] Configuração de produção ausente: ${a}`);
 
   // dados da empresa exibidos nos Termos/Privacidade/rodapé (CDC + LGPD)

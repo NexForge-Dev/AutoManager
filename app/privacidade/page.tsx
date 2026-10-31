@@ -68,8 +68,8 @@ export default function PrivacidadePage() {
           registros de uso (por exemplo, quem registrou uma venda e quando).
         </p>
         <p>
-          <strong>Da assinatura:</strong> plano, status, datas e identificadores da assinatura no
-          Mercado Pago. Os dados do cartão são digitados diretamente no Mercado Pago e{" "}
+          <strong>Da assinatura:</strong> plano, status, datas e identificadores do cliente e da
+          assinatura no Stripe. Os dados do cartão são digitados diretamente no Stripe e{" "}
           <strong>não</strong> chegam ao AutoManager.
         </p>
         <p>
@@ -131,9 +131,9 @@ export default function PrivacidadePage() {
             cláusulas contratuais e garantias de segurança do provedor (art. 33 da LGPD).
           </li>
           <li>
-            <strong>Mercado Pago</strong> — processamento das assinaturas e pagamentos. O Mercado Pago
-            trata os dados de pagamento como controlador próprio, conforme a política de privacidade
-            dele.
+            <strong>Stripe</strong> — processamento das assinaturas e pagamentos. O Stripe trata os
+            dados de pagamento como controlador próprio, conforme a política de privacidade dele, e pode
+            processá-los fora do Brasil (art. 33 da LGPD).
           </li>
           <li>
             <strong>Provedor de hospedagem do site</strong> — entrega das páginas e registros técnicos
