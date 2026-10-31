@@ -17,10 +17,12 @@ import { tratarEventoStripe } from "@/lib/billing/stripeSync";
 
 export const runtime = "nodejs";
 
+const VIVA = ["active", "trialing", "past_due", "unpaid", "paused"];
+
 // Assina ou troca o plano da loja no Stripe. Só o DONO pode.
 //  - sem assinatura Stripe viva: cria uma Checkout Session e devolve { url } p/ redirecionar.
-//  - já assina: troca o preço da assinatura existente (proporcional na próxima fatura)
-//    e devolve { atualizado: true } - nunca cria uma segunda cobrança.
+//  - já assina: troca o preço da assinatura existente e cobra a diferença NA HORA; o plano
+//    novo só vale depois que essa fatura é paga (pending update) - nunca cria 2ª cobrança.
 export async function POST(req: Request) {
   const dono = await donoDaOrg();
   if (!dono) return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
@@ -31,21 +33,60 @@ export async function POST(req: Request) {
 
   try {
     const admin = adminClient();
+
+    // assinatura antiga do Mercado Pago ainda ativa: assinar no Stripe cobraria em dobro
+    const { data: atual } = await admin
+      .from("assinatura")
+      .select("provider, provider_assinatura_id, status")
+      .eq("org_id", dono.orgId)
+      .maybeSingle();
+    if (atual?.provider === "mercadopago" && atual.provider_assinatura_id && atual.status !== "canceled")
+      return NextResponse.json(
+        {
+          erro:
+            "Sua loja ainda tem uma assinatura ativa no Mercado Pago. Cancele-a no app do Mercado Pago " +
+            "(Assinaturas) ou fale com o suporte antes de assinar pelo novo meio de pagamento.",
+        },
+        { status: 409 }
+      );
+
     const preco = await precoDoPlano(plano);
     registrarEvento("plan_selected", dono.orgId, { plan: plano, billing_period: "month" });
 
-    const viva = await assinaturaVivaDaOrg(admin, dono.orgId);
+    const customer = await clienteDaOrg(admin, dono.orgId, dono.email);
+    // fonte da verdade é o Stripe: pega também assinatura criada por outra aba/sessão
+    // que o webhook ainda não gravou no banco
+    let viva = await assinaturaVivaDaOrg(admin, dono.orgId);
+    if (!viva) {
+      const { data } = await stripe().subscriptions.list({ customer, status: "all", limit: 10 });
+      viva = data.find((s) => VIVA.includes(s.status)) ?? null;
+    }
+
     if (viva) {
+      if (viva.status !== "active" && viva.status !== "trialing")
+        return NextResponse.json(
+          { erro: "Há um pagamento pendente na sua assinatura. Regularize em Gerenciar pagamento antes de trocar de plano.", portal: true },
+          { status: 409 }
+        );
       const item = viva.items.data[0];
       if (item?.price.id === preco.id) {
         await enviarMetricas();
         return NextResponse.json({ atualizado: true, plano });
       }
-      await stripe().subscriptions.update(viva.id, {
+      // always_invoice cobra a diferença agora; pending_if_incomplete só aplica a troca
+      // quando essa cobrança é paga (sem isso o upgrade sairia de graça até a renovação).
+      const atualizada = await stripe().subscriptions.update(viva.id, {
         items: [{ id: item.id, price: preco.id }],
-        proration_behavior: "create_prorations",
-        metadata: { org_id: dono.orgId, plano },
+        proration_behavior: "always_invoice",
+        payment_behavior: "pending_if_incomplete",
       });
+      if (atualizada.pending_update) {
+        await enviarMetricas();
+        return NextResponse.json(
+          { erro: "Não conseguimos cobrar a diferença do novo plano. Atualize o cartão em Gerenciar pagamento e tente de novo.", portal: true },
+          { status: 402 }
+        );
+      }
       // aplica já (o webhook customer.subscription.updated confirma depois, idempotente)
       const r = await tratarEventoStripe(
         { id: `troca:${viva.id}:${preco.id}`, type: "customer.subscription.updated", data: { object: { id: viva.id } } } as any,
@@ -57,7 +98,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ atualizado: true, plano: r.plano ?? plano });
     }
 
-    const customer = await clienteDaOrg(admin, dono.orgId, dono.email);
+    // expira checkouts abertos anteriores (outra aba / link antigo) para não virar 2ª assinatura
+    const abertas = await stripe().checkout.sessions.list({ customer, status: "open", limit: 20 });
+    for (const s of abertas.data) await stripe().checkout.sessions.expire(s.id).catch(() => {});
+
     const base = appUrl();
     const sessao = await stripe().checkout.sessions.create({
       mode: "subscription",

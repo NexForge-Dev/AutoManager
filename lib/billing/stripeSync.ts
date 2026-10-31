@@ -64,6 +64,8 @@ export interface ResultadoEvento {
   status?: StatusAssinatura;
   // assinatura antiga a cancelar no Stripe (quando uma nova a substituiu)
   cancelarAnterior?: string;
+  // evento de cobrança recusada (métrica payment_failed)
+  pagamentoFalhou?: boolean;
 }
 
 const VIVOS: StatusAssinatura[] = ["active", "past_due"];
@@ -88,12 +90,15 @@ export function planoDaAssinatura(sub: Stripe.Subscription): PlanoId | null {
 }
 
 // status do Stripe -> status interno. null = ainda não decidiu (1º pagamento pendente).
+// past_due = cobrança recusada e o Stripe ainda tentando de novo: segue "active", mas com
+// data_fim no início do ciclo não pago, então a carência de planoEfetivo (3 dias) é que
+// decide até quando o acesso continua. Esgotadas as tentativas, vira unpaid/canceled.
 export function statusInterno(s: Stripe.Subscription.Status): StatusAssinatura | null {
   switch (s) {
     case "active":
     case "trialing":
-      return "active";
     case "past_due":
+      return "active";
     case "unpaid":
     case "paused":
       return "past_due";
@@ -142,13 +147,19 @@ async function sincronizar(
   }
 
   // Desde a API 2025-03-31 o período de cobrança fica nos itens da assinatura.
+  // O Stripe avança current_period_end assim que gera a fatura de renovação, mesmo sem
+  // pagamento; em past_due o ciclo pago terminou no início do período atual.
   const item = sub.items?.data?.[0];
+  const fimPago =
+    sub.status === "past_due"
+      ? item?.current_period_start ?? (sub as any).current_period_start
+      : item?.current_period_end ?? (sub as any).current_period_end;
   await store.gravar(orgId, {
     plano,
     status,
     precoCentavos: item?.price?.unit_amount ?? PLANOS[plano].precoCentavos,
     dataInicio: iso(sub.start_date),
-    dataFim: iso(item?.current_period_end ?? (sub as any).current_period_end),
+    dataFim: iso(fimPago),
     providerClienteId: customerId,
     providerAssinaturaId: sub.id,
     limparTrial: status === "active",
@@ -192,6 +203,7 @@ export async function tratarEventoStripe(
     case "invoice.payment_failed": {
       const subId = assinaturaDaInvoice(obj);
       if (subId) r = await sincronizar(subId, store, fetchSubscription);
+      if (event.type === "invoice.payment_failed" && r.resultado === "sincronizada") r.pagamentoFalhou = true;
       break;
     }
   }

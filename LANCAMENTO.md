@@ -41,7 +41,14 @@ Revise também o texto jurídico das três páginas (de preferência com um advo
    `invoice.paid`, `invoice.payment_failed`. Copie o Signing secret para `STRIPE_WEBHOOK_SECRET`.
 4. Em Settings › Billing › Customer portal, ative o portal (atualizar cartão, ver faturas e
    cancelar assinatura). Trocas de plano são feitas pelo próprio app em `/planos`.
-5. Aplique a migration `0037_stripe.sql` e faça novo deploy.
+5. Em Settings › Billing › Subscriptions and emails › "Manage failed payments", deixe as novas
+   tentativas ligadas e, ao esgotá-las, **marcar como unpaid** ou **cancelar**. Durante as tentativas
+   (past_due) a loja mantém o plano por 3 dias após o vencimento; depois cai no Ambulante.
+6. **Assinantes antigos do Mercado Pago:** o app não fala mais com o MP. Antes do deploy, rode no
+   Supabase `select org_id, plano from assinatura where provider = 'mercadopago' and status <> 'canceled';`
+   — para cada loja, cancele a assinatura no painel do MP e peça para assinar de novo em `/planos`
+   (o checkout recusa quem ainda tem assinatura MP ativa, para não cobrar em dobro).
+7. Aplique a migration `0037_stripe.sql` e faça novo deploy.
 
 ## 4. Supabase Auth (e-mails)
 

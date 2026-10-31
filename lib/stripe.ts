@@ -104,6 +104,11 @@ export async function posSincronizar(r: ResultadoEvento, chave: string): Promise
     }
   }
 
+  if (r.pagamentoFalhou) {
+    registrarEvento("payment_failed", r.orgId, {}, `recusa:${chave}`);
+    return;
+  }
+
   const virouAtiva = r.status === "active" && r.statusAnterior !== "active";
   if (r.status === "active" && r.statusAnterior === "active" && r.planoAnterior && r.planoAnterior !== r.plano) {
     registrarEvento(
@@ -114,8 +119,6 @@ export async function posSincronizar(r: ResultadoEvento, chave: string): Promise
     );
   } else if (virouAtiva) {
     registrarEvento("plan_activated", r.orgId, propsPlano(r.plano), `ativa:${chave}`);
-  } else if (r.status === "past_due" && r.statusAnterior !== "past_due") {
-    registrarEvento("payment_failed", r.orgId, {}, `recusa:${chave}`);
   } else if (r.status === "canceled" && r.statusAnterior !== "canceled") {
     registrarEvento("plan_canceled", r.orgId, { plan: r.plano }, `cancelada:${chave}`);
   }

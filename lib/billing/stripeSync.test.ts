@@ -33,6 +33,7 @@ function memoriaStore(inicial: Record<string, AssinaturaAtual> = {}, clientes: R
 }
 
 const FIM = 1_900_000_000; // unix
+const INICIO_CICLO = FIM - 30 * 86_400;
 function sub(over: Partial<Stripe.Subscription> & { lookup?: string | null; amount?: number } = {}): Stripe.Subscription {
   const { lookup = "automanager_equipe", amount = 9900, ...rest } = over;
   return {
@@ -43,7 +44,7 @@ function sub(over: Partial<Stripe.Subscription> & { lookup?: string | null; amou
     start_date: 1_800_000_000,
     cancel_at_period_end: false,
     items: {
-      data: [{ id: "si_1", current_period_end: FIM, price: { lookup_key: lookup, unit_amount: amount } }],
+      data: [{ id: "si_1", current_period_start: INICIO_CICLO, current_period_end: FIM, price: { lookup_key: lookup, unit_amount: amount } }],
     },
     ...rest,
   } as unknown as Stripe.Subscription;
@@ -70,7 +71,7 @@ describe("statusInterno", () => {
   it.each([
     ["active", "active"],
     ["trialing", "active"],
-    ["past_due", "past_due"],
+    ["past_due", "active"], // carência: o Stripe ainda está tentando cobrar
     ["unpaid", "past_due"],
     ["paused", "past_due"],
     ["canceled", "canceled"],
@@ -139,7 +140,7 @@ describe("tratarEventoStripe", () => {
     expect(r.planoAnterior).toBe("solo");
   });
 
-  it("pagamento recusado marca past_due", async () => {
+  it("cobrança recusada mantém o acesso só pela carência (data_fim = início do ciclo não pago)", async () => {
     mem.assinaturas["org-1"] = { plano: "equipe", status: "active", providerAssinaturaId: "sub_novo" };
     const r = await tratarEventoStripe(
       evento("invoice.payment_failed", { parent: { subscription_details: { subscription: "sub_novo" } } }),
@@ -147,6 +148,17 @@ describe("tratarEventoStripe", () => {
       async () => sub({ status: "past_due" })
     );
     expect(r.resultado).toBe("sincronizada");
+    expect(r.pagamentoFalhou).toBe(true);
+    expect(mem.gravacoes[0].dados.status).toBe("active");
+    // planoEfetivo derruba para o piso 3 dias depois de data_fim
+    expect(mem.gravacoes[0].dados.dataFim).toBe(new Date(INICIO_CICLO * 1000).toISOString());
+  });
+
+  it("depois das novas tentativas (unpaid) perde o plano", async () => {
+    mem.assinaturas["org-1"] = { plano: "equipe", status: "active", providerAssinaturaId: "sub_novo" };
+    await tratarEventoStripe(evento("customer.subscription.updated", { id: "sub_novo" }), mem.store, async () =>
+      sub({ status: "unpaid" })
+    );
     expect(mem.gravacoes[0].dados.status).toBe("past_due");
     expect(mem.gravacoes[0].dados.limparTrial).toBe(false);
   });
