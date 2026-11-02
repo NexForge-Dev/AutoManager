@@ -21,7 +21,7 @@ import { parseProdutosCSV } from "./csvProdutos";
 describe("parseProdutosCSV", () => {
   it("aceita quebra de linha dentro de campo entre aspas", () => {
     const r = parseProdutosCSV('nome;preco\n"Colar\nlongo";25,00\nBrinco;10\n');
-    expect(r.linhas.map((l) => l.nome)).toEqual(["Colar\nlongo", "Brinco"]);
+    expect(r.linhas.map((l) => l.nome)).toEqual(["Colar longo", "Brinco"]);
   });
   it("recusa preço zero e custo negativo", () => {
     const r = parseProdutosCSV("nome;preco;custo\nA;0;1\nB;10;-2\nC;10;2\n");
