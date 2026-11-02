@@ -69,10 +69,13 @@ function Perfil() {
         <div className="flex items-center gap-2 text-sm text-muted">
           <Mail size={15} /> {email ? email : <Skeleton className="h-4 w-40" />}
         </div>
-        <div className="grid grid-cols-3 gap-2 pt-1 stagger">
+        {/* faturamento da loja é informação do dono — vendedor/entregador não vê */}
+        <div className={`grid ${role === "owner" ? "grid-cols-3" : "grid-cols-2"} gap-2 pt-1 stagger`}>
           <Stat label="Produtos" value={<CountUp value={produtos.length} />} />
           <Stat label="Vendas" value={<CountUp value={vendas.length} />} />
-          <Stat label="Faturado" value={<CountUp value={faturamento} format={brl} />} />
+          {role === "owner" && (
+            <Stat label="Faturado" value={<CountUp value={faturamento} format={brl} />} />
+          )}
         </div>
       </div>
 
@@ -100,8 +103,9 @@ function Perfil() {
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="surface-alt rounded-xl px-3 py-2.5 text-center">
-      <div className="font-bold text-base truncate">{value}</div>
+    <div className="surface-alt rounded-xl px-2 py-2.5 text-center min-w-0">
+      {/* sem truncate: valores como "R$ 10.640,00" quebram/encolhem em vez de virar "R$ 106..." */}
+      <div className="font-bold text-sm sm:text-base leading-tight tabular-nums break-words">{value}</div>
       <div className="text-[11px] text-muted">{label}</div>
     </div>
   );
@@ -116,7 +120,9 @@ function PlanoLinha() {
         <BadgeCheck size={18} className="text-brand-500" />
         <span className="font-semibold">Plano {defContratado.nome}</span>
         {emTrial && (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-600 text-white">Trial · {diasTrial}d</span>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-600 text-white whitespace-nowrap">
+            Teste grátis · {diasTrial}d
+          </span>
         )}
       </div>
       {role === "owner" ? (

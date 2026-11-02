@@ -246,25 +246,54 @@ function Painel() {
 }
 
 function PlanoCard() {
-  const { defContratado, caps, uso, emTrial, diasTrial } = usePlano();
+  const { defContratado, caps, uso, emTrial, diasTrial, assinatura } = usePlano();
+  // No teste grátis vale o Expansão (caps) e depois o plano contratado: mostra os
+  // dois para não parecer que o plano contratado tem revendedoras ilimitadas.
   const limRev = caps.maxRevendedoras;
+  const limDepois = defContratado.maxRevendedoras;
   const pctRev = limRev === Infinity ? 0 : Math.min(100, (uso.revendedoras / limRev) * 100);
+  const ate =
+    emTrial && assinatura?.trialAte
+      ? new Date(assinatura.trialAte).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+      : null;
   return (
     <Link href="/configuracoes/plano" className="card block hover:surface-alt transition">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-semibold">
-          <Crown size={18} className="text-brand-500" /> Plano {defContratado.nome}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-semibold min-w-0">
+          <Crown size={18} className="text-brand-500 shrink-0" />
+          {emTrial ? (
+            <span className="truncate">Teste grátis</span>
+          ) : (
+            <span className="truncate">Plano {defContratado.nome}</span>
+          )}
           {emTrial && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-600 text-white">Trial · {diasTrial}d</span>
+            <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-brand-600 text-white whitespace-nowrap">
+              {diasTrial} dia{diasTrial === 1 ? "" : "s"}
+            </span>
           )}
         </div>
-        <span className="text-xs text-brand-500 font-semibold flex items-center gap-1">
+        <span className="shrink-0 text-xs text-brand-500 font-semibold flex items-center gap-1">
           Gerenciar <Sparkles size={13} />
         </span>
       </div>
-      <div className="mt-2 flex items-center justify-between text-sm">
+      {emTrial && (
+        <p className="mt-1 text-xs text-muted">
+          Recursos do <b>{caps.nome}</b>{ate ? <> até <b>{ate}</b></> : null}. Depois, plano{" "}
+          <b>{defContratado.nome}</b>.
+        </p>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-2 text-sm">
         <span className="text-muted">Revendedoras</span>
-        <span className="font-semibold">{uso.revendedoras} / {fmtLimite(limRev)}</span>
+        <span className="font-semibold text-right">
+          {uso.revendedoras} / {fmtLimite(limRev)}
+          {emTrial && limDepois !== limRev && (
+            <span className="block text-[11px] font-normal text-muted">
+              {limDepois === 0
+                ? `o ${defContratado.nome} não inclui revendedoras`
+                : `${fmtLimite(limDepois)} no ${defContratado.nome}`}
+            </span>
+          )}
+        </span>
       </div>
       {limRev !== Infinity && (
         <div className="h-1.5 rounded-full surface-alt overflow-hidden mt-1">
