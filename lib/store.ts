@@ -289,7 +289,7 @@ interface State {
   setStatusEntrega: (entregaId: string, status: StatusEntrega) => Promise<Resultado>;
   // pool do motoboy: pegar uma entrega disponível / devolver ao balcão
   pegarEntrega: (entregaId: string) => Promise<{ ok: boolean; erro?: string }>;
-  devolverEntrega: (entregaId: string) => Promise<void>;
+  devolverEntrega: (entregaId: string) => Promise<Resultado>;
   recarregarEntregas: () => Promise<void>;
 
   addProduto: (p: NovoProduto) => Promise<Resultado>;
@@ -812,7 +812,7 @@ export const useStore = create<State>()((set, get) => {
       if (error || !data || data.length === 0) {
         // não conseguiu (já pegaram / RLS / rede): ressincroniza com o banco
         await get().recarregarEntregas();
-        return { ok: false, erro: error ? error.message : "Outra pessoa já pegou esta entrega." };
+        return { ok: false, erro: error ? erroAmigavel(error.message) : "Outra pessoa já pegou esta entrega." };
       }
       return { ok: true };
     },
@@ -824,8 +824,11 @@ export const useStore = create<State>()((set, get) => {
         entregas: s.entregas.map((e) => (e.id === entregaId ? { ...e, motoboyId: null } : e)),
       }));
       const { error } = await sb().from("entrega").update({ motoboy_id: null }).eq("id", entregaId);
-      if (error && anterior)
-        set((s) => ({ entregas: s.entregas.map((e) => (e.id === entregaId ? anterior : e)) }));
+      if (error) {
+        if (anterior) set((s) => ({ entregas: s.entregas.map((e) => (e.id === entregaId ? anterior : e)) }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     recarregarEntregas: async () => {
