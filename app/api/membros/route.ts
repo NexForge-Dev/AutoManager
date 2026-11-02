@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
-import { createClient as createServer } from "@/lib/supabase/server";
+import { donoDaOrg } from "@/lib/donoDaOrg";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { capacidades, limiteDoRecurso, type Assinatura, type PlanoId } from "@/lib/plans";
 import { emailValido, erroAuthPtBr, normalizarEmail, NOME_MAX, SENHA_MAX, SENHA_MIN, uuidValido } from "@/lib/validacao";
@@ -17,20 +17,6 @@ function admin() {
   );
 }
 
-async function donoDaOrg() {
-  const sb = await createServer();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  if (!user) return null;
-  const { data: eu } = await sb
-    .from("usuario")
-    .select("org_id, role")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!eu || eu.role !== "owner") return null;
-  return { userId: user.id, orgId: eu.org_id as string };
-}
 
 export async function POST(req: Request) {
   const dono = await donoDaOrg();

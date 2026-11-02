@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { capacidades, type Assinatura, type PlanoId, type StatusAssinatura } from "@/lib/plans";
 import { LIMITES_ATIVACAO, chaveLimite, ipDaRequisicao, todasDentroDoLimite } from "@/lib/rateLimit";
-import { emailValido, normalizarEmail, SENHA_MAX } from "@/lib/validacao";
+import { emailValido, normalizarEmail, SENHA_MAX, SENHA_MIN } from "@/lib/validacao";
 
 // Ativação self-service da revendedora: ela informa o e-mail que a loja liberou e
 // escolhe a própria senha no 1º acesso. Só funciona se o dono liberou o acesso
@@ -20,8 +20,11 @@ export async function POST(req: Request) {
   const mail = normalizarEmail(body?.email);
   const cod = typeof body?.codigo === "string" ? body.codigo.trim().toUpperCase() : "";
   const senha = typeof body?.senha === "string" ? body.senha : "";
-  if (!mail || !senha || senha.length < 6 || senha.length > SENHA_MAX)
-    return NextResponse.json({ erro: "Informe o e-mail e uma senha de pelo menos 6 caracteres." }, { status: 400 });
+  if (!mail || !senha || senha.length < SENHA_MIN || senha.length > SENHA_MAX)
+    return NextResponse.json(
+      { erro: `Informe o e-mail e uma senha de ${SENHA_MIN} a ${SENHA_MAX} caracteres.` },
+      { status: 400 }
+    );
   // formato antes de tudo: e-mail com curinga/metacaractere (%, *, espaço...) nem chega ao banco
   if (!emailValido(mail)) return NextResponse.json({ erro: "E-mail inválido." }, { status: 400 });
   if (!cod)

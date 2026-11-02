@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { enviarMetricas } from "@/lib/metricas/servidor";
 import { donoDaOrg } from "@/lib/donoDaOrg";
-import { adminClient, posSincronizar, semIdempotencia, stripe, supabaseBillingStore } from "@/lib/stripe";
+import { adminClient, lerAssinatura, posSincronizar, semIdempotencia, stripe, supabaseBillingStore } from "@/lib/stripe";
 import { tratarEventoStripe } from "@/lib/billing/stripeSync";
 
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const r = await tratarEventoStripe(
       { id: `confirmar:${sessao.id}`, type: "checkout.session.completed", data: { object: sessao } } as any,
       semIdempotencia(supabaseBillingStore(adminClient())),
-      (id) => stripe().subscriptions.retrieve(id)
+      lerAssinatura
     );
     await posSincronizar(r, sessao.id);
     await enviarMetricas();

@@ -162,6 +162,11 @@ export function diasDeTrial(a: Assinatura | null): number {
 // private.plano_efetivo (migration 0035).
 export const CARENCIA_PAGAMENTO_MS = 3 * 86_400_000;
 
+// Assinar durante o teste grátis: com mais que isso de teste restante, a assinatura do
+// Stripe nasce em trial até o fim do teste e a 1ª cobrança fica para essa data (o
+// Stripe Checkout só aceita trial_end pelo menos 48 h no futuro). Com menos, cobra já.
+export const MIN_TRIAL_STRIPE_MS = 48 * 3600 * 1000;
+
 // Durante o trial valem as capacidades de EXPANSAO.
 // Espelha private.plano_efetivo (supabase/migrations/0035).
 export function planoEfetivo(a: Assinatura | null): PlanoId {

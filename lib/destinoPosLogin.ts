@@ -21,11 +21,12 @@ export async function destinoPosLogin(): Promise<string> {
   if (situacao === "ativa") return "/revenda";
 
   await useStore.getState().hydrate();
-  const { config, role, semOrg } = useStore.getState();
+  const { config, role, semOrg, superadmin } = useStore.getState();
   return decidirDestino({
     situacaoRevendedora: situacao,
     semOrg,
     role,
     onboardingCompleto: config.onboardingCompleto,
+    superadmin,
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { waLink } from "@/lib/contato";
 import { useStore } from "@/lib/store";
-import { linkWhatsappSuporte } from "@/lib/admin";
 import { brlPreco, ORDEM_PLANOS, PLANOS, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -55,6 +55,8 @@ const STATUS_INFO: Record<string, { txt: string; cls: string }> = {
   trialing: { txt: "Trial", cls: "bg-brand-500/15 text-brand-600" },
   past_due: { txt: "Pendente", cls: "bg-amber-500/15 text-amber-600" },
   canceled: { txt: "Cancelada", cls: "bg-red-500/15 text-red-600" },
+  trial_vencido: { txt: "Trial vencido", cls: "bg-amber-500/15 text-amber-600" },
+  cortesia: { txt: "Cortesia", cls: "bg-sky-500/15 text-sky-600" },
 };
 
 type Acesso = "ativo" | "desativado" | "banido";
@@ -127,6 +129,7 @@ function Admin() {
   const [logs, setLogs] = useState<AdminLog[] | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [filtro, setFiltro] = useState<"abertos" | "todos">("abertos");
+  const [erroChamados, setErroChamados] = useState<string | null>(null);
 
   async function carregar() {
     setCarregando(true);
@@ -139,7 +142,8 @@ function Admin() {
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
     ]);
-    setChamados(lista);
+    setChamados(lista.chamados);
+    setErroChamados(lista.erro ?? null);
     setOverview(res);
     setLogs(logsRes?.logs ?? null);
     setCarregando(false);
@@ -160,7 +164,12 @@ function Admin() {
           : x
       )
     );
-    await resolverChamado(c.id, resolvido);
+    const r = await resolverChamado(c.id, resolvido);
+    if (!r.ok) {
+      // volta ao estado anterior e avisa (antes ficava "resolvido" só na tela)
+      setChamados((cs) => cs.map((x) => (x.id === c.id ? c : x)));
+      setErroChamados(r.erro || "Não foi possível atualizar o chamado.");
+    }
   }
 
   if (!autorizado) {
@@ -230,6 +239,7 @@ function Admin() {
           filtro={filtro}
           setFiltro={setFiltro}
           alternar={alternar}
+          erro={erroChamados}
         />
       )}
     </div>
@@ -366,7 +376,7 @@ function LojasView({
     if (plano === l.plano) return;
     const ok = await confirm({
       titulo: `Mudar para ${PLANOS[plano].nome}?`,
-      mensagem: `"${l.nome}" — de ${PLANOS[l.plano].nome} para ${PLANOS[plano].nome}.\n\nA troca é aplicada na hora, sem cobrança. Se a loja tiver uma assinatura ativa no Stripe, ela continua sendo cobrada lá até ser cancelada.`,
+      mensagem: `"${l.nome}" — de ${PLANOS[l.plano].nome} para ${PLANOS[plano].nome}.\n\nA troca é aplicada na hora, sem cobrança e sem vencimento (cortesia), e encerra o teste grátis. Num plano menor, o que passar do limite (revendedoras, vendedores, motoboys/entregas) fica bloqueado — nada é apagado. Loja com assinatura ativa no Stripe não recebe plano manual: cancele a assinatura antes.`,
       confirmar: "Mudar plano",
     });
     if (!ok) return;
@@ -574,11 +584,13 @@ function ChamadosView({
   filtro,
   setFiltro,
   alternar,
+  erro,
 }: {
   chamados: Chamado[];
   filtro: "abertos" | "todos";
   setFiltro: (f: "abertos" | "todos") => void;
   alternar: (c: Chamado) => void;
+  erro: string | null;
 }) {
   const lista = filtro === "abertos" ? chamados.filter((c) => c.status !== "resolvido") : chamados;
 
@@ -598,7 +610,12 @@ function ChamadosView({
         ))}
       </div>
 
-      {lista.length === 0 ? (
+      {erro && (
+        <div role="alert" className="card text-sm text-red-500">
+          {erro}
+        </div>
+      )}
+      {lista.length === 0 && !erro ? (
         <div className="card text-center text-muted py-10 flex flex-col items-center gap-2">
           <Inbox size={32} />
           {filtro === "abertos" ? "Nenhum chamado em aberto 🎉" : "Nenhum chamado ainda."}
@@ -645,7 +662,7 @@ function ChamadosView({
                 </a>
               )}
               {c.whatsapp && (
-                <a href={linkWhatsappSuporte()} className="flex items-center gap-1 hover:text-green-600">
+                <a href={waLink(c.whatsapp)} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-green-600">
                   <MessageCircle size={13} /> {c.whatsapp}
                 </a>
               )}

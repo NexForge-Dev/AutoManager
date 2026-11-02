@@ -6,7 +6,8 @@ export function slugify(s: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
+    .slice(0, 40)
+    .replace(/-+$/g, ""); // o corte pode cair num hífen (slugSugerido viraria "nome--abcd")
 }
 
 export function slugSugerido(nome: string): string {

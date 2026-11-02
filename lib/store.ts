@@ -289,7 +289,7 @@ interface State {
   setStatusEntrega: (entregaId: string, status: StatusEntrega) => Promise<Resultado>;
   // pool do motoboy: pegar uma entrega disponível / devolver ao balcão
   pegarEntrega: (entregaId: string) => Promise<{ ok: boolean; erro?: string }>;
-  devolverEntrega: (entregaId: string) => Promise<void>;
+  devolverEntrega: (entregaId: string) => Promise<Resultado>;
   recarregarEntregas: () => Promise<void>;
 
   addProduto: (p: NovoProduto) => Promise<Resultado>;
@@ -314,7 +314,7 @@ interface State {
     parcelas?: number;
     desconto?: number;
     fiado?: boolean;
-  }) => Promise<Venda | null>;
+  }) => Promise<{ venda: Venda | null; erro?: string }>;
   // marca como paga SÓ as vendas informadas (as que a tela somou/mostrou)
   marcarComissaoPaga: (revendedoraId: string, vendaIds: string[]) => Promise<Resultado>;
   marcarVendaRecebida: (vendaId: string) => Promise<Resultado>;
@@ -347,8 +347,11 @@ interface State {
     emailContato?: string;
     whatsapp?: string;
   }) => Promise<{ ok: boolean; erro?: string }>;
-  listarChamados: () => Promise<Chamado[]>;
-  resolverChamado: (id: string, resolvido: boolean) => Promise<void>;
+  // erro = não conseguiu ler (a tela mostra o erro em vez de "nenhum chamado")
+  listarChamados: () => Promise<{ chamados: Chamado[]; erro?: string }>;
+  resolverChamado: (id: string, resolvido: boolean) => Promise<Resultado>;
+  // sair: limpa os dados da loja da memória (outra conta no mesmo navegador não vê nada)
+  limpar: () => void;
 }
 
 // retorno padrão das ações que gravam no banco (a tela mostra `erro` se falhar)
@@ -384,6 +387,7 @@ function erroAmigavel(msg: string | undefined): string {
   // regras do banco (migrations 0041/0042)
   if (/plano_sem_vendedores/.test(m))
     return "Seu acesso de vendedor está pausado pelo plano atual da loja. Fale com o dono.";
+  if (/venda_canal_valido/.test(m)) return "Canal de venda inválido.";
   if (/canal_invalido|_len"/.test(m)) return "Texto muito longo. Encurte e tente de novo.";
   if (/preco_nao_negativo|valor_positivo|taxa_nao_negativa/.test(m)) return "Informe um valor maior ou igual a zero.";
   if (/comissao_faixa|comissao_padrao_faixa/.test(m)) return "A comissão precisa ficar entre 0% e 100%.";
@@ -391,6 +395,9 @@ function erroAmigavel(msg: string | undefined): string {
   if (/vinculo_somente_pela_ativacao/.test(m)) return "O acesso da revendedora é liberado pelo botão Liberar acesso.";
   if (/entrega_campo_bloqueado/.test(m)) return "Só o dono da loja altera os dados da entrega.";
   if (/papel_protegido|usuario_campo_protegido|org_campo_protegido/.test(m)) return "Só o suporte pode alterar isso.";
+  if (/motoboy_invalido/.test(m)) return "Esse motoboy não faz parte da sua loja.";
+  if (/chat_limite/.test(m)) return "Muitas mensagens em pouco tempo. Aguarde um minuto e tente de novo.";
+  if (/org_slug_formato/.test(m)) return "Use só letras minúsculas, números e hífens no link (até 60 caracteres).";
   if (/permission denied|row-level security/i.test(m)) return "Você não tem permissão para fazer isso.";
   if (/failed to fetch|network/i.test(m)) return "Sem conexão. Tente de novo.";
   return m || "Não foi possível salvar. Tente de novo.";
@@ -663,7 +670,7 @@ export const useStore = create<State>()((set, get) => {
           ok: false,
           erro: /duplicate|unique/i.test(error.message)
             ? "Esse link já está em uso. Tente outro."
-            : error.message,
+            : erroAmigavel(error.message),
         };
       set((s) => ({ config: { ...s.config, slug } }));
       return { ok: true };
@@ -809,7 +816,7 @@ export const useStore = create<State>()((set, get) => {
       if (error || !data || data.length === 0) {
         // não conseguiu (já pegaram / RLS / rede): ressincroniza com o banco
         await get().recarregarEntregas();
-        return { ok: false, erro: error ? error.message : "Outra pessoa já pegou esta entrega." };
+        return { ok: false, erro: error ? erroAmigavel(error.message) : "Outra pessoa já pegou esta entrega." };
       }
       return { ok: true };
     },
@@ -821,8 +828,11 @@ export const useStore = create<State>()((set, get) => {
         entregas: s.entregas.map((e) => (e.id === entregaId ? { ...e, motoboyId: null } : e)),
       }));
       const { error } = await sb().from("entrega").update({ motoboy_id: null }).eq("id", entregaId);
-      if (error && anterior)
-        set((s) => ({ entregas: s.entregas.map((e) => (e.id === entregaId ? anterior : e)) }));
+      if (error) {
+        if (anterior) set((s) => ({ entregas: s.entregas.map((e) => (e.id === entregaId ? anterior : e)) }));
+        return { ok: false, erro: erroAmigavel(error.message) };
+      }
+      return { ok: true };
     },
 
     recarregarEntregas: async () => {
@@ -1351,14 +1361,15 @@ export const useStore = create<State>()((set, get) => {
       // valida estoque (por variação quando houver)
       for (const it of itens) {
         const prod = s.produtos.find((p) => p.id === it.produtoId);
-        if (!prod) return null;
+        if (!prod) return { venda: null, erro: "Um produto do carrinho não existe mais. Atualize a página." };
         if (it.variacaoId) {
           const v = prod.variacoes.find((x) => x.id === it.variacaoId);
-          if (!v || v.estoqueAtual < it.qtd) return null;
+          if (!v) return { venda: null, erro: `A variação escolhida de "${prod.nome}" não existe mais.` };
+          if (v.estoqueAtual < it.qtd) return { venda: null, erro: `Estoque insuficiente de "${prod.nome} - ${v.nome}".` };
         } else if (prod.variacoes.length > 0) {
-          return null; // produto com grade exige escolher variação
+          return { venda: null, erro: `"${prod.nome}" tem variações: escolha a variação.` };
         } else if (prod.estoqueAtual < it.qtd) {
-          return null;
+          return { venda: null, erro: `Estoque insuficiente de "${prod.nome}".` };
         }
       }
 
@@ -1431,7 +1442,7 @@ export const useStore = create<State>()((set, get) => {
         }),
       }));
 
-      if (!orgId) return venda;
+      if (!orgId) return { venda };
 
       // Tudo numa transação atômica no banco (valida estoque, grava venda+itens,
       // baixa estoque relativo e movimentos). O id vem do cliente p/ casar com o otimista.
@@ -1464,7 +1475,7 @@ export const useStore = create<State>()((set, get) => {
         }));
         // o cache pode estar velho (ex.: sem_estoque por venda em paralelo): ressincroniza
         void recarregarProdutos([...afetados]);
-        return null;
+        return { venda: null, erro: erroAmigavel(error.message) };
       }
 
       registrarMetrica({ tipo: "recurso", recurso: revendedoraId ? "venda_revendedora" : "venda_registrada" });
@@ -1484,7 +1495,7 @@ export const useStore = create<State>()((set, get) => {
       // estoque real (outras vendas podem ter baixado as mesmas peças)
       void recarregarProdutos([...baixaPorProduto.keys()]);
 
-      return confirmada;
+      return { venda: confirmada };
     },
 
     // Paga SÓ as vendas que a tela somou (ids explícitos). Antes marcava todas
@@ -1819,18 +1830,41 @@ export const useStore = create<State>()((set, get) => {
         .from("chamado")
         .select("*")
         .order("created_at", { ascending: false });
-      if (error) return [];
-      return (data || []).map(mapChamado);
+      if (error) return { chamados: [], erro: erroAmigavel(error.message) };
+      return { chamados: (data || []).map(mapChamado) };
     },
 
     resolverChamado: async (id, resolvido) => {
-      await sb()
+      const { error } = await sb()
         .from("chamado")
         .update({
           status: resolvido ? "resolvido" : "aberto",
           resolved_at: resolvido ? new Date().toISOString() : null,
         })
         .eq("id", id);
+      if (error) return { ok: false, erro: erroAmigavel(error.message) };
+      return { ok: true };
     },
+
+    limpar: () =>
+      set({
+        ready: false,
+        orgId: null,
+        usuarioId: null,
+        email: null,
+        superadmin: false,
+        role: "owner",
+        semOrg: false,
+        config: configInicial,
+        assinatura: null,
+        produtos: [],
+        revendedoras: [],
+        vendas: [],
+        movimentos: [],
+        membros: [],
+        entregas: [],
+        entradasPendentes: [],
+        contasPagar: [],
+      }),
   };
 });

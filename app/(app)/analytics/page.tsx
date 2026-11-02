@@ -51,7 +51,8 @@ function Analytics() {
         <h1 className="text-2xl font-bold">Inteligência</h1>
       </header>
 
-      {vendas.length === 0 ? (
+      {/* canceladas não contam: só canceladas = sem dados */}
+      {a.totalVendas === 0 ? (
         <div className="card text-center text-muted">
           Sem vendas ainda. Os gráficos aparecem quando você começar a vender.
         </div>
@@ -59,23 +60,35 @@ function Analytics() {
         <>
           {/* KPIs */}
           <div className={`grid gap-2 stagger ${caps.allowAdvancedAnalytics ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
+            {/* ticket médio e itens/venda: só vendas com produtos (sem "Recebimento avulso") */}
             <Kpi label="Ticket médio" valor={<CountUp value={a.ticketMedio} format={brl} />} />
-            <Kpi label="Itens/venda" valor={<CountUp value={a.itensPorVenda} format={(n) => n.toFixed(1)} />} />
-            {caps.allowAdvancedAnalytics && (
-              <Kpi
-                label="Mês vs anterior"
-                valor={`${a.tendenciaMes >= 0 ? "+" : ""}${a.tendenciaMes.toFixed(0)}%`}
-                cor={a.tendenciaMes >= 0 ? "text-green-500" : "text-red-500"}
-                icon={a.tendenciaMes >= 0 ? TrendingUp : TrendingDown}
-              />
-            )}
+            <Kpi label="Itens/venda" valor={<CountUp value={a.itensPorVenda} format={(n) => n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} />} />
+            {caps.allowAdvancedAnalytics &&
+              (a.tendenciaMes === null ? (
+                // mês anterior sem vendas: não há base para comparar (nada de "+0%" verde)
+                <Kpi label="Mês vs anterior" valor="—" />
+              ) : (
+                <Kpi
+                  label="Mês vs anterior"
+                  valor={`${a.tendenciaMes >= 0 ? "+" : ""}${a.tendenciaMes.toFixed(0)}%`}
+                  cor={a.tendenciaMes >= 0 ? "text-green-500" : "text-red-500"}
+                  icon={a.tendenciaMes >= 0 ? TrendingUp : TrendingDown}
+                />
+              ))}
           </div>
+          {a.vendasComItens < a.totalVendas && (
+            <p className="text-[11px] text-muted -mt-2">
+              Ticket médio e itens/venda consideram só vendas com produtos (
+              {a.totalVendas - a.vendasComItens} recebimento(s) avulso(s) fora da conta).
+            </p>
+          )}
 
           {/* Vendas por produto (donut) */}
           <section className="card space-y-3">
             <div className="flex items-center gap-2 font-semibold">
               <ShoppingBag size={18} className="text-brand-500" /> Receita por produto
             </div>
+            <p className="text-xs text-muted -mt-2">Já com os descontos das vendas, rateados entre os itens.</p>
             {a.porProduto.length === 0 ? (
               <p className="text-sm text-muted">Sem dados.</p>
             ) : (
@@ -85,10 +98,10 @@ function Analytics() {
                 />
                 <div className="flex-1 min-w-[150px] space-y-1">
                   {a.porProduto.map((p, i) => (
-                    <div key={p.nome} className="flex items-center gap-2 text-sm">
+                    <div key={`${i}-${p.nome}`} className="flex items-center gap-2 text-sm">
                       <span className="h-3 w-3 rounded-sm shrink-0" style={{ background: CORES[i % CORES.length] }} />
                       <span className="truncate flex-1">{p.nome}</span>
-                      <span className="text-muted">{brl(p.receita)}</span>
+                      <span className="text-muted shrink-0">{brl(p.receita)}</span>
                     </div>
                   ))}
                 </div>
@@ -101,9 +114,9 @@ function Analytics() {
             <div className="font-semibold">Mix por canal</div>
             {a.porCanal.map((c) => (
               <div key={c.canal}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>{c.label}</span>
-                  <span className="text-muted">
+                <div className="flex justify-between gap-2 text-sm mb-1">
+                  <span className="truncate">{c.label}</span>
+                  <span className="text-muted shrink-0">
                     {brl(c.total)} · {c.pct.toFixed(0)}%
                   </span>
                 </div>
@@ -130,8 +143,8 @@ function Analytics() {
                   <p className="text-xs text-muted">
                     Produtos sem estoque que vendiam bem — repor pode recuperar esta receita.
                   </p>
-                  {a.ruptura.map((r) => (
-                    <div key={r.nome} className="flex items-center justify-between text-sm">
+                  {a.ruptura.map((r, i) => (
+                    <div key={`${i}-${r.nome}`} className="flex items-center justify-between gap-2 text-sm">
                       <span className="truncate">{r.nome}</span>
                       <span className="text-amber-500 font-semibold shrink-0">~{brl(r.perdaEstimada)}/mês</span>
                     </div>

@@ -16,6 +16,7 @@ export default function AcessoPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doLink, setDoLink] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   // /acesso?motivo=suspenso|sem_loja (destinoPosLogin): conta sem loja ativa.
   // Mostra o motivo e encerra a sessão, para não ficar preso num login sem acesso.
@@ -58,6 +59,7 @@ export default function AcessoPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
+    setAviso(null);
     setLoading(true);
     const supabase = createClient();
     const mail = email.trim().toLowerCase();
@@ -71,23 +73,35 @@ export default function AcessoPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setErro(data?.erro || "Não foi possível ativar o acesso.");
+          setErro(typeof data?.erro === "string" && data.erro ? data.erro : "Não foi possível ativar o acesso.");
           setLoading(false);
           return;
         }
+        // o código é de uso único: daqui em diante é só "Entrar" (mantém o e-mail).
+        // Se o login abaixo falhar, tentar de novo não reenvia o código já usado.
+        setModo("entrar");
+        setCodigo("");
+        setDoLink(false);
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email: mail, password: senha });
       if (error) {
-        setErro(/invalid login/i.test(error.message) ? "E-mail ou senha incorretos." : error.message);
+        if (modo === "ativar") setAviso("Acesso ativado! Agora é só entrar com o e-mail e a senha que você acabou de criar.");
+        setErro(traduzErroLogin(error.message));
         setLoading(false);
         return;
       }
       await entrarERedirecionar();
     } catch {
-      setErro("Erro inesperado. Tente novamente.");
+      setErro("Erro inesperado. Confira sua conexão e tente novamente.");
       setLoading(false);
     }
+  }
+
+  function trocarModo(m: "ativar" | "entrar") {
+    setModo(m);
+    setErro(null);
+    setAviso(null);
   }
 
   return (
@@ -101,13 +115,17 @@ export default function AcessoPage() {
         <div className="card space-y-4">
           <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
             <button
-              onClick={() => setModo("ativar")}
+              type="button"
+              aria-pressed={modo === "ativar"}
+              onClick={() => trocarModo("ativar")}
               className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "ativar" ? "surface shadow" : "text-muted hover:text-strong"}`}
             >
               Primeiro acesso
             </button>
             <button
-              onClick={() => setModo("entrar")}
+              type="button"
+              aria-pressed={modo === "entrar"}
+              onClick={() => trocarModo("entrar")}
               className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "entrar" ? "surface shadow" : "text-muted hover:text-strong"}`}
             >
               Entrar
@@ -124,13 +142,14 @@ export default function AcessoPage() {
 
           <form onSubmit={submit} className="space-y-3">
             <div>
-              <label className="label">E-mail</label>
-              <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+              <label htmlFor="acesso-email" className="label">E-mail</label>
+              <input id="acesso-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             {modo === "ativar" && (
               <div>
-                <label className="label">Código de acesso</label>
+                <label htmlFor="acesso-codigo" className="label">Código de acesso</label>
                 <input
+                  id="acesso-codigo"
                   className="input tracking-[0.3em] font-mono uppercase"
                   value={codigo}
                   onChange={(e) => setCodigo(e.target.value.toUpperCase())}
@@ -144,18 +163,21 @@ export default function AcessoPage() {
               </div>
             )}
             <div>
-              <label className="label">{modo === "ativar" ? "Crie sua senha" : "Senha"}</label>
+              <label htmlFor="acesso-senha" className="label">{modo === "ativar" ? "Crie sua senha" : "Senha"}</label>
               <input
+                id="acesso-senha"
                 type="password"
                 className="input"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 required
-                minLength={6}
+                minLength={modo === "ativar" ? 8 : 6}
+                maxLength={72}
                 autoComplete={modo === "ativar" ? "new-password" : "current-password"}
               />
             </div>
-            {erro && <p className="text-sm text-red-600">{erro}</p>}
+            {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
+            {aviso && <p role="status" className="text-sm text-green-600">{aviso}</p>}
             <button disabled={loading} className="btn-primary w-full disabled:opacity-60">
               {loading ? <Loader2 className="animate-spin" size={18} /> : modo === "ativar" ? "Ativar e entrar" : "Entrar"}
             </button>
@@ -170,4 +192,14 @@ export default function AcessoPage() {
       </div>
     </div>
   );
+}
+
+// Erros do signInWithPassword em pt-BR (nunca a mensagem crua em inglês).
+function traduzErroLogin(msg: string): string {
+  if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
+  if (/email not confirmed/i.test(msg)) return "Confirme seu e-mail antes de entrar.";
+  if (/rate limit|too many|security purposes/i.test(msg))
+    return "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.";
+  if (/fetch|network/i.test(msg)) return "Sem conexão. Confira a internet e tente de novo.";
+  return "Não foi possível entrar agora. Tente de novo.";
 }

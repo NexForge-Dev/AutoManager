@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { calcularMetricas, brl } from "@/lib/analytics";
 import { usePlano } from "@/lib/usePlano";
 import { fmtLimite } from "@/lib/plans";
+import { FUSO_LOJA } from "@/lib/fuso";
 import Guard from "@/components/Guard";
 import Reporte from "@/components/Reporte";
 import CountUp from "@/components/CountUp";
@@ -27,6 +28,7 @@ import {
   Crown,
   Sparkles,
   Inbox,
+  Lock,
 } from "lucide-react";
 
 export default function PainelPage() {
@@ -70,10 +72,15 @@ function Painel() {
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
+          {/* só com pendências: não há importação automática de recebimentos */}
+          {recebimentosPendentes > 0 && (
           <Link
             href="/recebimentos"
             className="relative grid place-items-center h-10 w-10 rounded-xl text-muted hover:text-strong hover:bg-[var(--hover)] active:scale-90 transition"
             title="Recebimentos"
+            aria-label={
+              recebimentosPendentes > 0 ? `Recebimentos (${recebimentosPendentes} pendentes)` : "Recebimentos"
+            }
           >
             <Inbox size={22} />
             {recebimentosPendentes > 0 && (
@@ -82,10 +89,12 @@ function Painel() {
               </span>
             )}
           </Link>
+          )}
           <Link
             href="/relatorios"
             className="grid place-items-center h-10 w-10 rounded-xl text-muted hover:text-strong hover:bg-[var(--hover)] active:scale-90 transition"
             title="Relatórios"
+            aria-label="Relatórios"
           >
             <BarChart3 size={22} />
           </Link>
@@ -93,6 +102,7 @@ function Painel() {
             href="/configuracoes"
             className="grid place-items-center h-10 w-10 rounded-xl text-muted hover:text-strong hover:bg-[var(--hover)] active:scale-90 transition"
             title="Configurações"
+            aria-label="Configurações"
           >
             <Settings size={22} />
           </Link>
@@ -128,8 +138,16 @@ function Painel() {
           <div className="flex items-center gap-2 text-muted text-xs">
             <TrendingUp size={14} /> Lucro estimado
           </div>
-          <CountUp value={m.lucroMes} format={brl} className="block text-xl font-bold mt-1 text-green-600" />
-          <div className="text-xs mt-1 h-4 text-muted">margem no mês</div>
+          <CountUp
+            value={m.lucroMes}
+            format={brl}
+            className={`block text-xl font-bold mt-1 ${m.lucroMes < 0 ? "text-red-500" : "text-green-600"}`}
+          />
+          <div className="text-xs mt-1 h-4 text-muted">
+            {m.faturamentoMes > 0
+              ? `margem de ${Math.round((m.lucroMes / m.faturamentoMes) * 100)}% no mês`
+              : "no mês atual"}
+          </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-2 text-muted text-xs">
@@ -205,12 +223,13 @@ function Painel() {
           </div>
           <div className="space-y-2 stagger">
             {m.rankingRevendedoras.map((r, i) => (
-              <div key={r.nome} className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className="text-muted w-5">{i + 1}º</span>
-                  <span className="font-medium">{r.nome}</span>
+              // nomes podem repetir (homônimas, "-" de revendedora removida): posição + nome
+              <div key={r.id ?? `${i}-${r.nome}`} className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="text-muted w-5 shrink-0">{i + 1}º</span>
+                  <span className="font-medium truncate">{r.nome}</span>
                 </span>
-                <span className="text-sm">{brl(r.total)}</span>
+                <span className="text-sm shrink-0">{brl(r.total)}</span>
               </div>
             ))}
           </div>
@@ -223,9 +242,9 @@ function Painel() {
           <div className="text-sm font-semibold mb-3">🔥 Mais vendidos</div>
           <div className="space-y-2 stagger">
             {m.topProdutos.map((p) => (
-              <div key={p.nome} className="flex items-center justify-between text-sm">
-                <span className="font-medium">{p.nome}</span>
-                <span className="text-muted">{p.qtd} un</span>
+              <div key={p.nome} className="flex items-center justify-between gap-2 text-sm">
+                <span className="font-medium truncate">{p.nome}</span>
+                <span className="text-muted shrink-0">{p.qtd} un</span>
               </div>
             ))}
           </div>
@@ -246,16 +265,54 @@ function Painel() {
 }
 
 function PlanoCard() {
-  const { defContratado, caps, uso, emTrial, diasTrial, assinatura } = usePlano();
+  const { defContratado, caps, uso, emTrial, diasTrial, assinatura, situacao, bloqueado } = usePlano();
   // No teste grátis vale o Expansão (caps) e depois o plano contratado: mostra os
   // dois para não parecer que o plano contratado tem revendedoras ilimitadas.
   const limRev = caps.maxRevendedoras;
   const limDepois = defContratado.maxRevendedoras;
-  const pctRev = limRev === Infinity ? 0 : Math.min(100, (uso.revendedoras / limRev) * 100);
+  // limite 0 (Ambulante/piso): sem divisão por zero (NaN na largura da barra)
+  const pctRev =
+    limRev === Infinity ? 0 : limRev > 0 ? Math.min(100, (uso.revendedoras / limRev) * 100) : uso.revendedoras > 0 ? 100 : 0;
   const ate =
     emTrial && assinatura?.trialAte
-      ? new Date(assinatura.trialAte).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+      ? new Date(assinatura.trialAte).toLocaleDateString("pt-BR", {
+          timeZone: FUSO_LOJA,
+          day: "2-digit",
+          month: "2-digit",
+        })
       : null;
+  // sem assinatura / teste vencido / cancelada / inadimplente: a loja está no piso
+  const motivoBloqueio =
+    situacao === "sem_assinatura"
+      ? "Sem assinatura"
+      : situacao === "trial_vencido"
+        ? "Teste encerrado"
+        : situacao === "cancelada"
+          ? "Assinatura cancelada"
+          : "Pagamento pendente";
+  if (bloqueado) {
+    return (
+      <Link href="/planos" className="card block border-red-500/40 bg-red-500/5 hover:surface-alt transition">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-semibold min-w-0">
+            <Lock size={18} className="text-red-500 shrink-0" />
+            <span className="truncate">
+              {situacao === "sem_assinatura" ? "Nenhum plano ativo" : `Plano ${defContratado.nome}`}
+            </span>
+            <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-red-500 text-white whitespace-nowrap">
+              {motivoBloqueio}
+            </span>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          Revendedoras, vendedores, motoboys, ranking e analytics estão bloqueados. Seus dados continuam salvos.
+        </p>
+        <span className="mt-2 text-sm text-brand-500 font-semibold flex items-center gap-1">
+          {situacao === "pendente" ? "Regularizar pagamento" : "Assinar um plano"} <Sparkles size={13} />
+        </span>
+      </Link>
+    );
+  }
   return (
     <Link href="/configuracoes/plano" className="card block hover:surface-alt transition">
       <div className="flex items-center justify-between gap-2">
@@ -299,7 +356,7 @@ function PlanoCard() {
           )}
         </span>
       </div>
-      {limRev !== Infinity && (
+      {limRev !== Infinity && limRev > 0 && (
         <div className="h-1.5 rounded-full surface-alt overflow-hidden mt-1">
           <div
             className={`h-full rounded-full progress-fill ${pctRev >= 100 ? "bg-red-500" : "bg-brand-600"}`}

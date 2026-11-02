@@ -64,7 +64,22 @@ function Entregas() {
     recarregarEntregas,
   } = useStore();
   const { caps } = usePlano();
+  const { alerta } = useDialog();
   const dono = role === "owner";
+  // entrega com gravação em andamento (desliga os botões do card; a store desfaz o
+  // otimista se o banco recusar, então o erro PRECISA aparecer, senão o status
+  // "volta sozinho" sem explicação)
+  const [ocupada, setOcupada] = useState<string | null>(null);
+  async function executar(id: string, acao: () => Promise<{ ok: boolean; erro?: string }>) {
+    if (ocupada) return;
+    setOcupada(id);
+    const r = await acao();
+    setOcupada(null);
+    if (!r.ok) alerta({ titulo: "Não foi possível atualizar a entrega", mensagem: r.erro || "Tente novamente." });
+  }
+  const atribuir = (id: string, motoboyId: string | null) => executar(id, () => atribuirMotoboy(id, motoboyId));
+  const mudarStatus = (id: string, st: StatusEntrega) => executar(id, () => setStatusEntrega(id, st));
+  const devolver = (id: string) => executar(id, () => devolverEntrega(id));
 
   // realtime: o balcão e os status ficam vivos (nova entrega, alguém pegou, mudou status)
   useEffect(() => {
@@ -104,8 +119,9 @@ function Entregas() {
         entregas={entregas}
         usuarioId={usuarioId}
         onPegar={pegarEntrega}
-        onDevolver={devolverEntrega}
-        onStatus={setStatusEntrega}
+        onDevolver={devolver}
+        onStatus={mudarStatus}
+        ocupada={ocupada}
       />
     );
   }
@@ -122,18 +138,12 @@ function Entregas() {
           <Truck className="text-brand-600" />
           <h1 className="text-2xl font-bold">Entregas</h1>
         </div>
-        {dono && (
-          <button onClick={() => setAberto(true)} className="btn-primary py-2 px-3 text-sm">
-            <Plus size={18} /> Entrega
-          </button>
-        )}
+        <button onClick={() => setAberto(true)} className="btn-primary py-2 px-3 text-sm">
+          <Plus size={18} /> Entrega
+        </button>
       </header>
 
-      {entregas.length === 0 && (
-        <div className="card text-center text-muted">
-          {dono ? "Nenhuma entrega ainda." : "Nenhuma entrega atribuída a você."}
-        </div>
-      )}
+      {entregas.length === 0 && <div className="card text-center text-muted">Nenhuma entrega ainda.</div>}
 
       {ativas.length > 0 && (
         <div className="space-y-2 stagger">
@@ -145,8 +155,9 @@ function Entregas() {
               dono={dono}
               motoboys={motoboys}
               nomeMotoboy={membros.find((m) => m.id === e.motoboyId)?.nome}
-              onAtribuir={atribuirMotoboy}
-              onStatus={setStatusEntrega}
+              onAtribuir={atribuir}
+              onStatus={mudarStatus}
+              ocupada={ocupada === e.id}
             />
           ))}
         </div>
@@ -162,8 +173,9 @@ function Entregas() {
               dono={dono}
               motoboys={motoboys}
               nomeMotoboy={membros.find((m) => m.id === e.motoboyId)?.nome}
-              onAtribuir={atribuirMotoboy}
-              onStatus={setStatusEntrega}
+              onAtribuir={atribuir}
+              onStatus={mudarStatus}
+              ocupada={ocupada === e.id}
             />
           ))}
         </div>
@@ -328,12 +340,14 @@ function MotoboyEntregas({
   onPegar,
   onDevolver,
   onStatus,
+  ocupada,
 }: {
   entregas: Entrega[];
   usuarioId: string | null;
   onPegar: (id: string) => Promise<{ ok: boolean; erro?: string }>;
   onDevolver: (id: string) => void;
   onStatus: (id: string, s: StatusEntrega) => void;
+  ocupada: string | null;
 }) {
   const { alerta } = useDialog();
   const [aba, setAba] = useState<"disponiveis" | "minhas">("disponiveis");
@@ -409,7 +423,7 @@ function MotoboyEntregas({
             <div className="space-y-2 stagger">
               <h2 className="text-sm font-semibold text-muted">Em aberto ({minhasAtivas.length})</h2>
               {minhasAtivas.map((e) => (
-                <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} />
+                <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} ocupada={ocupada === e.id} />
               ))}
             </div>
           )}
@@ -417,7 +431,7 @@ function MotoboyEntregas({
             <div className="space-y-2 stagger">
               <h2 className="text-sm font-semibold text-muted">Entregues ({minhasFeitas.length})</h2>
               {minhasFeitas.map((e) => (
-                <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} />
+                <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} ocupada={ocupada === e.id} />
               ))}
             </div>
           )}
@@ -457,10 +471,12 @@ function MinhaEntregaCard({
   e,
   onStatus,
   onDevolver,
+  ocupada,
 }: {
   e: Entrega;
   onStatus: (id: string, s: StatusEntrega) => void;
   onDevolver: (id: string) => void;
+  ocupada: boolean;
 }) {
   return (
     <div className="card space-y-2">
@@ -468,17 +484,17 @@ function MinhaEntregaCard({
       {e.status !== "entregue" && (
         <div className="flex gap-2">
           {e.status === "pendente" && (
-            <button onClick={() => onStatus(e.id, "a_caminho")} className="btn-ghost flex-1 py-2 text-sm">
+            <button disabled={ocupada} onClick={() => onStatus(e.id, "a_caminho")} className="btn-ghost flex-1 py-2 text-sm disabled:opacity-60">
               <Bike size={16} /> Saí para entrega
             </button>
           )}
-          <button onClick={() => onStatus(e.id, "entregue")} className="btn-primary flex-1 py-2 text-sm">
+          <button disabled={ocupada} onClick={() => onStatus(e.id, "entregue")} className="btn-primary flex-1 py-2 text-sm disabled:opacity-60">
             <Check size={16} /> Entregue
           </button>
         </div>
       )}
       {e.status === "pendente" && (
-        <button onClick={() => onDevolver(e.id)} className="w-full py-1.5 text-xs text-muted flex items-center justify-center gap-1">
+        <button disabled={ocupada} onClick={() => onDevolver(e.id)} className="w-full min-h-[44px] py-1.5 text-xs text-muted flex items-center justify-center gap-1 disabled:opacity-60">
           <Undo2 size={14} /> Devolver ao balcão
         </button>
       )}
@@ -493,6 +509,7 @@ function EntregaCard({
   nomeMotoboy,
   onAtribuir,
   onStatus,
+  ocupada,
 }: {
   e: Entrega;
   dono: boolean;
@@ -500,6 +517,7 @@ function EntregaCard({
   nomeMotoboy?: string | null;
   onAtribuir: (id: string, motoboyId: string | null) => void;
   onStatus: (id: string, s: StatusEntrega) => void;
+  ocupada: boolean;
 }) {
   return (
     <div className="card space-y-2">
@@ -529,6 +547,8 @@ function EntregaCard({
       {dono && (
         <select
           className="input py-1.5 text-sm"
+          aria-label="Motoboy da entrega"
+          disabled={ocupada}
           value={e.motoboyId ?? ""}
           onChange={(ev) => onAtribuir(e.id, ev.target.value || null)}
         >
@@ -550,15 +570,17 @@ function EntregaCard({
         <div className="flex gap-2">
           {e.status === "pendente" && (
             <button
+              disabled={ocupada}
               onClick={() => onStatus(e.id, "a_caminho")}
-              className="btn-ghost flex-1 py-2 text-sm"
+              className="btn-ghost flex-1 py-2 text-sm disabled:opacity-60"
             >
               <Bike size={16} /> Saí para entrega
             </button>
           )}
           <button
+            disabled={ocupada}
             onClick={() => onStatus(e.id, "entregue")}
-            className="btn-primary flex-1 py-2 text-sm"
+            className="btn-primary flex-1 py-2 text-sm disabled:opacity-60"
           >
             <Check size={16} /> Entregue
           </button>
@@ -596,27 +618,27 @@ function NovaEntrega({
   return (
     <Modal onClose={onClose} titulo="Nova entrega">
         <div>
-          <label className="label">Cliente</label>
-          <input className="input" value={cliente} onChange={(e) => setCliente(e.target.value)} />
+          <label className="label" htmlFor="ent-cliente">Cliente</label>
+          <input id="ent-cliente" maxLength={120} className="input" value={cliente} onChange={(e) => setCliente(e.target.value)} />
         </div>
         <div>
-          <label className="label">Endereço</label>
-          <input className="input" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
+          <label className="label" htmlFor="ent-endereco">Endereço</label>
+          <input id="ent-endereco" maxLength={300} className="input" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Telefone</label>
-            <input className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+            <label className="label" htmlFor="ent-telefone">Telefone</label>
+            <input id="ent-telefone" className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
           </div>
           <div>
-            <label className="label">Taxa (R$)</label>
-            <input className="input" inputMode="decimal" placeholder="0,00" value={taxa} onChange={(e) => setTaxa(e.target.value)} />
+            <label className="label" htmlFor="ent-taxa">Taxa (R$)</label>
+            <input id="ent-taxa" className="input" inputMode="decimal" placeholder="0,00" value={taxa} onChange={(e) => setTaxa(e.target.value)} />
           </div>
         </div>
         {motoboys.length > 0 && (
           <div>
-            <label className="label">Motoboy</label>
-            <select className="input" value={motoboyId} onChange={(e) => setMotoboyId(e.target.value)}>
+            <label className="label" htmlFor="ent-motoboy">Motoboy</label>
+            <select id="ent-motoboy" className="input" value={motoboyId} onChange={(e) => setMotoboyId(e.target.value)}>
               <option value="">Atribuir depois</option>
               {motoboys.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -627,8 +649,8 @@ function NovaEntrega({
           </div>
         )}
         <div>
-          <label className="label">Observação</label>
-          <input className="input" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: ponto de referência" />
+          <label className="label" htmlFor="ent-obs">Observação</label>
+          <input id="ent-obs" maxLength={300} className="input" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: ponto de referência" />
         </div>
         {erro && (
           <p className="text-sm text-red-500 bg-red-500/10 rounded-xl px-3 py-2">{erro}</p>
@@ -636,8 +658,13 @@ function NovaEntrega({
         <button
           disabled={salvando}
           onClick={async () => {
-            if (!cliente && !endereco) {
+            if (!cliente.trim() && !endereco.trim()) {
               setErro("Informe o cliente ou o endereço da entrega.");
+              return;
+            }
+            const taxaNum = taxa.trim() ? parseNumero(taxa) : 0;
+            if (!Number.isFinite(taxaNum) || taxaNum < 0) {
+              setErro("Informe a taxa em reais (ex.: 8,00) ou deixe em branco.");
               return;
             }
             setErro(null);
@@ -646,7 +673,7 @@ function NovaEntrega({
               clienteNome: cliente,
               endereco,
               telefone: telefone || undefined,
-              taxa: parseNumero(taxa) || 0,
+              taxa: taxaNum,
               motoboyId: motoboyId || null,
               observacao: obs || undefined,
             });

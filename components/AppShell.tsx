@@ -41,14 +41,16 @@ type Item = {
   primary?: boolean; // destaque no mobile
   mobile?: boolean; // aparece no bottom nav
   adminOnly?: boolean; // só o superadmin do AutoManager
+  soComPendencia?: boolean; // some do menu quando o badge está zerado
 };
 
 const ITENS: Item[] = [
   { href: "/painel", label: "Painel", icon: LayoutDashboard, roles: ["owner"], mobile: true },
   { href: "/produtos", label: "Estoque", icon: Package, roles: ["owner", "vendedor"], mobile: true },
   { href: "/vender", label: "Vender", icon: PlusCircle, roles: ["owner", "vendedor"], primary: true, mobile: true },
-  // sem `cap`: a aba aparece sempre p/ o dono — sem o plano, a página mostra o pitch de upgrade
-  { href: "/recebimentos", label: "Recebimentos", icon: Inbox, roles: ["owner"] },
+  // caixa de recebimentos: só aparece quando há algo para confirmar (não há integração
+  // bancária automática; sem pendências a aba ficava vazia para sempre)
+  { href: "/recebimentos", label: "Recebimentos", icon: Inbox, roles: ["owner"], soComPendencia: true },
   { href: "/entregas", label: "Entregas", icon: Truck, roles: ["owner", "motoboy"], mobile: true },
   { href: "/reposicao", label: "Repor", icon: TrendingUp, roles: ["owner"], mobile: true },
   { href: "/minha-loja", label: "Minha Loja", icon: Store, roles: ["owner"] },
@@ -81,7 +83,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const conversasNaoLidas = useConversasNaoLidas();
   const recebimentosPendentes = useRecebimentosPendentes();
 
-  const navDesktop = ITENS.filter((it) => visivel(it, role, caps, admin));
+  const navDesktop = ITENS.filter(
+    (it) => visivel(it, role, caps, admin) && (!it.soComPendencia || recebimentosPendentes > 0 || path === it.href)
+  );
   // bottom nav tem 5 vagas: se o papel tem mais telas que isso, 4 fixas + "Mais"
   // (senão Perfil/sair, Financeiro, Conversas etc. ficam inacessíveis no celular)
   const mobileFixos = navDesktop.filter((it) => it.mobile);

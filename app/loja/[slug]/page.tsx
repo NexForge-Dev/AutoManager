@@ -10,6 +10,23 @@ import { waLink, igLink, fbLink, ttLink } from "@/lib/contato";
 import { brl } from "@/lib/analytics";
 import { MessageCircle, X, Send, Gem, Loader2, Phone, Mail, Instagram, Facebook, Music2 } from "lucide-react";
 
+// localStorage pode lançar (modo privado, cookies bloqueados): o chat segue sem ele
+function lsLer(chave: string): string | null {
+  try {
+    return localStorage.getItem(chave);
+  } catch {
+    return null;
+  }
+}
+function lsGravar(chave: string, valor: string) {
+  try {
+    localStorage.setItem(chave, valor);
+  } catch {
+    /* ignora */
+  }
+}
+const sufixo = () => Math.random().toString(36).slice(2, 8);
+
 type Variacao = { id: string; nome: string; preco_ajuste: number; esgotado: boolean };
 type ProdutoPub = {
   id: string;
@@ -65,7 +82,9 @@ export default function LojaPage() {
       setLoja(d);
       if (d?.cor_marca) aplicarCorMarca(d.cor_marca);
       if (d?.fonte) setFontStack(carregarFonte(d.fonte));
-      if (d) aplicarFavicon(d.logo_url, d.nome); // ícone/título da aba = logo e nome da loja
+      // ícone/título da aba = logo e nome da loja, sem gravar no cache: senão a landing e
+      // as outras lojas abriam com o ícone da última vitrine visitada
+      if (d) aplicarFavicon(d.logo_url, d.nome, false);
     });
   }, [slug, tentativa]);
 
@@ -74,7 +93,7 @@ export default function LojaPage() {
   useEffect(() => {
     if (!loja) return;
     const orgId = loja.org_id;
-    const token = typeof localStorage !== "undefined" ? localStorage.getItem("amchat_" + orgId) : null;
+    const token = lsLer("amchat_" + orgId);
     if (!token) return;
     const client = sb.current;
     let canceled = false;
@@ -96,14 +115,14 @@ export default function LojaPage() {
 
       const { data } = await client.rpc("recuperar_conversa", { p_org: orgId, p_token: token });
       if (canceled || !data) return;
-      const visto = Number(localStorage.getItem("amchat_visto_" + orgId) || 0);
+      const visto = Number(lsLer("amchat_visto_" + orgId) || 0);
       const novas = ((data.mensagens as any[]) || []).filter(
         (m) => m.autor_tipo === "loja" && new Date(m.criada_em).getTime() > visto
       ).length;
       setNaoLidas(novas);
 
       canal = client
-        .channel("badge-" + data.id)
+        .channel(`badge-${data.id}-${sufixo()}`)
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "mensagem", filter: `conversa_id=eq.${data.id}` },
@@ -121,12 +140,12 @@ export default function LojaPage() {
   }, [loja]);
 
   function abrirChat() {
-    if (loja) localStorage.setItem("amchat_visto_" + loja.org_id, String(Date.now()));
+    if (loja) lsGravar("amchat_visto_" + loja.org_id, String(Date.now()));
     setNaoLidas(0);
     setChat(true);
   }
   function fecharChat() {
-    if (loja) localStorage.setItem("amchat_visto_" + loja.org_id, String(Date.now()));
+    if (loja) lsGravar("amchat_visto_" + loja.org_id, String(Date.now()));
     setNaoLidas(0);
     setChat(false);
   }
@@ -323,6 +342,7 @@ function ProdutoCard({ p }: { p: ProdutoPub }) {
       <div className="p-3 flex-1 flex flex-col">
         <div className="text-sm font-semibold leading-tight">{p.nome}</div>
         {p.marca && <div className="text-[11px] text-muted">{p.marca}</div>}
+        {p.descricao && <p className="text-[11px] text-muted mt-1 line-clamp-3 whitespace-pre-line">{p.descricao}</p>}
         <div className="mt-auto pt-2">
           {temDesconto && (
             <div className="text-[11px] text-muted line-through">{brl(p.preco_comparativo!)}</div>
@@ -389,7 +409,10 @@ function ChatWidget({
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const meId = useRef<string | null>(null);
+  const montado = useRef(true);
   const fimRef = useRef<HTMLDivElement>(null);
   const chRef = useRef<ReturnType<typeof sb.channel> | null>(null);
 
@@ -418,8 +441,12 @@ function ChatWidget({
   }
 
   function assinarRealtime(convId: string) {
+    // widget fechou enquanto restaurava: não deixa canal órfão
+    if (!montado.current) return;
+    if (chRef.current) sb.removeChannel(chRef.current);
+    // nome único: reabrir o chat não reaproveita um canal que ainda está sendo removido
     chRef.current = sb
-      .channel("conv-" + convId)
+      .channel(`conv-${convId}-${sufixo()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "mensagem", filter: `conversa_id=eq.${convId}` },
@@ -435,11 +462,11 @@ function ChatWidget({
   useEffect(() => {
     (async () => {
       try {
-        const token = typeof localStorage !== "undefined" ? localStorage.getItem(tokenKey) : null;
+        const token = lsLer(tokenKey);
         if (!token) return; // nunca conversou neste navegador
         await garantirSessao();
         const { data } = await sb.rpc("recuperar_conversa", { p_org: orgId, p_token: token });
-        if (data) {
+        if (data && montado.current) {
           setConversaId(data.id);
           if (data.cliente_nome) setNome(data.cliente_nome);
           setMsgs((data.mensagens as Msg[]) || []);
@@ -449,21 +476,22 @@ function ChatWidget({
       } catch {
         /* segue para a tela inicial */
       } finally {
-        setRestaurando(false);
+        if (montado.current) setRestaurando(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function iniciar() {
+    setErro(null);
     setCarregando(true);
     try {
       const uid = await garantirSessao();
       if (!uid) throw new Error("sessão");
-      let token = localStorage.getItem(tokenKey);
+      let token = lsLer(tokenKey);
       if (!token) {
         token = crypto.randomUUID();
-        localStorage.setItem(tokenKey, token);
+        lsGravar(tokenKey, token);
       }
 
       // reaproveita a conversa do token, se já existir
@@ -486,12 +514,14 @@ function ChatWidget({
       setIniciado(true);
     } catch (e: any) {
       const msg = String(e?.message || e);
-      alert(
+      setErro(
         /anonymous sign-ins are disabled/i.test(msg)
           ? "O chat desta loja está indisponível no momento. Tente pelo WhatsApp ou mais tarde."
-          : /fetch|network/i.test(msg)
-            ? "Sem conexão. Confira sua internet e tente de novo."
-            : "Não foi possível iniciar o chat. Tente de novo em instantes."
+          : /chat_limite/.test(msg)
+            ? "Você abriu muitas conversas em pouco tempo. Aguarde um pouco e tente de novo."
+            : /fetch|network/i.test(msg)
+              ? "Sem conexão. Confira sua internet e tente de novo."
+              : "Não foi possível iniciar o chat. Tente de novo em instantes."
       );
     } finally {
       setCarregando(false);
@@ -500,33 +530,58 @@ function ChatWidget({
 
   async function enviar() {
     const t = texto.trim();
-    if (!t || !conversaId || !meId.current) return;
+    // um envio por vez: Enter repetido (ou composição do teclado) não duplica a mensagem
+    if (!t || !conversaId || !meId.current || enviando) return;
+    setErro(null);
+    setEnviando(true);
     setTexto("");
     const { data, error } = await sb
       .from("mensagem")
       .insert({ conversa_id: conversaId, org_id: orgId, autor_id: meId.current, autor_tipo: "cliente", texto: t })
       .select("id, autor_tipo, texto")
       .single();
+    setEnviando(false);
     if (error) {
-      alert("Não foi possível enviar a mensagem. Tente de novo.");
+      setErro(
+        /chat_limite/.test(error.message)
+          ? "Muitas mensagens em pouco tempo. Aguarde um minuto e tente de novo."
+          : "Não foi possível enviar a mensagem. Tente de novo."
+      );
       setTexto(t);
       return;
     }
     if (data) setMsgs((prev) => (prev.some((x) => x.id === data.id) ? prev : [...prev, data as Msg]));
   }
 
+  // ref: o pai recria onClose a cada render; o efeito abaixo não pode re-rodar
+  // (a limpeza removeria o canal do realtime)
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
+    montado.current = true;
+    const fecharNoEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseRef.current();
+    };
+    window.addEventListener("keydown", fecharNoEsc);
     return () => {
+      montado.current = false;
+      window.removeEventListener("keydown", fecharNoEsc);
       if (chRef.current) sb.removeChannel(chRef.current); // remove só o canal do widget
+      chRef.current = null;
     };
   }, [sb]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
-      <div className="surface w-full max-w-md md:rounded-3xl rounded-t-3xl flex flex-col h-[80vh] md:h-[600px]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="chat-titulo"
+        className="surface w-full max-w-md md:rounded-3xl rounded-t-3xl flex flex-col h-[80dvh] md:h-[600px]"
+      >
         <header className="flex items-center justify-between p-4 border-b border-default">
-          <div className="font-semibold">{nomeLoja}</div>
-          <button onClick={onClose} aria-label="Fechar chat">
+          <div id="chat-titulo" className="font-semibold truncate">{nomeLoja}</div>
+          <button onClick={onClose} aria-label="Fechar chat" className="grid place-items-center h-11 w-11 -mr-2 rounded-full">
             <X />
           </button>
         </header>
@@ -543,9 +598,12 @@ function ChatWidget({
               <input
                 className="input"
                 placeholder="Seu nome (opcional)"
+                aria-label="Seu nome (opcional)"
+                maxLength={120}
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
               />
+              {erro && <p role="alert" className="text-sm text-red-500">{erro}</p>}
               <button onClick={iniciar} disabled={carregando} className="btn-primary w-full disabled:opacity-60">
                 {carregando ? <Loader2 className="animate-spin" size={18} /> : "Iniciar conversa"}
               </button>
@@ -571,15 +629,18 @@ function ChatWidget({
               ))}
               <div ref={fimRef} />
             </div>
+            {erro && <p role="alert" className="px-4 pt-2 text-sm text-red-500">{erro}</p>}
             <div className="p-3 border-t border-default flex gap-2">
               <input
                 className="input flex-1"
                 placeholder="Escreva uma mensagem…"
+                aria-label="Mensagem"
+                maxLength={2000}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && enviar()}
+                onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && enviar()}
               />
-              <button onClick={enviar} className="btn-primary px-4">
+              <button onClick={enviar} disabled={enviando} aria-label="Enviar mensagem" className="btn-primary px-4 disabled:opacity-60">
                 <Send size={18} />
               </button>
             </div>

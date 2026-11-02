@@ -83,8 +83,9 @@ export function parseNumero(bruto: string): number {
   const temVirgula = s.includes(",");
   const temPonto = s.includes(".");
   if (temVirgula && temPonto) {
-    // assume ponto = milhar, vírgula = decimal (pt-BR)
-    s = s.replace(/\./g, "").replace(",", ".");
+    // o separador que vem por último é o decimal: "1.234,56" (pt-BR) ou "1,234.56" (planilha em inglês)
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else s = s.replace(/,/g, "");
   } else if (temVirgula) {
     s = s.replace(",", ".");
   } else if (temPonto) {
@@ -102,12 +103,27 @@ export function parseNumero(bruto: string): number {
   return parseFloat(s);
 }
 
+// quebra em linhas sem cortar campo entre aspas que tenha quebra de linha
+// (descrição com Enter dentro da célula do Excel)
+function quebrarLinhas(texto: string): string[] {
+  const out: string[] = [];
+  let atual = "";
+  let aspas = false;
+  for (const ch of texto) {
+    if (ch === '"') aspas = !aspas;
+    if (ch === "\n" && !aspas) {
+      out.push(atual);
+      atual = "";
+    } else atual += ch;
+  }
+  out.push(atual);
+  return out;
+}
+
 export function parseProdutosCSV(texto: string): ResultadoImport {
-  const linhasBrutas = texto
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n")
-    .filter((l, i) => l.trim() !== "" || i === 0);
+  const linhasBrutas = quebrarLinhas(texto.replace(/\r\n/g, "\n").replace(/\r/g, "\n")).filter(
+    (l, i) => l.trim() !== "" || i === 0
+  );
 
   const erros: ResultadoImport["erros"] = [];
   const linhas: LinhaImport[] = [];
@@ -141,18 +157,23 @@ export function parseProdutosCSV(texto: string): ResultadoImport {
   for (let i = 1; i < linhasBrutas.length; i++) {
     const campos = dividir(linhasBrutas[i], sep);
     const get = (k: keyof typeof COLUNAS) => (idx[k] !== undefined ? campos[idx[k]!] ?? "" : "");
-    const nome = get("nome").trim();
+    // quebra de linha/tab dentro da célula vira espaço (o nome aparece numa linha só)
+    const nome = get("nome").replace(/\s+/g, " ").trim();
     if (!nome) continue; // pula linha sem nome (linha vazia/separadora)
     total++;
     const nLinha = i + 1;
 
     const precoVenda = parseNumero(get("precoVenda"));
-    if (isNaN(precoVenda) || precoVenda < 0) {
+    if (isNaN(precoVenda) || precoVenda <= 0) {
       erros.push({ linha: nLinha, motivo: `"${nome}": preço inválido.` });
       continue;
     }
     const custoBruto = get("custo");
     const custo = custoBruto ? parseNumero(custoBruto) : 0;
+    if (custo < 0) {
+      erros.push({ linha: nLinha, motivo: `"${nome}": custo negativo.` });
+      continue;
+    }
     const estoqueBruto = get("estoqueAtual");
     const estoqueAtual = estoqueBruto ? Math.max(0, Math.round(parseNumero(estoqueBruto)) || 0) : 0;
     const minimoBruto = get("estoqueMinimo");

@@ -41,6 +41,38 @@ export function registrarMetrica(m: Metrica) {
   }
 }
 
+type Armazem = Pick<Storage, "getItem" | "setItem">;
+const CHAVE_SESSAO = "am_metrica_sessao";
+
+/**
+ * session_started: no máximo uma vez por sessão do navegador e por usuário (EVENTS.md:
+ * "login or return visit (max once per session)"). Vale para login com senha, para o
+ * login automático depois de redefinir a senha e para quem volta já logado (Guard).
+ * Devolve true quando deve enviar (e já marca como enviado).
+ */
+export function marcarSessao(armazem: Armazem | null | undefined, userId: string): boolean {
+  if (!userId) return false;
+  try {
+    if (!armazem) return true;
+    if (armazem.getItem(CHAVE_SESSAO) === userId) return false;
+    armazem.setItem(CHAVE_SESSAO, userId);
+    return true;
+  } catch {
+    return true; // sem armazenamento: melhor contar do que perder a sessão
+  }
+}
+
+export function registrarSessao(userId: string | null | undefined) {
+  if (!userId) return;
+  let armazem: Armazem | null = null;
+  try {
+    armazem = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+  } catch {
+    armazem = null;
+  }
+  if (marcarSessao(armazem, userId)) registrarMetrica({ tipo: "sessao" });
+}
+
 /** Registra uma vez quando a tela abre (ex.: "consultou reposição"). */
 export function useMetricaAoAbrir(m: Metrica) {
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type Stripe from "stripe";
-import { tratarEventoStripe, planoDaAssinatura, statusInterno, type BillingStore, type AssinaturaAtual, type GravarAssinatura } from "./stripeSync";
+import { tratarEventoStripe, planoDaAssinatura, statusInterno, trialEndParaCheckout, metricaCobranca, type BillingStore, type AssinaturaAtual, type GravarAssinatura } from "./stripeSync";
 
 // ---------------------------------------------------------------- dublês
 function memoriaStore(inicial: Record<string, AssinaturaAtual> = {}, clientes: Record<string, string> = {}) {
@@ -172,6 +172,24 @@ describe("tratarEventoStripe", () => {
     expect(pedido).toBe("sub_x");
   });
 
+  it("checkout abandonado que expira (incomplete_expired) não derruba o teste grátis", async () => {
+    const r = await tratarEventoStripe(evento("customer.subscription.updated", { id: "sub_novo" }), mem.store, async () =>
+      sub({ status: "incomplete_expired" })
+    );
+    expect(r.resultado).toBe("ignorado_substituida");
+    expect(mem.gravacoes).toHaveLength(0);
+    expect(mem.assinaturas["org-1"].status).toBe("trialing");
+  });
+
+  it("cancelamento da assinatura gravada na org é aplicado", async () => {
+    mem.assinaturas["org-1"] = { plano: "equipe", status: "active", providerAssinaturaId: "sub_novo" };
+    const r = await tratarEventoStripe(evento("customer.subscription.deleted", { id: "sub_novo" }), mem.store, async () =>
+      sub({ status: "canceled" })
+    );
+    expect(r.resultado).toBe("sincronizada");
+    expect(mem.gravacoes[0].dados.status).toBe("canceled");
+  });
+
   it("primeiro pagamento pendente (incomplete) não altera nada", async () => {
     const r = await tratarEventoStripe(evento("customer.subscription.created", { id: "sub_novo" }), mem.store, async () =>
       sub({ status: "incomplete" })
@@ -200,5 +218,93 @@ describe("tratarEventoStripe", () => {
   it("ignora checkout que não é de assinatura e eventos desconhecidos", async () => {
     expect((await tratarEventoStripe(evento("checkout.session.completed", { mode: "payment" }), mem.store, async () => sub())).resultado).toBe("ignorado");
     expect((await tratarEventoStripe(evento("charge.refunded", {}), mem.store, async () => sub())).resultado).toBe("ignorado");
+  });
+});
+
+describe("trialEndParaCheckout", () => {
+  const agora = Date.UTC(2026, 10, 2, 12);
+  const dias = (n: number) => new Date(agora + n * 86_400_000).toISOString();
+  it("teste vigente com mais de 48 h: a 1ª cobrança vai para o fim do teste", () => {
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: dias(20) }, agora)).toBe(Math.floor((agora + 20 * 86_400_000) / 1000));
+  });
+  it("menos de 48 h, teste vencido, assinatura paga ou sem linha: cobra já", () => {
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: dias(1) }, agora)).toBeNull();
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: dias(-3) }, agora)).toBeNull();
+    expect(trialEndParaCheckout({ status: "active", trial_ate: dias(20) }, agora)).toBeNull();
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: null }, agora)).toBeNull();
+    expect(trialEndParaCheckout(null, agora)).toBeNull();
+  });
+});
+
+describe("tratarEventoStripe — efeitos antes de marcar", () => {
+  it("se o efeito falha, o evento não fica processado (o Stripe reenvia)", async () => {
+    const mem = memoriaStore({ "org-1": { plano: "solo", status: "active", providerAssinaturaId: "sub_antiga" } });
+    const ev = evento("customer.subscription.created", { id: "sub_novo" }, "evt_efeito");
+    await expect(
+      tratarEventoStripe(ev, mem.store, async () => sub(), async () => {
+        throw new Error("stripe fora");
+      })
+    ).rejects.toThrow("stripe fora");
+    const r = await tratarEventoStripe(ev, mem.store, async () => sub(), async () => {});
+    expect(r.resultado).toBe("sincronizada");
+    expect((await tratarEventoStripe(ev, mem.store, async () => sub())).resultado).toBe("duplicado");
+  });
+});
+
+describe("metricaCobranca (Painel NexForge)", () => {
+  const trial = { "org-1": { plano: "ambulante" as const, status: "trialing" as const, providerAssinaturaId: null } };
+
+  it("plan_activated usa o valor cobrado de verdade (cupom), não o preço de tabela", async () => {
+    const mem = memoriaStore({ ...trial });
+    const s = sub({ latest_invoice: { status: "paid", amount_paid: 4950 } } as any);
+    const r = await tratarEventoStripe(evento("checkout.session.completed", { mode: "subscription", subscription: "sub_novo" }), mem.store, async () => s);
+    const m = metricaCobranca(r, "evt_1");
+    expect(m).toEqual({
+      evento: "plan_activated",
+      props: { plan: "equipe", billing_period: "month", amount_cents: 4950, currency: "BRL" },
+      chave: "ativa:sub_novo",
+    });
+  });
+
+  it("sem fatura expandida cai no preço do item", async () => {
+    const mem = memoriaStore({ ...trial });
+    const r = await tratarEventoStripe(evento("customer.subscription.updated", { id: "sub_novo" }), mem.store, async () => sub({ amount: 9900 }));
+    expect(metricaCobranca(r, "x")?.props.amount_cents).toBe(9900);
+  });
+
+  it("assinou durante o teste (trial no Stripe): não ativa agora; ativa na 1ª fatura paga pós-trial", async () => {
+    const mem = memoriaStore({ ...trial });
+    const FIM_TRIAL = 1_900_000_000;
+    const emTrial = sub({ status: "trialing", trial_end: FIM_TRIAL, latest_invoice: { status: "paid", amount_paid: 0 } } as any);
+    const r1 = await tratarEventoStripe(evento("customer.subscription.created", { id: "sub_novo" }), mem.store, async () => emTrial);
+    expect(metricaCobranca(r1, "e1")).toBeNull();
+
+    const pago = sub({ status: "active", trial_end: FIM_TRIAL } as any);
+    const r2 = await tratarEventoStripe(
+      evento("invoice.paid", {
+        subscription: "sub_novo",
+        amount_paid: 8910,
+        billing_reason: "subscription_cycle",
+        period_start: FIM_TRIAL - 30 * 86_400,
+        period_end: FIM_TRIAL,
+      }),
+      mem.store,
+      async () => pago
+    );
+    expect(metricaCobranca(r2, "e2")).toMatchObject({ evento: "plan_activated", chave: "ativa:sub_novo", props: { amount_cents: 8910 } });
+  });
+
+  it("confirmação e webhook geram a MESMA chave de plan_activated (não conta duas vezes)", async () => {
+    const a = await tratarEventoStripe(evento("checkout.session.completed", { mode: "subscription", subscription: "sub_novo" }), memoriaStore({ ...trial }).store, async () => sub());
+    const b = await tratarEventoStripe(evento("customer.subscription.updated", { id: "sub_novo" }), memoriaStore({ ...trial }).store, async () => sub());
+    expect(metricaCobranca(a, "confirmar:cs_1")?.chave).toBe(metricaCobranca(b, "evt_9")?.chave);
+  });
+
+  it("troca de plano leva o preço do novo item; cancelamento e recusa", async () => {
+    const mem = memoriaStore({ "org-1": { plano: "solo", status: "active", providerAssinaturaId: "sub_novo" } });
+    const r = await tratarEventoStripe(evento("customer.subscription.updated", { id: "sub_novo" }), mem.store, async () => sub({ amount: 9900 }));
+    expect(metricaCobranca(r, "e")).toMatchObject({ evento: "plan_changed", props: { from_plan: "solo", to_plan: "equipe", amount_cents: 9900 } });
+    const c = await tratarEventoStripe(evento("customer.subscription.deleted", { id: "sub_novo" }), mem.store, async () => sub({ status: "canceled" }));
+    expect(metricaCobranca(c, "e2")?.evento).toBe("plan_canceled");
   });
 });

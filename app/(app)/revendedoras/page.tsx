@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { waNumero } from "@/lib/contato";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
@@ -14,6 +15,7 @@ import type { Resultado } from "@/lib/store";
 import { usePlano } from "@/lib/usePlano";
 import { UpgradeModal } from "@/components/UpgradeGate";
 import { planoQueLibera, fmtLimite } from "@/lib/plans";
+import { inicioDoMes } from "@/lib/fuso";
 
 export default function RevendedorasPage() {
   return (
@@ -29,6 +31,10 @@ function Revendedoras() {
   const { caps, uso, limiteAtingido } = usePlano();
   const { prompt, confirm, alerta } = useDialog();
   const [aberto, setAberto] = useState(false);
+  // null = cadastro novo; id = editando uma revendedora existente
+  const [editId, setEditId] = useState<string | null>(null);
+  const [salvandoRev, setSalvandoRev] = useState(false);
+  const [pagando, setPagando] = useState<string | null>(null);
   const [upsell, setUpsell] = useState(false);
   const [nome, setNome] = useState("");
   const [whats, setWhats] = useState("");
@@ -40,14 +46,30 @@ function Revendedoras() {
   const planoUpgrade = planoQueLibera((p) => p.maxRevendedoras > uso.revendedoras);
 
   function novaRevendedora() {
-    if (noLimite) setUpsell(true);
-    else setAberto(true);
+    if (noLimite) {
+      setUpsell(true);
+      return;
+    }
+    setEditId(null);
+    setNome("");
+    setWhats("");
+    setEmailNova("");
+    setComissao(String(config.comissaoPadrao));
+    setMeta("");
+    setAberto(true);
   }
 
-  const inicioMes = (() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-  })();
+  function editarRevendedora(r: Revendedora) {
+    setEditId(r.id);
+    setNome(r.nome);
+    setWhats(r.whatsapp ?? "");
+    setComissao(r.comissaoPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 }));
+    setMeta(r.metaMensal ? r.metaMensal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "");
+    setAberto(true);
+  }
+
+  // mês corrente no fuso da loja (America/Sao_Paulo), como o resto do app
+  const inicioMes = inicioDoMes(Date.now());
 
   // vendas com comissão a pagar (as MESMAS que são somadas e depois marcadas)
   function vendasPendentes(id: string) {
@@ -68,21 +90,41 @@ function Revendedoras() {
   }
 
   async function salvar() {
+    if (salvandoRev) return;
     if (!nome.trim()) {
       alerta({ titulo: "Falta o nome", mensagem: "Informe o nome da revendedora." });
       return;
     }
-    const res = await addRevendedora({
-      nome,
-      whatsapp: whats,
-      email: emailNova.trim().toLowerCase() || null,
-      comissaoPercent: parseNumero(comissao) || config.comissaoPadrao,
-      metaMensal: parseNumero(meta) || 0,
-    });
-    if (!res.ok) {
-      alerta({ titulo: "Não foi possível cadastrar", mensagem: res.erro || "Tente novamente." });
+    // vazio = comissão padrão da loja; 0% é um valor válido (não cai no padrão)
+    const c = comissao.trim() === "" ? config.comissaoPadrao : parseNumero(comissao);
+    if (!Number.isFinite(c) || c < 0 || c > 100) {
+      alerta({ titulo: "Comissão inválida", mensagem: "Informe uma comissão entre 0% e 100%." });
       return;
     }
+    const m = meta.trim() === "" ? 0 : parseNumero(meta);
+    if (!Number.isFinite(m) || m < 0) {
+      alerta({ titulo: "Meta inválida", mensagem: "Informe a meta em reais (ex.: 1.500,00) ou deixe em branco." });
+      return;
+    }
+    setSalvandoRev(true);
+    const res = editId
+      ? await updateRevendedora(editId, { nome: nome.trim(), whatsapp: whats.trim(), comissaoPercent: c, metaMensal: m })
+      : await addRevendedora({
+          nome: nome.trim(),
+          whatsapp: whats.trim(),
+          email: emailNova.trim().toLowerCase() || null,
+          comissaoPercent: c,
+          metaMensal: m,
+        });
+    setSalvandoRev(false);
+    if (!res.ok) {
+      alerta({
+        titulo: editId ? "Não foi possível salvar" : "Não foi possível cadastrar",
+        mensagem: res.erro || "Tente novamente.",
+      });
+      return;
+    }
+    setEditId(null);
     setNome("");
     setWhats("");
     setEmailNova("");
@@ -94,13 +136,18 @@ function Revendedoras() {
     const v = await prompt({
       titulo: "Meta do mês",
       mensagem: "Defina a meta de vendas mensal (R$):",
-      valorInicial: String(atual || ""),
-      tipo: "number",
+      valorInicial: atual ? atual.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
+      tipo: "text",
       inputMode: "decimal",
       confirmar: "Salvar",
     });
     if (v === null) return;
-    const res = await updateRevendedora(id, { metaMensal: parseNumero(v) || 0 });
+    const m = v.trim() === "" ? 0 : parseNumero(v);
+    if (!Number.isFinite(m) || m < 0) {
+      alerta({ titulo: "Meta inválida", mensagem: "Informe a meta em reais (ex.: 1.500,00) ou deixe em branco." });
+      return;
+    }
+    const res = await updateRevendedora(id, { metaMensal: m });
     if (!res.ok) alerta({ titulo: "Não foi possível salvar a meta", mensagem: res.erro || "Tente novamente." });
   }
 
@@ -135,7 +182,9 @@ function Revendedoras() {
       confirmar: "Marcar como pago",
     });
     if (!ok) return;
+    setPagando(id);
     const res = await marcarComissaoPaga(id, vendaIds);
+    setPagando(null);
     if (!res.ok) alerta({ titulo: "Não foi possível marcar como pago", mensagem: res.erro || "Tente novamente." });
   }
 
@@ -209,7 +258,7 @@ function Revendedoras() {
                     )}
                   </div>
                   <div className="text-xs text-muted">
-                    {r.comissaoPercent}% · vendeu {brl(vendMes)} no mês
+                    {r.comissaoPercent.toLocaleString("pt-BR")}% · vendeu {brl(vendMes)} no mês
                   </div>
                 </div>
                 <div className="flex items-center shrink-0 -mr-2">
@@ -224,6 +273,15 @@ function Revendedoras() {
                       <MessageCircle />
                     </a>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => editarRevendedora(r)}
+                    aria-label={`Editar ${r.nome}`}
+                    title="Editar"
+                    className="grid place-items-center h-11 w-11 rounded-full text-muted hover:bg-[var(--hover)]"
+                  >
+                    <Pencil size={17} />
+                  </button>
                   <button
                     type="button"
                     onClick={() => alternarAtiva(r)}
@@ -278,9 +336,10 @@ function Revendedoras() {
                 {pend > 0 && (
                   <button
                     onClick={() => pagarComissao(r.id, r.nome, pendVendas.map((v) => v.id), pend)}
-                    className="text-xs btn-primary py-1.5 px-2"
+                    disabled={pagando === r.id}
+                    className="text-xs btn-primary py-1.5 px-2 disabled:opacity-60"
                   >
-                    <BadgeDollarSign size={14} /> Pagar
+                    <BadgeDollarSign size={14} /> {pagando === r.id ? "Salvando…" : "Pagar"}
                   </button>
                 )}
               </div>
@@ -301,14 +360,15 @@ function Revendedoras() {
       )}
 
       {aberto && (
-        <Modal onClose={() => setAberto(false)} titulo="Nova revendedora">
+        <Modal onClose={() => setAberto(false)} titulo={editId ? "Editar revendedora" : "Nova revendedora"}>
             <div>
-              <label className="label">Nome</label>
-              <input className="input" value={nome} onChange={(e) => setNome(e.target.value)} />
+              <label className="label" htmlFor="rev-nome">Nome</label>
+              <input id="rev-nome" className="input" maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />
             </div>
             <div>
-              <label className="label">WhatsApp (opcional)</label>
+              <label className="label" htmlFor="rev-whats">WhatsApp (opcional)</label>
               <input
+                id="rev-whats"
                 className="input"
                 placeholder="DDD + número"
                 inputMode="tel"
@@ -316,21 +376,25 @@ function Revendedoras() {
                 onChange={(e) => setWhats(e.target.value)}
               />
             </div>
-            <div>
-              <label className="label">E-mail de acesso (opcional)</label>
-              <input
-                className="input"
-                placeholder="email@dela.com"
-                type="email"
-                value={emailNova}
-                onChange={(e) => setEmailNova(e.target.value)}
-              />
-              <p className="text-xs text-muted mt-1">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas.</p>
-            </div>
+            {!editId && (
+              <div>
+                <label className="label" htmlFor="rev-email">E-mail de acesso (opcional)</label>
+                <input
+                  id="rev-email"
+                  className="input"
+                  placeholder="email@dela.com"
+                  type="email"
+                  value={emailNova}
+                  onChange={(e) => setEmailNova(e.target.value)}
+                />
+                <p className="text-xs text-muted mt-1">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas.</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Comissão (%)</label>
+                <label className="label" htmlFor="rev-comissao">Comissão (%)</label>
                 <input
+                  id="rev-comissao"
                   className="input"
                   inputMode="decimal"
                   value={comissao}
@@ -338,8 +402,9 @@ function Revendedoras() {
                 />
               </div>
               <div>
-                <label className="label">Meta mensal (R$)</label>
+                <label className="label" htmlFor="rev-meta">Meta mensal (R$)</label>
                 <input
+                  id="rev-meta"
                   className="input"
                   inputMode="decimal"
                   placeholder="0,00"
@@ -348,8 +413,13 @@ function Revendedoras() {
                 />
               </div>
             </div>
-            <button onClick={salvar} className="btn-primary w-full">
-              Salvar
+            {editId && (
+              <p className="text-xs text-muted">
+                A nova comissão vale para as próximas vendas; as já registradas mantêm o percentual da época.
+              </p>
+            )}
+            <button onClick={salvar} disabled={salvandoRev} className="btn-primary w-full disabled:opacity-60">
+              {salvandoRev ? "Salvando…" : "Salvar"}
             </button>
         </Modal>
       )}
@@ -538,8 +608,3 @@ function AcessoRevendedora({
   );
 }
 
-// wa.me exige o código do país: "DDD + número" (10-11 dígitos) ganha o 55
-function waNumero(tel: string) {
-  const d = tel.replace(/\D/g, "");
-  return d.length === 10 || d.length === 11 ? `55${d}` : d;
-}

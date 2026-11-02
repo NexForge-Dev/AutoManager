@@ -2,7 +2,8 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl, resumoContas } from "@/lib/analytics";
+import { brl, centavos, resumoContas } from "@/lib/analytics";
+import { ymdSP } from "@/lib/fuso";
 import type { ContaPagar } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -50,26 +51,27 @@ function Financeiro() {
   const { confirm, alerta } = useDialog();
   const [aberto, setAberto] = useState(false);
   const [filtro, setFiltro] = useState<"pendentes" | "pagas" | "todas">("pendentes");
+  // conta com ação em andamento (marcar paga / reabrir / excluir): trava toque duplo
+  const [processando, setProcessando] = useState<string | null>(null);
 
   const resumo = useMemo(() => resumoContas(contasPagar), [contasPagar]);
   const aReceber = useMemo(
     () =>
-      vendas
-        .filter((v) => v.statusPagamento === "pendente")
-        .reduce((a, v) => a + v.total, 0),
+      centavos(
+        vendas
+          .filter((v) => v.statusPagamento === "pendente")
+          .reduce((a, v) => a + v.total, 0)
+      ),
     [vendas]
   );
-  const saldoProjetado = aReceber - resumo.aPagar;
+  const saldoProjetado = centavos(aReceber - resumo.aPagar);
 
   if (role !== "owner") {
     return <div className="card text-center text-muted">O financeiro é exclusivo do dono da loja.</div>;
   }
 
-  const hoje = (() => {
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  })();
+  // "hoje" no fuso da loja, igual ao resumoContas (vencidas)
+  const hoje = ymdSP(Date.now());
 
   const lista = contasPagar
     .filter((c) =>
@@ -84,14 +86,25 @@ function Financeiro() {
       confirmar: "Excluir",
       perigo: true,
     });
-    if (!ok) return;
-    const res = await removerContaPagar(c.id);
-    if (!res.ok) alerta({ titulo: "Não foi possível excluir a conta", mensagem: res.erro || "Tente novamente." });
+    if (!ok || processando) return;
+    setProcessando(c.id);
+    try {
+      const res = await removerContaPagar(c.id);
+      if (!res.ok) alerta({ titulo: "Não foi possível excluir a conta", mensagem: res.erro || "Tente novamente." });
+    } finally {
+      setProcessando(null);
+    }
   }
 
   async function marcarPaga(c: ContaPagar, paga: boolean) {
-    const res = await marcarContaPaga(c.id, paga);
-    if (!res.ok) alerta({ titulo: "Não foi possível atualizar a conta", mensagem: res.erro || "Tente novamente." });
+    if (processando) return;
+    setProcessando(c.id);
+    try {
+      const res = await marcarContaPaga(c.id, paga);
+      if (!res.ok) alerta({ titulo: "Não foi possível atualizar a conta", mensagem: res.erro || "Tente novamente." });
+    } finally {
+      setProcessando(null);
+    }
   }
 
   return (
@@ -161,6 +174,8 @@ function Financeiro() {
         {(["pendentes", "pagas", "todas"] as const).map((f) => (
           <button
             key={f}
+            type="button"
+            aria-pressed={filtro === f}
             onClick={() => setFiltro(f)}
             className={`chip ${filtro === f ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
           >
@@ -180,6 +195,7 @@ function Financeiro() {
         <div className="space-y-2 stagger">
           {lista.map((c) => {
             const vencida = c.status === "pendente" && c.vencimento < hoje;
+            const ocupada = processando === c.id;
             return (
               <div key={c.id} className="card space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -211,23 +227,29 @@ function Financeiro() {
                 <div className="flex gap-2">
                   {c.status === "pendente" ? (
                     <button
+                      type="button"
                       onClick={() => marcarPaga(c, true)}
-                      className="btn-primary flex-1 py-1.5 text-sm"
+                      disabled={ocupada}
+                      className="btn-primary flex-1 py-1.5 text-sm disabled:opacity-60"
                     >
-                      <Check size={15} /> Marcar paga
+                      <Check size={15} /> {ocupada ? "Salvando…" : "Marcar paga"}
                     </button>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => marcarPaga(c, false)}
-                      className="btn-ghost flex-1 py-1.5 text-sm"
+                      disabled={ocupada}
+                      className="btn-ghost flex-1 py-1.5 text-sm disabled:opacity-60"
                     >
-                      <RotateCcw size={15} /> Reabrir
+                      <RotateCcw size={15} /> {ocupada ? "Salvando…" : "Reabrir"}
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => remover(c)}
-                    className="btn-ghost py-1.5 px-3 text-sm text-red-500"
-                    aria-label="Excluir conta"
+                    disabled={ocupada}
+                    className="btn-ghost py-1.5 px-3 text-sm text-red-500 disabled:opacity-60"
+                    aria-label={`Excluir conta ${c.descricao}`}
                   >
                     <Trash2 size={15} />
                   </button>
@@ -246,11 +268,7 @@ function Financeiro() {
 function ContaForm({ onClose }: { onClose: () => void }) {
   const { addContaPagar } = useStore();
   const { alerta } = useDialog();
-  const hoje = (() => {
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  })();
+  const hoje = ymdSP(Date.now()); // fuso da loja
 
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -262,6 +280,7 @@ function ContaForm({ onClose }: { onClose: () => void }) {
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
+    if (salvando) return;
     setSalvando(true);
     const res = await addContaPagar({
       descricao,
@@ -283,8 +302,9 @@ function ContaForm({ onClose }: { onClose: () => void }) {
   return (
     <Modal onClose={onClose} titulo="Nova conta a pagar">
         <div>
-          <label className="label">Descrição</label>
+          <label className="label" htmlFor="conta-descricao">Descrição</label>
           <input
+            id="conta-descricao"
             className="input"
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
@@ -293,8 +313,9 @@ function ContaForm({ onClose }: { onClose: () => void }) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Valor (R$)</label>
+            <label className="label" htmlFor="conta-valor">Valor (R$)</label>
             <input
+              id="conta-valor"
               className="input"
               inputMode="decimal"
               value={valor}
@@ -303,31 +324,34 @@ function ContaForm({ onClose }: { onClose: () => void }) {
             />
           </div>
           <div>
-            <label className="label">Vencimento</label>
-            <input type="date" className="input" value={vencimento} onChange={(e) => setVencimento(e.target.value)} />
+            <label className="label" htmlFor="conta-vencimento">Vencimento</label>
+            <input id="conta-vencimento" type="date" className="input" value={vencimento} onChange={(e) => setVencimento(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Categoria</label>
-            <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            <label className="label" htmlFor="conta-categoria">Categoria</label>
+            <select id="conta-categoria" className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               {CATEGORIAS.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="label">Fornecedor (opcional)</label>
-            <input className="input" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
+            <label className="label" htmlFor="conta-fornecedor">Fornecedor (opcional)</label>
+            <input id="conta-fornecedor" className="input" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} />
-          <Repeat size={14} className="text-brand-500" /> Despesa fixa (recorrente)
+          <Repeat size={14} className="text-brand-500" /> Marcar como despesa fixa
         </label>
+        <p className="text-[11px] text-muted -mt-2">
+          Só identifica a conta como fixa (aluguel, internet…). O próximo mês não é lançado automaticamente.
+        </p>
         <div>
-          <label className="label">Observação (opcional)</label>
-          <textarea className="input" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
+          <label className="label" htmlFor="conta-obs">Observação (opcional)</label>
+          <textarea id="conta-obs" className="input" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
         </div>
         <button onClick={salvar} disabled={salvando} className="btn-primary w-full disabled:opacity-60">
           {salvando ? "Salvando…" : "Salvar conta"}

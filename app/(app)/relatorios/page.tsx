@@ -50,6 +50,9 @@ function Relatorios() {
   const [de, setDe] = useState(() => ymdSP(inicioDoMes(Date.now())));
   const [ate, setAte] = useState(() => ymdSP(Date.now()));
 
+  // período invertido no "Personalizado" (De depois de Até): avisa em vez de mostrar relatório vazio
+  const periodoInvalido = preset === "custom" && !!de && !!ate && de > ate;
+
   const { deMs, ateMs, label } = useMemo(() => {
     const now = Date.now();
     if (preset === "hoje") return { deMs: inicioDoDia(now), ateMs: fimDoDia(now), label: "Hoje" };
@@ -122,6 +125,10 @@ function Relatorios() {
 
   function exportarExcel() {
     registrarMetrica({ tipo: "recurso", recurso: "relatorio_exportado" });
+    if (periodoInvalido) {
+      alerta({ titulo: "Período inválido", mensagem: "A data inicial (De) precisa ser antes da final (Até)." });
+      return;
+    }
     const noPeriodo = vendas
       .filter((v) => v.data >= deMs && v.data <= ateMs)
       .sort((a, b) => a.data - b.data);
@@ -139,6 +146,12 @@ function Relatorios() {
       pendente: "A receber",
       cancelada: "Cancelada",
     };
+    const canalLabel: Record<string, string> = {
+      loja: "Loja",
+      whatsapp: "WhatsApp",
+      instagram: "Instagram",
+    };
+    const reais = (n: number) => (Math.round(n * 100) / 100 + 0).toFixed(2).replace(".", ",");
     const linhas = noPeriodo.map((v) => {
       const { data, hora } = dataHora(v.data);
       const itens = v.itens.map((i) => `${i.qtd}x ${i.nome}`).join(" | ");
@@ -146,22 +159,23 @@ function Relatorios() {
       return [
         data,
         hora,
-        v.canal,
+        canalLabel[v.canal] || v.canal,
         formaLabel[v.formaPagamento] || v.formaPagamento,
         v.parcelas > 1 ? `${v.parcelas}x` : "À vista",
         statusLabel[v.statusPagamento] || v.statusPagamento,
         nome(v.revendedoraId),
-        itens,
-        bruto.toFixed(2).replace(".", ","),
-        (v.desconto || 0).toFixed(2).replace(".", ","),
-        v.total.toFixed(2).replace(".", ","),
-        v.custoTotal.toFixed(2).replace(".", ","),
-        v.comissaoTotal.toFixed(2).replace(".", ","),
-        v.lucro.toFixed(2).replace(".", ","),
+        itens || "Recebimento avulso",
+        reais(bruto),
+        reais(v.desconto || 0),
+        reais(v.total),
+        reais(v.custoTotal),
+        reais(v.comissaoTotal),
+        reais(v.lucro),
       ];
     });
     baixarCSV(
-      `vendas_${de}_a_${ate}.csv`,
+      // nome pelo período realmente exibido (preset ou personalizado), no fuso da loja
+      `vendas_${ymdSP(deMs)}_a_${ymdSP(ateMs)}.csv`,
       [
         "Data",
         "Hora",
@@ -201,50 +215,71 @@ function Relatorios() {
             ["ano", "Ano"],
             ["custom", "Personalizado"],
           ] as [Preset, string][]).map(([id, lbl]) => (
-            <span
+            <button
               key={id}
+              type="button"
+              aria-pressed={preset === id}
               onClick={() => setPreset(id)}
               className={`chip ${
                 preset === id ? "bg-brand-600 text-white border-brand-600" : "border-default"
               }`}
             >
               {lbl}
-            </span>
+            </button>
           ))}
         </div>
         {preset === "custom" && (
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
-              <label className="label">De</label>
-              <input type="date" className="input" value={de} onChange={(e) => setDe(e.target.value)} />
+              <label className="label" htmlFor="rel-de">De</label>
+              <input id="rel-de" type="date" className="input" value={de} onChange={(e) => setDe(e.target.value)} />
             </div>
             <div className="flex-1">
-              <label className="label">Até</label>
-              <input type="date" className="input" value={ate} onChange={(e) => setAte(e.target.value)} />
+              <label className="label" htmlFor="rel-ate">Até</label>
+              <input id="rel-ate" type="date" className="input" value={ate} onChange={(e) => setAte(e.target.value)} />
             </div>
           </div>
         )}
+        {periodoInvalido && (
+          <p className="text-sm text-red-500" role="alert">
+            A data inicial (De) precisa ser antes da final (Até). Ajuste o período para ver o relatório.
+          </p>
+        )}
         <div className="flex gap-2">
-          <button onClick={exportarExcel} className="btn-ghost flex-1 py-2 text-sm">
+          <button
+            type="button"
+            onClick={exportarExcel}
+            disabled={periodoInvalido}
+            className="btn-ghost flex-1 py-2 text-sm disabled:opacity-50"
+          >
             <FileSpreadsheet size={16} /> Excel
           </button>
-          <button onClick={() => {
+          <button type="button" disabled={periodoInvalido} onClick={() => {
             registrarMetrica({ tipo: "recurso", recurso: "relatorio_exportado" });
             window.print();
-          }} className="btn-ghost flex-1 py-2 text-sm">
+          }} className="btn-ghost flex-1 py-2 text-sm disabled:opacity-50">
             <Printer size={16} /> PDF
           </button>
         </div>
       </div>
 
-      <div className="text-xs text-muted -mt-1">Período: {label}</div>
+      <div className="text-xs text-muted -mt-1">
+        Período: {label}
+        {/* a loja carrega primeiro só os últimos 180 dias; o resto chega em segundo plano */}
+        {deMs < Date.now() - 180 * 24 * 60 * 60 * 1000 &&
+          " · vendas com mais de 180 dias podem levar alguns segundos para aparecer"}
+      </div>
+
+      {vendas.length > 0 && vendasPeriodo.length === 0 && !periodoInvalido && (
+        <div className="card text-center text-muted py-6 text-sm">Nenhuma venda neste período.</div>
+      )}
 
       {/* cards principais */}
       <div className="grid grid-cols-2 gap-3 stagger">
         <Metric titulo="Faturamento bruto" valor={<CountUp value={r.faturamento} format={brl} />} sub="vendas (competência)" />
         <Metric titulo="Recebido (caixa)" valor={<CountUp value={r.recebido} format={brl} />} sub={`${r.qtdPagas} pagas`} forte />
         <Metric titulo="A receber" valor={<CountUp value={r.aReceber} format={brl} />} sub={`${r.qtdPendentes} pendentes`} />
-        <Metric titulo="Descontos" valor={<CountUp value={r.descontos} format={brl} />} sub={`${r.qtdCanceladas} canceladas`} />
+        <Metric titulo="Descontos" valor={<CountUp value={r.descontos} format={brl} />} sub={`em ${r.qtdComDesconto} venda(s)`} />
       </div>
 
       <div className="grid grid-cols-1 gap-3">
@@ -253,6 +288,7 @@ function Relatorios() {
           <CountUp value={r.lucroProjetado} format={brl} className="text-2xl font-bold text-green-500 block" />
           <div className="text-xs text-muted mt-1">
             Se todas as vendas do período forem pagas · margem {r.margem.toFixed(1)}%
+            {r.qtdCanceladas > 0 && ` · ${r.qtdCanceladas} cancelada(s) fora da conta`}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -270,10 +306,11 @@ function Relatorios() {
         <div className="grid grid-cols-3 gap-2 my-3">
           <Mini label="Média" valor={brl(r.fluxoMedia)} />
           <Mini label="Pico" valor={brl(r.fluxoPico.valor)} sub={r.fluxoPico.dia} />
+          {/* sem base de comparação (ex.: "Hoje"): neutro, nada de "+0%" verde */}
           <Mini
             label="Tendência"
-            valor={`${r.tendencia >= 0 ? "+" : ""}${r.tendencia.toFixed(0)}%`}
-            up={r.tendencia >= 0}
+            valor={r.tendencia === null ? "—" : `${r.tendencia >= 0 ? "+" : ""}${r.tendencia.toFixed(0)}%`}
+            up={r.tendencia === null ? undefined : r.tendencia >= 0}
           />
         </div>
         <VendasArea data={r.fluxo} yKey="valor" gradientId="fx" interval="preserveStartEnd" height={150} />
@@ -318,16 +355,16 @@ function Relatorios() {
             {ranking.map((r2, i) => {
               const ultimo = i === ranking.length - 1 && ranking.length > 1;
               return (
-                <div key={r2.nome} className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <span className="text-muted w-5">{i + 1}º</span>
-                    <span className="font-medium">{r2.nome}</span>
+                <div key={r2.id} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="text-muted w-5 shrink-0">{i + 1}º</span>
+                    <span className="font-medium truncate">{r2.nome}</span>
                     {i === 0 && r2.total > 0 && (
-                      <TrendingUp size={14} className="text-green-500" />
+                      <TrendingUp size={14} className="text-green-500 shrink-0" />
                     )}
-                    {ultimo && <TrendingDown size={14} className="text-red-500" />}
+                    {ultimo && <TrendingDown size={14} className="text-red-500 shrink-0" />}
                   </span>
-                  <span className="text-sm">
+                  <span className="text-sm shrink-0">
                     {brl(r2.total)} <span className="text-muted">· {r2.qtd}</span>
                   </span>
                 </div>

@@ -14,7 +14,7 @@
 // ============================================================================
 
 import type Stripe from "stripe";
-import { PLANOS, planoValido, type PlanoId, type StatusAssinatura } from "../plans";
+import { MIN_TRIAL_STRIPE_MS, PLANOS, planoValido, type PlanoId, type StatusAssinatura } from "../plans";
 
 export const PREFIXO_LOOKUP = "automanager_";
 
@@ -66,9 +66,79 @@ export interface ResultadoEvento {
   cancelarAnterior?: string;
   // evento de cobrança recusada (métrica payment_failed)
   pagamentoFalhou?: boolean;
+  // assinatura sincronizada (para cancelar outras mais antigas do mesmo cliente)
+  assinaturaId?: string;
+  clienteId?: string;
+  criadaEm?: number; // unix (s)
+  // ---- métricas (Painel NexForge): valor REAL cobrado, não o preço de tabela ----
+  precoCentavos?: number; // preço recorrente do item (unit_amount)
+  emTrialStripe?: boolean; // assinatura em trial no Stripe (assinou durante o teste grátis)
+  valorPagoCentavos?: number | null; // amount_paid da última fatura (com cupom/desconto), se disponível
+  // evento invoice.paid: 1ª cobrança depois do trial (é aí que a assinatura "paga" de verdade)
+  primeiraCobrancaPosTrial?: { valorCentavos: number } | null;
+}
+
+export interface MetricaCobranca {
+  evento: "plan_activated" | "plan_changed" | "plan_canceled" | "payment_failed";
+  props: Record<string, string | number>;
+  chave: string;
+}
+
+/**
+ * Qual métrica de cobrança enviar ao Painel NexForge (EVENTS.md) para uma sincronização.
+ * - plan_activated leva o valor efetivamente cobrado (amount_paid da fatura, com cupom),
+ *   e só quando há cobrança: quem assina durante o teste grátis (trial no Stripe) só
+ *   "ativa" na 1ª fatura paga depois do trial.
+ * - chave de plan_activated = assinatura: confirmação e webhook não contam duas vezes.
+ */
+export function metricaCobranca(r: ResultadoEvento, chave: string): MetricaCobranca | null {
+  if (r.resultado !== "sincronizada" || !r.plano) return null;
+  if (r.pagamentoFalhou) return { evento: "payment_failed", props: {}, chave: `recusa:${chave}` };
+  const id = r.assinaturaId ?? chave;
+  const ativar = (valor: number) => ({
+    evento: "plan_activated" as const,
+    props: { plan: r.plano!, billing_period: "month", amount_cents: valor, currency: "BRL" },
+    chave: `ativa:${id}`,
+  });
+  if (r.primeiraCobrancaPosTrial && r.status === "active") return ativar(r.primeiraCobrancaPosTrial.valorCentavos);
+  if (r.status === "active" && r.statusAnterior === "active" && r.planoAnterior && r.planoAnterior !== r.plano)
+    return {
+      evento: "plan_changed",
+      props: {
+        from_plan: r.planoAnterior,
+        to_plan: r.plano,
+        billing_period: "month",
+        amount_cents: r.precoCentavos ?? PLANOS[r.plano].precoCentavos,
+      },
+      chave: `troca:${chave}`,
+    };
+  if (r.status === "active" && r.statusAnterior !== "active") {
+    if (r.emTrialStripe) return null; // ainda não cobrou nada: ativa na 1ª fatura paga
+    return ativar(r.valorPagoCentavos ?? r.precoCentavos ?? PLANOS[r.plano].precoCentavos);
+  }
+  if (r.status === "canceled" && r.statusAnterior !== "canceled")
+    return { evento: "plan_canceled", props: { plan: r.plano }, chave: `cancelada:${chave}` };
+  return null;
 }
 
 const VIVOS: StatusAssinatura[] = ["active", "past_due"];
+
+
+/**
+ * Quem assina DURANTE o teste grátis não perde o resto do "1º mês grátis": a
+ * assinatura nasce em trial no Stripe até o fim do teste interno e a 1ª cobrança
+ * acontece só nessa data. Devolve o trial_end (unix, segundos) ou null quando
+ * não há teste vigente (ou falta menos de 48 h: cobra já).
+ */
+export function trialEndParaCheckout(
+  atual: { status?: string | null; trial_ate?: string | null } | null | undefined,
+  agora = Date.now()
+): number | null {
+  if (!atual || atual.status !== "trialing" || !atual.trial_ate) return null;
+  const fim = new Date(atual.trial_ate).getTime();
+  if (!Number.isFinite(fim) || fim - agora < MIN_TRIAL_STRIPE_MS) return null;
+  return Math.floor(fim / 1000);
+}
 
 const iso = (unix: number | null | undefined) => (unix ? new Date(unix * 1000).toISOString() : null);
 
@@ -110,6 +180,13 @@ export function statusInterno(s: Stripe.Subscription.Status): StatusAssinatura |
   }
 }
 
+// amount_paid da última fatura quando ela veio expandida (retrieve com expand latest_invoice)
+function valorPago(sub: Stripe.Subscription): number | null {
+  const inv = (sub as any).latest_invoice;
+  if (!inv || typeof inv === "string") return null;
+  return inv.status === "paid" && typeof inv.amount_paid === "number" ? inv.amount_paid : null;
+}
+
 function idDe(x: string | { id: string } | null | undefined): string | null {
   if (!x) return null;
   return typeof x === "string" ? x : x.id;
@@ -141,8 +218,11 @@ async function sincronizar(
   if (!atual) return { resultado: "ignorado_sem_org", orgId };
 
   const outra = atual.providerAssinaturaId && atual.providerAssinaturaId !== sub.id ? atual.providerAssinaturaId : null;
-  // evento de uma assinatura antiga encerrada: não mexe na assinatura viva atual
-  if (outra && VIVOS.includes(atual.status) && !VIVOS.includes(status)) {
+  // Assinatura encerrada que NÃO é a gravada na org não muda nada: ou é uma antiga já
+  // substituída, ou nunca chegou a valer (checkout com 1º pagamento não concluído que
+  // expirou: incomplete_expired). Sem isso, um boleto/3DS abandonado durante o teste
+  // grátis gravava "canceled" e derrubava a loja para o piso no meio do trial.
+  if (atual.providerAssinaturaId !== sub.id && !VIVOS.includes(status)) {
     return { resultado: "ignorado_substituida", orgId, plano };
   }
 
@@ -173,13 +253,23 @@ async function sincronizar(
     statusAnterior: atual.status,
     status,
     cancelarAnterior: outra && VIVOS.includes(status) ? outra : undefined,
+    assinaturaId: sub.id,
+    clienteId: customerId || undefined,
+    criadaEm: sub.created,
+    precoCentavos: item?.price?.unit_amount ?? PLANOS[plano].precoCentavos,
+    emTrialStripe: sub.status === "trialing",
+    valorPagoCentavos: valorPago(sub),
   };
 }
 
+// `efeitos` roda ANTES de marcar o evento como processado: se ele falhar (ex.: não
+// conseguiu cancelar a assinatura substituída), o evento não fica marcado e o
+// Stripe reenvia — senão o reenvio virava "duplicado" e a cobrança dupla ficava.
 export async function tratarEventoStripe(
   event: Stripe.Event,
   store: BillingStore,
-  fetchSubscription: FetchSubscription
+  fetchSubscription: FetchSubscription,
+  efeitos?: (r: ResultadoEvento) => Promise<void>
 ): Promise<ResultadoEvento> {
   if (await store.jaProcessado(event.id)) return { resultado: "duplicado" };
 
@@ -204,10 +294,20 @@ export async function tratarEventoStripe(
       const subId = assinaturaDaInvoice(obj);
       if (subId) r = await sincronizar(subId, store, fetchSubscription);
       if (event.type === "invoice.payment_failed" && r.resultado === "sincronizada") r.pagamentoFalhou = true;
+      if (event.type === "invoice.paid" && r.resultado === "sincronizada" && subId) {
+        // 1ª fatura paga depois do trial do Stripe (assinou durante o teste grátis)
+        const sub = await fetchSubscription(subId);
+        const fimTrial = sub.trial_end ?? null;
+        const pago = typeof obj?.amount_paid === "number" ? obj.amount_paid : 0;
+        const perto = (t: unknown) => typeof t === "number" && fimTrial !== null && Math.abs(t - fimTrial) < 3600;
+        if (pago > 0 && fimTrial && obj?.billing_reason === "subscription_cycle" && (perto(obj.period_end) || perto(obj.period_start)))
+          r.primeiraCobrancaPosTrial = { valorCentavos: pago };
+      }
       break;
     }
   }
 
+  if (efeitos) await efeitos(r);
   await store.marcarProcessado(event.id, event.type);
   return r;
 }

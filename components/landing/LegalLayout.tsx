@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Gem } from "lucide-react";
 import Rodape from "@/components/landing/Rodape";
 
-export const ULTIMA_ATUALIZACAO = "28/10/2026";
+export const ULTIMA_ATUALIZACAO = "02/11/2026";
 
 // Moldura das páginas legais (Termos, Privacidade, Cancelamento).
 export default function LegalLayout({

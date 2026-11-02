@@ -198,7 +198,7 @@ function Produtos() {
           const baixo = p.estoqueAtual <= p.estoqueMinimo;
           const temGrade = p.variacoes.length > 0;
           return (
-            <div key={p.id} className="card flex items-center gap-3">
+            <div key={p.id} className={`card flex items-center gap-3 ${p.ativo ? "" : "opacity-60"}`}>
               {p.imagens[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -215,18 +215,18 @@ function Produtos() {
                 <div className="font-semibold truncate">
                   {p.nome}
                   {p.marca ? <span className="text-muted font-normal"> · {p.marca}</span> : null}
+                  {!p.ativo && (
+                    <span className="ml-1.5 align-middle text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 surface-alt text-muted">
+                      Inativo
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-muted truncate">
                   {p.categoria} · {brl(p.precoVenda)}
-                  {podeEditar && (
-                    <>
-                      {" "}· margem{" "}
-                      {p.custo > 0 && p.precoVenda > 0
-                        ? (((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)
-                        : "-"}
-                      %
-                    </>
+                  {podeEditar && p.custo > 0 && p.precoVenda > 0 && (
+                    <> · margem {(((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)}%</>
                   )}
+                  {podeEditar && !(p.custo > 0) && <> · sem custo</>}
                   {temGrade && (
                     <span className="ml-1 inline-flex items-center gap-0.5 text-brand-500">
                       <Layers size={11} /> {p.variacoes.length}
@@ -240,7 +240,7 @@ function Produtos() {
                   {podeEditar && (
                   <button
                     onClick={() => setForm({ open: true, editar: p })}
-                    className="grid place-items-center h-9 w-9 rounded-lg text-brand-500 hover:bg-[var(--hover)] active:scale-90 transition"
+                    className="grid place-items-center h-10 w-10 rounded-lg text-brand-500 hover:bg-[var(--hover)] active:scale-90 transition"
                     title="Editar produto"
                     aria-label="Editar produto"
                   >
@@ -251,7 +251,7 @@ function Produtos() {
                     <>
                       <button
                         onClick={() => reporEstoque(p)}
-                        className="grid place-items-center h-9 w-9 rounded-lg text-brand-600 hover:bg-[var(--hover)] active:scale-90 transition"
+                        className="grid place-items-center h-10 w-10 rounded-lg text-brand-600 hover:bg-[var(--hover)] active:scale-90 transition"
                         title="Dar entrada (comprei)"
                         aria-label="Dar entrada no estoque"
                       >
@@ -259,7 +259,7 @@ function Produtos() {
                       </button>
                       <button
                         onClick={() => ajustar(p)}
-                        className="grid place-items-center h-9 w-9 rounded-lg text-muted hover:bg-[var(--hover)] active:scale-90 transition"
+                        className="grid place-items-center h-10 w-10 rounded-lg text-muted hover:bg-[var(--hover)] active:scale-90 transition"
                         title="Ajustar estoque"
                         aria-label="Ajustar estoque"
                       >
@@ -306,8 +306,16 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
   async function onArquivo(files: FileList | null) {
     const f = files?.[0];
     if (!f) return;
-    const texto = await f.text();
-    processar(texto, f.name);
+    // Excel pt-BR salva "CSV (separado por ;)" em Windows-1252: lido como UTF-8,
+    // "Coração" virava "Cora��o". Tenta UTF-8 estrito e cai no 1252.
+    const bytes = await f.arrayBuffer();
+    let texto: string;
+    try {
+      texto = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      texto = new TextDecoder("windows-1252").decode(bytes);
+    }
+    processar(texto.replace(/^\uFEFF/, ""), f.name);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -317,9 +325,14 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
 
   async function confirmar() {
     if (linhas.length === 0) return;
+    if (salvando) return;
     setSalvando(true);
     // descarta os campos de controle (_linha) antes de gravar
-    const res = await importarProdutos(linhas.map(({ _linha, ...rest }) => rest));
+    const res = await importarProdutos(linhas.map(({ _linha, ...rest }) => rest)).catch(() => ({
+      ok: false as const,
+      inseridos: 0,
+      erro: "Sem conexão. Tente de novo.",
+    }));
     setSalvando(false);
     if (!res.ok) {
       alerta({ titulo: "Falha ao importar", mensagem: res.erro || "Tente novamente." });
@@ -429,19 +442,21 @@ function ProdutoForm({
   onClose: () => void;
 }) {
   const { addProduto, updateProduto, config, orgId } = useStore();
-  const { alerta } = useDialog();
+  const { alerta, confirm } = useDialog();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [nome, setNome] = useState(editar?.nome ?? "");
   const [categoria, setCategoria] = useState(editar?.categoria ?? categorias[0] ?? "");
   const [marca, setMarca] = useState(editar?.marca ?? "");
   const [descricao, setDescricao] = useState(editar?.descricao ?? "");
-  const [custo, setCusto] = useState(editar ? String(editar.custo) : "");
-  const [preco, setPreco] = useState(editar ? String(editar.precoVenda) : "");
+  // valores já gravados aparecem no formato pt-BR ("12,50"), como a pessoa digita
+  const [custo, setCusto] = useState(editar ? numBR(editar.custo) : "");
+  const [preco, setPreco] = useState(editar ? numBR(editar.precoVenda) : "");
   const [precoDe, setPrecoDe] = useState(
-    editar?.precoComparativo != null ? String(editar.precoComparativo) : ""
+    editar?.precoComparativo != null ? numBR(editar.precoComparativo) : ""
   );
-  const [imposto, setImposto] = useState(editar ? String(editar.impostoPercent) : "0");
+  const [imposto, setImposto] = useState(editar ? String(editar.impostoPercent).replace(".", ",") : "0");
+  const [ativo, setAtivo] = useState(editar?.ativo ?? true);
   const [estoque, setEstoque] = useState(editar ? String(editar.estoqueAtual) : "");
   const [minimo, setMinimo] = useState(editar ? String(editar.estoqueMinimo) : "5");
   const [imagens, setImagens] = useState<string[]>(editar?.imagens ?? []);
@@ -504,10 +519,13 @@ function ProdutoForm({
     const custoNum = custo.trim() ? parseNumero(custo) : 0;
     const precoNum = parseNumero(preco);
     const precoDeNum = precoDe.trim() ? parseNumero(precoDe) : undefined;
+    const impostoNum = imposto.trim() ? parseNumero(imposto) : 0;
     const faltando = [
       !nome.trim() && "nome",
       !(precoNum > 0) && "preço de venda",
-      isNaN(custoNum) && "custo (número válido)",
+      (isNaN(custoNum) || custoNum < 0) && "custo (número maior ou igual a zero)",
+      precoDeNum != null && (isNaN(precoDeNum) || precoDeNum < 0) && "preço \"de\" (número maior ou igual a zero)",
+      (isNaN(impostoNum) || impostoNum < 0 || impostoNum > 100) && "imposto (entre 0% e 100%)",
       !categoria && "categoria",
     ].filter(Boolean);
     if (faltando.length > 0) {
@@ -517,8 +535,29 @@ function ProdutoForm({
     const vars = usaGrade
       ? variacoes
           .filter((v) => v.nome.trim())
-          .map((v) => ({ ...v, nome: v.nome.trim() }))
+          .map((v) => ({ ...v, nome: v.nome.trim(), estoqueAtual: Math.max(0, v.estoqueAtual || 0) }))
       : [];
+    // variações que já existiam e vão sumir (grade desligada ou nome apagado):
+    // excluir apaga o estoque delas, então pede confirmação
+    if (editar) {
+      const ficam = new Set(vars.map((v) => v.id).filter(Boolean));
+      const somem = editar.variacoes.filter((v) => !ficam.has(v.id));
+      if (somem.length > 0) {
+        const ok = await confirm({
+          titulo: `Excluir ${somem.length} variação(ões)?`,
+          mensagem: `${somem.map((v) => v.nome).join(", ")} ${somem.length === 1 ? "será excluída" : "serão excluídas"} junto com o estoque. As vendas já registradas continuam no histórico.`,
+          confirmar: "Excluir e salvar",
+          perigo: true,
+        });
+        if (!ok) return;
+      }
+    }
+    // estoque base: campo vazio na edição = não mexe (antes virava 0 sem aviso)
+    const estoqueDigitado = parseInt(estoque);
+    if (!usaGrade && estoque.trim() !== "" && (isNaN(estoqueDigitado) || estoqueDigitado < 0)) {
+      alerta({ titulo: "Estoque inválido", mensagem: "Informe o estoque atual como um número inteiro (0 ou mais)." });
+      return;
+    }
     const base = {
       nome: nome.trim(),
       categoria,
@@ -527,12 +566,13 @@ function ProdutoForm({
       custo: custoNum,
       precoVenda: precoNum,
       precoComparativo: precoDeNum != null && !isNaN(precoDeNum) ? precoDeNum : undefined,
-      impostoPercent: parseNumero(imposto) || 0,
+      impostoPercent: impostoNum,
       estoqueMinimo: (() => {
         const m = parseInt(minimo);
         return isNaN(m) || m < 0 ? 5 : m; // 0 é válido (sem alerta)
       })(),
       imagens,
+      ...(editar ? { ativo } : {}),
     };
     setSalvando(true);
     try {
@@ -541,12 +581,12 @@ function ProdutoForm({
       const res = editar
         ? await updateProduto(editar.id, {
             ...base,
-            estoqueAtual: usaGrade ? editar.estoqueAtual : parseInt(estoque) || 0,
+            estoqueAtual: usaGrade || estoque.trim() === "" ? editar.estoqueAtual : estoqueDigitado,
             variacoes: vars,
           })
         : await addProduto({
             ...base,
-            estoqueAtual: usaGrade ? 0 : parseInt(estoque) || 0,
+            estoqueAtual: usaGrade || estoque.trim() === "" ? 0 : estoqueDigitado,
             variacoes: vars.map(({ id, ...rest }) => rest),
           });
       if (!res.ok) {
@@ -600,26 +640,27 @@ function ProdutoForm({
         </div>
 
         <div>
-          <label className="label">Nome</label>
-          <input className="input" value={nome} onChange={(e) => setNome(e.target.value)} />
+          <label className="label" htmlFor="prod-nome">Nome</label>
+          <input id="prod-nome" className="input" maxLength={200} value={nome} onChange={(e) => setNome(e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Categoria</label>
-            <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            <label className="label" htmlFor="prod-categoria">Categoria</label>
+            <select id="prod-categoria" className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               {(categoria && !categorias.includes(categoria) ? [categoria, ...categorias] : categorias).map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="label">Marca</label>
-            <input className="input" value={marca} onChange={(e) => setMarca(e.target.value)} />
+            <label className="label" htmlFor="prod-marca">Marca</label>
+            <input id="prod-marca" className="input" value={marca} onChange={(e) => setMarca(e.target.value)} />
           </div>
         </div>
         <div>
-          <label className="label">Descrição</label>
+          <label className="label" htmlFor="prod-descricao">Descrição</label>
           <textarea
+            id="prod-descricao"
             className="input"
             rows={2}
             value={descricao}
@@ -629,16 +670,17 @@ function ProdutoForm({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Custo (R$)</label>
-            <input className="input" inputMode="decimal" value={custo} onChange={(e) => onCusto(e.target.value)} />
+            <label className="label" htmlFor="prod-custo">Custo (R$)</label>
+            <input id="prod-custo" className="input" inputMode="decimal" value={custo} onChange={(e) => onCusto(e.target.value)} />
           </div>
           <div>
-            <label className="label">Preço venda (R$)</label>
-            <input className="input" inputMode="decimal" value={preco} onChange={(e) => onPreco(e.target.value)} />
+            <label className="label" htmlFor="prod-preco">Preço venda (R$)</label>
+            <input id="prod-preco" className="input" inputMode="decimal" value={preco} onChange={(e) => onPreco(e.target.value)} />
           </div>
           <div>
-            <label className="label">Preço &quot;de&quot; (R$)</label>
+            <label className="label" htmlFor="prod-preco-de">Preço &quot;de&quot; (R$)</label>
             <input
+              id="prod-preco-de"
               className="input"
               inputMode="decimal"
               placeholder="opcional"
@@ -647,8 +689,8 @@ function ProdutoForm({
             />
           </div>
           <div>
-            <label className="label">Imposto (%)</label>
-            <input className="input" inputMode="decimal" value={imposto} onChange={(e) => setImposto(e.target.value)} />
+            <label className="label" htmlFor="prod-imposto">Imposto (%)</label>
+            <input id="prod-imposto" className="input" inputMode="decimal" value={imposto} onChange={(e) => setImposto(e.target.value)} />
           </div>
         </div>
 
@@ -667,6 +709,7 @@ function ProdutoForm({
                 <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
                   <input
                     className="input col-span-4 py-1.5 text-sm"
+                    aria-label="Nome da variação"
                     placeholder="Aro 16"
                     value={v.nome}
                     onChange={(e) => setVar(i, { nome: e.target.value })}
@@ -674,6 +717,7 @@ function ProdutoForm({
                   <input
                     className="input col-span-3 py-1.5 text-sm"
                     placeholder="SKU"
+                    aria-label="SKU da variação"
                     value={v.sku ?? ""}
                     onChange={(e) => setVar(i, { sku: e.target.value })}
                   />
@@ -681,13 +725,15 @@ function ProdutoForm({
                     className="input col-span-2 py-1.5 text-sm"
                     inputMode="numeric"
                     placeholder="Qtd"
+                    aria-label="Estoque da variação"
                     value={v.estoqueAtual || ""}
-                    onChange={(e) => setVar(i, { estoqueAtual: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setVar(i, { estoqueAtual: Math.max(0, parseInt(e.target.value) || 0) })}
                   />
                   <input
                     className="input col-span-2 py-1.5 text-sm"
                     inputMode="decimal"
                     placeholder="±R$"
+                    aria-label="Ajuste de preço da variação (R$)"
                     value={ajustesTxt[i] ?? ""}
                     onChange={(e) => {
                       const t = e.target.value;
@@ -710,20 +756,32 @@ function ProdutoForm({
         {!usaGrade && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Estoque atual</label>
-              <input className="input" inputMode="numeric" value={estoque} onChange={(e) => setEstoque(e.target.value)} />
+              <label className="label" htmlFor="prod-estoque">Estoque atual</label>
+              <input id="prod-estoque" className="input" inputMode="numeric" value={estoque} onChange={(e) => setEstoque(e.target.value)} />
             </div>
             <div>
-              <label className="label">Estoque mínimo</label>
-              <input className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+              <label className="label" htmlFor="prod-minimo">Estoque mínimo</label>
+              <input id="prod-minimo" className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
             </div>
           </div>
         )}
         {usaGrade && (
           <div>
-            <label className="label">Estoque mínimo (alerta)</label>
-            <input className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+            <label className="label" htmlFor="prod-minimo-grade">Estoque mínimo (alerta)</label>
+            <input id="prod-minimo-grade" className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
           </div>
+        )}
+
+        {editar && (
+          <label className="flex items-start gap-2 text-sm rounded-xl surface-alt p-3">
+            <input type="checkbox" className="mt-0.5" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
+            <span>
+              <span className="font-medium">Produto ativo</span>
+              <span className="block text-xs text-muted">
+                Desmarque para tirar o produto da tela Vender, da vitrine e do catálogo das revendedoras, sem perder o histórico.
+              </span>
+            </span>
+          </label>
         )}
 
         <button onClick={salvar} disabled={salvando || enviando} className="btn-primary w-full disabled:opacity-60">
@@ -731,6 +789,11 @@ function ProdutoForm({
         </button>
     </Modal>
   );
+}
+
+// número gravado -> texto pt-BR para o campo ("12.5" -> "12,50")
+function numBR(n: number): string {
+  return Number.isFinite(n) ? n.toFixed(2).replace(".", ",") : "";
 }
 
 function ResumoEstoque({ label, valor, cor }: { label: string; valor: number; cor: string }) {

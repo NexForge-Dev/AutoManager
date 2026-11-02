@@ -57,7 +57,8 @@ export async function updateSession(request: NextRequest) {
   // APIs se auto-protegem (retornam JSON 403); o webhook do Stripe chega sem sessão.
   const rotaPrivada = ROTAS_PRIVADAS.some((r) => path === r || path.startsWith(r + "/"));
 
-  if (!user && rotaPrivada) {
+  // a sessão anônima do chat da vitrine não é login de verdade: trata como deslogado
+  if ((!user || user.is_anonymous) && rotaPrivada) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

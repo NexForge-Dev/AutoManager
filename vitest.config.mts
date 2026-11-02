@@ -7,5 +7,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // worktrees do Claude Code (.claude/) têm cópias do repo: não rodar os testes delas
+    exclude: ["**/node_modules/**", "**/.next/**", ".claude/**"],
   },
 });

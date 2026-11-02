@@ -31,8 +31,11 @@ export function decidirDestino(e: {
   semOrg: boolean;
   role: Role;
   onboardingCompleto: boolean;
+  superadmin?: boolean;
 }): string {
   if (e.situacaoRevendedora === "ativa") return "/revenda";
+  // conta de suporte (criada por scripts/criar-admin.mjs) não tem loja: vai direto ao painel admin
+  if (e.superadmin && e.semOrg) return "/admin";
   if (e.semOrg) return `/acesso?motivo=${e.situacaoRevendedora === "suspensa" ? "suspenso" : "sem_loja"}`;
   if (!e.onboardingCompleto && e.role === "owner") return "/onboarding";
   return homeDe(e.role);

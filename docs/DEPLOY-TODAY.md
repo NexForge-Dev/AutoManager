@@ -14,6 +14,7 @@ New migrations, in apply order:
 | 4 | `supabase/migrations/0040_rpc_sem_anon.sql` | Revokes `anon`/`PUBLIC` EXECUTE on logged-in-only RPCs |
 | 5 | `supabase/migrations/0041_qa_hardening.sql` | QA hardening: RLS/grants/guard triggers, CHECKs, storage owner-only, org.acesso enforced |
 | 6 | `supabase/migrations/0042_qa_rpcs.sql` | QA hardening: rewritten RPCs (plan/org gates, rounding) + `minha_assinatura`, `revendedora_situacao`, `admin_encerrar_sessoes` |
+| 7 | `supabase/migrations/0043_auditoria_integridade.sql` | Audit 2026-11-02: variation/delivery must belong to the same store (cross-tenant injection), no support tickets from anonymous storefront sessions, chat flood limits (5 new conversations/h per visitor, 20 msgs/min per conversation, server timestamps), slug/contas/chamado CHECKs, revoke TRUNCATE/TRIGGER/REFERENCES from API roles |
 
 All six are additive/idempotent (`if not exists`, `create or replace`, `revoke`/`grant`,
 `not valid` CHECKs). The old Mercado Pago build keeps working on top of 0037–0040 (it never
@@ -61,10 +62,12 @@ for f in 0037_stripe 0038_rate_limit 0039_codigo_acesso_sem_vies 0040_rpc_sem_an
 done
 ```
 
-Right after the new build is live (§5), in this order:
+Right after the new build is live (§5), in this order (0043 needs 0041; it deletes only
+variations whose `org_id` differs from their product's store — rows that can only exist through
+the cross-tenant bug — and prints a NOTICE with the count):
 
 ```bash
-for f in 0041_qa_hardening 0042_qa_rpcs; do
+for f in 0041_qa_hardening 0042_qa_rpcs 0043_auditoria_integridade; do
   psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f "supabase/migrations/$f.sql" || break
 done
 ```

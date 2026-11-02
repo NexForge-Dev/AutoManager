@@ -42,6 +42,8 @@ function Conversas() {
   const [sel, setSel] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [msgsCarregando, setMsgsCarregando] = useState(false);
+  const [erroLista, setErroLista] = useState(false);
+  const [erroMsgs, setErroMsgs] = useState(false);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [vistos, setVistos] = useState<Record<string, number>>({});
@@ -59,7 +61,11 @@ function Conversas() {
   }
   function marcarVisto(id: string) {
     const agora = Date.now();
-    if (typeof localStorage !== "undefined") localStorage.setItem(vistoKey(id), String(agora));
+    try {
+      localStorage.setItem(vistoKey(id), String(agora));
+    } catch {
+      /* armazenamento bloqueado: o "visto" vale só nesta aba */
+    }
     setVistos((v) => ({ ...v, [id]: agora }));
     if (typeof window !== "undefined") window.dispatchEvent(new Event("aminbox-visto")); // atualiza o badge do menu
   }
@@ -81,29 +87,38 @@ function Conversas() {
   useEffect(() => {
     const client = sb.current;
     let ch: ReturnType<typeof client.channel> | null = null;
+    let ativo = true;
 
     client
       .from("conversa")
       .select("id, cliente_nome, ultima_em, ultima_cliente_em")
       .order("ultima_em", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (!ativo) return;
+        setErroLista(!!error);
         const lista = (data as Conversa[]) || [];
         setConversas(lista);
         setCarregando(false);
-        if (typeof localStorage !== "undefined") {
-          const seed: Record<string, number> = {};
+        const seed: Record<string, number> = {};
+        try {
           for (const c of lista) seed[c.id] = Number(localStorage.getItem(vistoKey(c.id)) || 0);
-          setVistos(seed);
+        } catch {
+          /* sem armazenamento: tudo conta como não visto */
         }
+        setVistos(seed);
       });
 
-    // garante token no realtime (RLS) antes de assinar
+    // token no realtime (RLS) ANTES de assinar: assinado sem ele, os eventos
+    // filtrados pela RLS não chegam até a próxima renovação do token
     client.auth.getSession().then(({ data }) => {
+      if (!ativo) return;
       if (data.session) client.realtime.setAuth(data.session.access_token);
+      assinar();
     });
 
     // nome único: channel() devolve um canal homônimo que ainda está saindo
     // (removeChannel é assíncrono) e a nova assinatura morreria junto
+    const assinar = () => {
     ch = client
       .channel(`inbox-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversa" }, (p) => {
@@ -131,25 +146,37 @@ function Conversas() {
         }
       })
       .subscribe();
+    };
 
     return () => {
-      client.removeChannel(ch);
+      ativo = false;
+      if (ch) client.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!sel) return;
+    // troca de conversa: limpa a anterior e ignora respostas atrasadas (A -> B rápido
+    // mostrava as mensagens de A com o cabeçalho de B)
+    let ativo = true;
+    setMsgs([]);
+    setErroMsgs(false);
     setMsgsCarregando(true);
     sb.current
       .from("mensagem")
       .select("id, autor_tipo, texto, criada_em")
       .eq("conversa_id", sel)
       .order("criada_em")
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (!ativo) return;
+        setErroMsgs(!!error);
         setMsgs((data as Msg[]) || []);
         setMsgsCarregando(false);
       });
+    return () => {
+      ativo = false;
+    };
   }, [sel]);
 
   // scroll inteligente: pula direto no 1º render; depois só rola se está perto do fim
@@ -198,8 +225,9 @@ function Conversas() {
     }
   }
 
-  // reenvia uma mensagem que falhou
+  // reenvia uma mensagem que falhou (só tira a bolha de erro se o reenvio começar)
   function reenviar(m: Msg) {
+    if (enviando) return;
     setMsgs((prev) => prev.filter((x) => x.id !== m.id));
     enviar(m.texto);
   }
@@ -214,13 +242,13 @@ function Conversas() {
           <button
             onClick={() => setSel(null)}
             aria-label="Voltar"
-            className="grid place-items-center h-9 w-9 -ml-1 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
+            className="grid place-items-center h-11 w-11 -ml-2 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
           >
             <ChevronLeft />
           </button>
         )}
         <MessageCircle className="text-brand-600" />
-        <h1 className="text-2xl font-bold">{sel ? selConversa?.cliente_nome || "Cliente" : "Conversas"}</h1>
+        <h1 className="text-2xl font-bold truncate min-w-0">{sel ? selConversa?.cliente_nome || "Cliente" : "Conversas"}</h1>
         {!sel && totalNaoLidas > 0 && (
           <span className="ml-1 text-xs font-bold text-white bg-red-500 rounded-full min-w-[20px] h-5 px-1.5 grid place-items-center">
             {totalNaoLidas > 99 ? "99+" : totalNaoLidas}
@@ -232,9 +260,14 @@ function Conversas() {
       {!sel && carregando && <SkeletonList count={4} />}
       {!sel && !carregando && (
         <div className="space-y-2 stagger">
-          {conversas.length === 0 && (
+          {erroLista && (
+            <div role="alert" className="card text-center text-red-500 text-sm">
+              Não foi possível carregar as conversas. Confira a conexão e abra a página de novo.
+            </div>
+          )}
+          {!erroLista && conversas.length === 0 && (
             <div className="card text-center text-muted">
-              Nenhuma conversa ainda. Ative a mini-loja em Configurações e compartilhe o link.
+              Nenhuma conversa ainda. Coloque a loja no ar em Minha Loja e compartilhe o link.
             </div>
           )}
           {conversas.map((c) => {
@@ -251,7 +284,7 @@ function Conversas() {
                     <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 border-2 border-[var(--surface)]" />
                   )}
                 </div>
-                <div className={`flex-1 ${nova ? "font-bold" : "font-medium"}`}>{c.cliente_nome || "Cliente"}</div>
+                <div className={`flex-1 min-w-0 truncate ${nova ? "font-bold" : "font-medium"}`}>{c.cliente_nome || "Cliente"}</div>
                 {nova && (
                   <span className="text-[11px] font-semibold text-white bg-brand-600 rounded-full px-2 py-0.5">nova</span>
                 )}
@@ -263,7 +296,7 @@ function Conversas() {
 
       {/* chat */}
       {sel && (
-        <div className="card flex flex-col h-[70vh] p-0 overflow-hidden">
+        <div className="card flex flex-col h-[70dvh] p-0 overflow-hidden">
           <div ref={scrollRef} onScroll={aoRolar} className="flex-1 overflow-auto p-4 space-y-2">
             {msgsCarregando && msgs.length === 0 && (
               <div className="space-y-2">
@@ -272,7 +305,10 @@ function Conversas() {
                 <div className="skeleton h-9 w-2/5 rounded-2xl" />
               </div>
             )}
-            {!msgsCarregando && msgs.length === 0 && (
+            {!msgsCarregando && erroMsgs && (
+              <p role="alert" className="text-center text-sm text-red-500">Não foi possível carregar as mensagens.</p>
+            )}
+            {!msgsCarregando && !erroMsgs && msgs.length === 0 && (
               <p className="text-center text-sm text-muted">Sem mensagens ainda.</p>
             )}
             {msgs.map((m) => {
@@ -306,6 +342,8 @@ function Conversas() {
             <input
               className="input flex-1"
               placeholder="Responder…"
+              aria-label="Responder"
+              maxLength={2000}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               onKeyDown={(e) => {

@@ -35,4 +35,9 @@ describe("decidirDestino (pós-login)", () => {
     expect(motivoDaUrl("")).toBeNull();
     expect(MOTIVOS_ACESSO.suspenso).toMatch(/suspenso pela loja/);
   });
+
+  it("super-admin sem loja vai para /admin (não para o /acesso)", () => {
+    expect(decidirDestino({ ...base, semOrg: true, superadmin: true })).toBe("/admin");
+    expect(decidirDestino({ ...base, superadmin: true })).toBe("/painel");
+  });
 });

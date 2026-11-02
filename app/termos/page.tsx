@@ -77,7 +77,8 @@ export default function TermosPage() {
         <p>
           <strong>Teste grátis:</strong> toda nova loja tem <strong>1 (um) mês grátis</strong>, sem
           necessidade de cartão, com acesso aos recursos do plano mais completo. Ao fim do teste, para
-          continuar usando os recursos pagos é preciso assinar um plano.
+          continuar usando os recursos pagos é preciso assinar um plano. Se você assinar durante o
+          teste, a primeira cobrança só acontece quando ele terminar.
         </p>
         <p>
           <strong>Planos atuais</strong> (valores mensais, em reais):
@@ -95,7 +96,8 @@ export default function TermosPage() {
           processada pelo <strong>Stripe</strong> (cartão e demais meios exibidos no checkout). Os
           dados de pagamento são informados diretamente no ambiente do Stripe; o AutoManager não
           recebe nem armazena o número do seu cartão. Ao trocar de plano no meio do ciclo, a diferença
-          é ajustada proporcionalmente na fatura seguinte.
+          proporcional é cobrada na hora (no upgrade) ou vira crédito para as próximas faturas (no
+          downgrade), e o novo plano passa a valer assim que a cobrança é aprovada.
         </p>
         <ul>
           <li>
@@ -103,8 +105,7 @@ export default function TermosPage() {
             recursos pagos ficam limitados até a regularização. Seus dados não são apagados por isso.
           </li>
           <li>
-            Ao trocar de plano, a nova assinatura substitui a anterior, que é cancelada para não haver
-            cobrança dupla.
+            A troca de plano é feita na mesma assinatura: não há duas cobranças em paralelo.
           </li>
           <li>
             Podemos reajustar preços ou alterar a composição dos planos, avisando com pelo menos{" "}

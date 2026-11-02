@@ -90,8 +90,9 @@ function Recebimentos() {
       </header>
 
       <p className="text-sm text-muted">
-        Quando cai dinheiro numa conta conectada, ele aparece aqui. Confirme se foi venda da
-        loja — aí entra automaticamente no seu caixa.
+        Pagamentos recebidos que ainda não viraram venda aparecem aqui. Confirme se foi venda da
+        loja — aí ela entra no seu caixa. A importação automática de bancos e maquininhas ainda não
+        está disponível.
       </p>
 
       {entradasPendentes.length > 0 && (
@@ -107,8 +108,8 @@ function Recebimentos() {
         <div className="card text-center text-muted space-y-1">
           <div className="font-medium text-default">Nenhum recebimento aguardando</div>
           <p className="text-sm">
-            Assim que entrar um pagamento numa conta conectada, ele aparece aqui pra você
-            confirmar.
+            Quando houver um pagamento aguardando confirmação, ele aparece aqui. Para registrar
+            uma venda agora, use a tela Vender.
           </p>
         </div>
       )}
@@ -149,8 +150,7 @@ function Recebimentos() {
           <FlaskConical size={15} /> Testar o fluxo
         </div>
         <p className="text-xs text-muted">
-          Simule um recebimento pra ver como fica. Em produção, quem cria essas entradas é o
-          webhook do provedor (ex.: Inter).
+          Simule um recebimento pra ver como fica (só em desenvolvimento).
         </p>
         <div className="flex gap-2">
           <input
