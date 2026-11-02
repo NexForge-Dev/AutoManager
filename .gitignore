@@ -8,3 +8,5 @@ next-env.d.ts
 .vercel
 .env*
 !.env.local.example
+backups/
+*.dump
