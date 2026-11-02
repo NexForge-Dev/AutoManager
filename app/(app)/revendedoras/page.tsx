@@ -240,8 +240,8 @@ function Revendedoras() {
       )}
 
       {aberto && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-end justify-center">
-          <div className="surface w-full max-w-md rounded-t-3xl p-5 space-y-3">
+        <div className="fixed inset-0 !mt-0 bg-black/40 z-40 flex items-end md:items-center justify-center">
+          <div className="surface w-full max-w-md rounded-t-3xl md:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold">Nova revendedora</h2>
               <button onClick={() => setAberto(false)}>
