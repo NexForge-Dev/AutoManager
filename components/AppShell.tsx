@@ -22,7 +22,6 @@ import {
   Inbox,
   Wallet,
   Menu,
-  X,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
@@ -31,6 +30,7 @@ import { useRecebimentosPendentes } from "@/lib/useRecebimentos";
 import type { PlanoDef } from "@/lib/plans";
 import PageTransition from "./PageTransition";
 import { DialogProvider } from "./Dialog";
+import Modal from "./Modal";
 
 type Item = {
   href: string;
@@ -237,20 +237,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* -------- "Mais" (mobile): demais telas -------- */}
       {maisAberto && (
-        <div
-          className="md:hidden fixed inset-0 z-50 bg-black/40 flex items-end modal-backdrop"
-          onClick={() => setMaisAberto(false)}
+        <Modal
+          onClose={() => setMaisAberto(false)}
+          titulo="Menu"
+          fecharLabel="Fechar menu"
+          backdropClassName="md:hidden"
+          className="space-y-2"
         >
-          <div
-            className="surface w-full rounded-t-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] modal-panel"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="font-bold">Menu</span>
-              <button onClick={() => setMaisAberto(false)} aria-label="Fechar menu" className="p-1 text-muted">
-                <X size={20} />
-              </button>
-            </div>
             <div className="grid grid-cols-3 gap-2">
               {resto.map((n) => {
                 const Icon = n.icon;
@@ -277,8 +270,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
     </DialogProvider>
