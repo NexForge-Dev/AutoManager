@@ -245,15 +245,29 @@ export function aplicarAparencia(a: Aparencia) {
 // ----------------------------------------------------------------------------
 const CHAVE_FAVICON = "favicon";
 
-function definirIconLink(rel: string, href: string) {
-  if (typeof document === "undefined") return;
-  const head = document.head;
-  // remove os links existentes desse rel e recria — força o navegador a reler o ícone
-  head.querySelectorAll(`link[rel="${rel}"]`).forEach((el) => el.remove());
-  const link = document.createElement("link");
-  link.rel = rel;
-  link.href = href;
-  head.appendChild(link);
+// Atributo que marca os <link> de ícone que NÓS criamos. Os <link rel="icon">
+// gerados pelo `metadata.icons` do Next pertencem ao React: removê-los ou
+// mutá-los quebra a navegação client-side ("Cannot read properties of null
+// (reading 'removeChild')" quando o React tenta desmontá-los). Por isso só
+// mexemos no nosso próprio link — criado uma vez e depois só com o href trocado.
+export const ATTR_FAVICON = "data-am-favicon";
+
+// Garante um único <link rel={rel} data-am-favicon> e atualiza o href. Fica por
+// último no <head> para ter precedência sobre os ícones padrão do Next.
+// `doc` é injetável para teste.
+export function definirIconLink(rel: string, href: string, doc?: Document) {
+  const d = doc ?? (typeof document === "undefined" ? undefined : document);
+  if (!d) return;
+  const head = d.head;
+  let link = head.querySelector<HTMLLinkElement>(`link[${ATTR_FAVICON}="${rel}"]`);
+  if (!link) {
+    link = d.createElement("link");
+    link.setAttribute(ATTR_FAVICON, rel);
+    link.rel = rel;
+  }
+  if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+  // reanexa no fim (move só o nosso nó; os do React ficam intactos)
+  if (head.lastElementChild !== link) head.appendChild(link);
 }
 
 // Aplica a logo como favicon (e, opcionalmente, o nome da loja como título da aba).
@@ -292,6 +306,6 @@ if(c.font)r.style.fontFamily=c.font;
 }
 var lg=localStorage.getItem('${CHAVE_FAVICON}');
 if(lg){['icon','apple-touch-icon'].forEach(function(rel){
-var l=document.createElement('link');l.rel=rel;l.href=lg;document.head.appendChild(l);
+var l=document.createElement('link');l.rel=rel;l.href=lg;l.setAttribute('${ATTR_FAVICON}',rel);document.head.appendChild(l);
 });}
 }catch(e){}})();`;
