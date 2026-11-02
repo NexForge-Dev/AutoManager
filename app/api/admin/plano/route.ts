@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { erroInterno } from "@/lib/erroApi";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { ehSuperadminUser } from "@/lib/admin";
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     .select("org_id")
     .maybeSingle();
 
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  if (error) return erroInterno("admin/plano", error, "Não foi possível trocar o plano agora.");
   if (!data) return NextResponse.json({ erro: "Loja não encontrada" }, { status: 404 });
 
   const { data: orgRow } = await a.from("org").select("nome").eq("id", orgId).maybeSingle();

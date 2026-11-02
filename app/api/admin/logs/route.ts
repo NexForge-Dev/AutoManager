@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { erroInterno } from "@/lib/erroApi";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { ehSuperadminUser } from "@/lib/admin";
@@ -33,7 +34,7 @@ export async function GET() {
     .order("criado_em", { ascending: false })
     .limit(200);
 
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  if (error) return erroInterno("admin/logs", error, "Não foi possível carregar a auditoria agora.");
 
   const logs = (data ?? []).map((l) => ({
     id: l.id,

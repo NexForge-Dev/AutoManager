@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { erroInterno } from "@/lib/erroApi";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { PLANOS, planoValido, type PlanoId } from "@/lib/plans";
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     .select("status, trial_ate, trial_usado, provider_assinatura_id")
     .eq("org_id", dono.orgId)
     .maybeSingle();
-  if (eSel) return NextResponse.json({ erro: eSel.message }, { status: 500 });
+  if (eSel) return erroInterno("onboarding/plano", eSel, "Não foi possível salvar o plano agora. Tente novamente.");
 
   // sem linha (org antiga sem assinatura): inicia o trial único agora.
   if (!atual) {
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
       data_inicio: agora.toISOString(),
       data_fim: null,
     });
-    if (eIns) return NextResponse.json({ erro: eIns.message }, { status: 500 });
+    if (eIns) return erroInterno("onboarding/plano", eIns, "Não foi possível salvar o plano agora. Tente novamente.");
     await metricasTrial(dono.orgId, plano);
     return NextResponse.json({ ok: true, plano });
   }
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
   }
 
   const { error } = await sb.from("assinatura").update(dados).eq("org_id", dono.orgId);
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  if (error) return erroInterno("onboarding/plano", error, "Não foi possível salvar o plano agora. Tente novamente.");
 
   await metricasTrial(dono.orgId, plano);
   return NextResponse.json({ ok: true, plano });
