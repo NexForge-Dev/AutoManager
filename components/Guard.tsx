@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { aplicarAparencia, aplicarFavicon } from "@/lib/aparencia";
+import { aplicarAparencia, aplicarFavicon, temaDoUsuario } from "@/lib/aparencia";
 import { homeDe, podeAcessar } from "@/lib/permissoes";
 import { createClient } from "@/lib/supabase/client";
 import AppShell from "./AppShell";
@@ -27,6 +27,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   const nomeLoja = useStore((s) => s.config.nomeLoja);
   const role = useStore((s) => s.role);
   const semOrg = useStore((s) => s.semOrg);
+  const usuarioId = useStore((s) => s.usuarioId);
 
   useEffect(() => {
     if (jaMontado) return;
@@ -35,8 +36,10 @@ export default function Guard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (jaMontado) return;
-    aplicarAparencia({ corMarca, temaBase, appFonte, appRaio });
-  }, [jaMontado, corMarca, temaBase, appFonte, appRaio]);
+    if (!ready) return; // antes de hidratar vale o cache anti-flash (já com a escolha do usuário)
+    // claro/escuro escolhido pelo usuário no Perfil vale por cima do tema da loja
+    aplicarAparencia({ corMarca, temaBase: temaDoUsuario(usuarioId, temaBase), appFonte, appRaio });
+  }, [jaMontado, ready, usuarioId, corMarca, temaBase, appFonte, appRaio]);
 
   // ícone da aba (favicon) = logo da loja; troca sozinho quando o dono muda a logo
   useEffect(() => {

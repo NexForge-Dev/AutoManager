@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ATTR_FAVICON, definirIconLink } from "./aparencia";
+import { ATTR_FAVICON, definirIconLink, resolverTemaUsuario } from "./aparencia";
 
 // DOM mínimo (o ambiente do vitest é node): só o que definirIconLink usa.
 class FakeEl {
@@ -78,5 +78,28 @@ describe("definirIconLink", () => {
     definirIconLink("icon", "/nova.png", doc);
     expect(head.children.filter((c) => c.getAttribute(ATTR_FAVICON) === "icon")).toEqual([pre]);
     expect(pre.getAttribute("href")).toBe("/nova.png");
+  });
+});
+
+describe("resolverTemaUsuario", () => {
+  const pref = (tema: string, base: string) => JSON.stringify({ tema, base });
+
+  it("sem preferência segue o tema da loja", () => {
+    expect(resolverTemaUsuario(null, "floresta")).toBe("floresta");
+  });
+
+  it("aplica a escolha do usuário enquanto o tema da loja não mudar", () => {
+    expect(resolverTemaUsuario(pref("claro", "escuro"), "escuro")).toBe("claro");
+    // tema nulo da loja = padrão "escuro"
+    expect(resolverTemaUsuario(pref("claro", "escuro"), null)).toBe("claro");
+  });
+
+  it("descarta a escolha se o dono trocou o tema base", () => {
+    expect(resolverTemaUsuario(pref("claro", "escuro"), "oceano")).toBe("oceano");
+  });
+
+  it("ignora valor inválido", () => {
+    expect(resolverTemaUsuario("{lixo", "escuro")).toBe("escuro");
+    expect(resolverTemaUsuario(pref("inexistente", "escuro"), "escuro")).toBe("escuro");
   });
 });

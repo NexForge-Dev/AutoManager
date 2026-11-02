@@ -239,6 +239,53 @@ export function aplicarAparencia(a: Aparencia) {
 }
 
 // ----------------------------------------------------------------------------
+// Preferência claro/escuro de cada usuário (atalho do Perfil). Fica no
+// localStorage por usuário e vale por cima do tema base da loja — mas só
+// enquanto o tema base for o mesmo de quando a pessoa escolheu: se o dono trocar
+// o tema em Configurações, a escolha antiga deixa de valer.
+// ----------------------------------------------------------------------------
+const CHAVE_TEMA_USUARIO = "tema-usuario:";
+
+type PrefTema = { tema: string; base: string };
+
+// Pura (testável): dado o valor salvo e o tema base atual da loja, devolve o
+// tema a aplicar.
+export function resolverTemaUsuario(salvo: string | null, temaBaseLoja: string | null): string | null {
+  const base = temaBaseDef(temaBaseLoja).key;
+  if (!salvo) return temaBaseLoja;
+  try {
+    const p = JSON.parse(salvo) as PrefTema;
+    if (p && typeof p.tema === "string" && p.base === base && TEMAS_BASE.some((t) => t.key === p.tema))
+      return p.tema;
+  } catch {
+    /* valor inválido: ignora */
+  }
+  return temaBaseLoja;
+}
+
+export function temaDoUsuario(usuarioId: string | null, temaBaseLoja: string | null): string | null {
+  if (!usuarioId || typeof window === "undefined") return temaBaseLoja;
+  try {
+    return resolverTemaUsuario(localStorage.getItem(CHAVE_TEMA_USUARIO + usuarioId), temaBaseLoja);
+  } catch {
+    return temaBaseLoja;
+  }
+}
+
+// tema=null (ou igual ao da loja) apaga a preferência
+export function salvarTemaDoUsuario(usuarioId: string | null, tema: string | null, temaBaseLoja: string | null) {
+  if (!usuarioId || typeof window === "undefined") return;
+  const base = temaBaseDef(temaBaseLoja).key;
+  try {
+    const k = CHAVE_TEMA_USUARIO + usuarioId;
+    if (!tema || tema === base) localStorage.removeItem(k);
+    else localStorage.setItem(k, JSON.stringify({ tema, base } satisfies PrefTema));
+  } catch {
+    /* ignora */
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Favicon dinâmico: o ícone da aba do navegador vira a logo da loja. Troca
 // sozinho quando o dono muda a logo (chamado no Guard) e na vitrine pública
 // usa a logo daquela loja. Sem logo, cai no /icon.svg padrão.
