@@ -12,10 +12,18 @@ New migrations, in apply order:
 | 2 | `supabase/migrations/0038_rate_limit.sql` | `rate_limite` table + `rate_limit_registrar` RPC (service_role only) |
 | 3 | `supabase/migrations/0039_codigo_acesso_sem_vies.sql` | Unbiased invite-code generator (`gen_random_bytes`) |
 | 4 | `supabase/migrations/0040_rpc_sem_anon.sql` | Revokes `anon`/`PUBLIC` EXECUTE on logged-in-only RPCs |
+| 5 | `supabase/migrations/0041_qa_hardening.sql` | QA hardening: RLS/grants/guard triggers, CHECKs, storage owner-only, org.acesso enforced |
+| 6 | `supabase/migrations/0042_qa_rpcs.sql` | QA hardening: rewritten RPCs (plan/org gates, rounding) + `minha_assinatura`, `revendedora_situacao`, `admin_encerrar_sessoes` |
 
-All four are additive/idempotent (`if not exists`, `create or replace`, `revoke`/`grant`).
-The old Mercado Pago build keeps working on top of them (it never calls the revoked RPCs as
-`anon`), so the database can be migrated before the new deploy goes live.
+All six are additive/idempotent (`if not exists`, `create or replace`, `revoke`/`grant`,
+`not valid` CHECKs). The old Mercado Pago build keeps working on top of 0037–0040 (it never
+calls the revoked RPCs as `anon`), so those four can be applied before the new deploy goes live.
+
+**0041/0042 must go together with (or right after) the new app build**, not before it: they
+close direct writes the old build still makes (e.g. the inbox writing `conversa.ultima_em`) and
+make `assinatura` owner-only (the new build reads the plan through `minha_assinatura`, with a
+fallback to the table while 0042 is not applied). Apply 0041 and then 0042 — 0042 depends on
+helpers and the unique index created by 0041.
 
 ## 0. Pre-flight (local, on the merged `main`)
 
@@ -45,11 +53,26 @@ Use `pg_dump` 17 (matches the server). `backups/` must not be committed (dump co
 
 ## 2. Apply the migrations
 
+Before the deploy (safe with the old build):
+
 ```bash
 for f in 0037_stripe 0038_rate_limit 0039_codigo_acesso_sem_vies 0040_rpc_sem_anon; do
   psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f "supabase/migrations/$f.sql" || break
 done
 ```
+
+Right after the new build is live (§5), in this order:
+
+```bash
+for f in 0041_qa_hardening 0042_qa_rpcs; do
+  psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f "supabase/migrations/$f.sql" || break
+done
+```
+
+0041 prints a `NOTICE` (and keeps the CHECK as `NOT VALID`) if legacy rows break a new rule
+(e.g. a negative price, a role outside owner/vendedor/motoboy); new writes are still checked.
+Review them with `select conname from pg_constraint where not convalidated;`. It also unlinks
+duplicated `revendedora.user_id` links (keeps the oldest) before creating the unique index.
 
 Verify:
 
@@ -58,15 +81,20 @@ select to_regclass('public.stripe_evento'), to_regclass('public.rate_limite');
 select p.proname, has_function_privilege('anon', p.oid, 'execute') as anon
 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef order by 1;
 -- anon = true ONLY for loja_publica and recuperar_conversa
+-- (admin_encerrar_sessoes and mudar_plano: false for anon AND authenticated)
 select private.gerar_codigo_acesso();   -- 6 chars from ABCDEFGHJKMNPQRSTUVWXYZ23456789
+-- after 0041/0042:
+select to_regprocedure('public.minha_assinatura()'), to_regprocedure('public.revendedora_situacao()'),
+       to_regclass('public.revendedora_user_uq');
+select has_table_privilege('authenticated', 'public.venda', 'insert');  -- false
 ```
 
 **Migration history:** this project has no `supabase_migrations.schema_migrations` table
 (migrations were always applied with psql), so `supabase migration repair` is not needed. Only
 if you later link the Supabase CLI (`supabase link --project-ref paqsixfvmbkowedvukgz`), register
 the history first so `db push` does not re-run everything:
-`supabase migration repair --status applied 0001 0002 ... 0040` (one version per file prefix;
-note the two `0025_*` files share a prefix — rename one before adopting the CLI).
+`supabase migration repair --status applied 0001 0002 ... 0042` (one version per file prefix;
+there is no `0015_*` file, so skip that number).
 
 ## 3. Vercel environment variables (Production)
 
@@ -118,6 +146,9 @@ entries from Vercel if they exist).
 Merge `fix/launch` → `dev` → `main` (after approval), push `main`, wait for the Vercel build,
 then point/confirm the domain and HTTPS.
 
+Then apply `0041_qa_hardening` and `0042_qa_rpcs` (§2, second block) and run the smoke test
+below as owner, vendedor, motoboy and revendedora.
+
 ## 6. Super-admin
 
 ```bash
@@ -135,6 +166,9 @@ in again to get the `superadmin` claim, then open `/admin`.
   no CSP violations on `/`, `/login`, `/loja/<slug>`, `/painel`.
 - Subscribe to the cheapest plan with a real card → plan active in the app; Stripe › Webhooks ›
   Event deliveries all **200**. Cancel via the portal and refund if it was only a test.
+- After 0041/0042: storefront chat opens a conversation as an anonymous visitor; a vendedor
+  registers a sale on `/vender`; a motoboy takes and finishes a delivery; a revendedora logs in
+  on `/acesso` and registers a sale; product images still load on `/loja/<slug>`.
 - Rest of the checklist: `LANCAMENTO.md` §7.
 
 ## Still needs the owner's data (do not invent)
