@@ -171,7 +171,8 @@ export default function LoginPage() {
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 required
-                minLength={6}
+                minLength={modo === "criar" ? 8 : 6}
+                maxLength={72}
                 autoComplete={modo === "criar" ? "new-password" : "current-password"}
               />
             </div>

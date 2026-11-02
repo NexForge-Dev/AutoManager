@@ -151,7 +151,8 @@ export default function AcessoPage() {
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 required
-                minLength={6}
+                minLength={modo === "ativar" ? 8 : 6}
+                maxLength={72}
                 autoComplete={modo === "ativar" ? "new-password" : "current-password"}
               />
             </div>

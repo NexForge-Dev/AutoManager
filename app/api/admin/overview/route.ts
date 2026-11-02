@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { ehSuperadminUser } from "@/lib/admin";
-import { PLANOS, type PlanoId } from "@/lib/plans";
+import { CARENCIA_PAGAMENTO_MS, PLANOS, type PlanoId } from "@/lib/plans";
 
 // Visão geral da PLATAFORMA (super-admin): todas as lojas, planos e faturamento.
 // Lê tudo com a service_role (ignora RLS), mas SÓ depois de confirmar que quem
@@ -45,7 +45,7 @@ export async function GET() {
   const a = admin();
   const [orgs, { data: assinaturas }, { data: usuarios }] = await Promise.all([
     buscarOrgs(a),
-    a.from("assinatura").select("org_id, plano, status, preco_centavos, trial_ate, data_inicio, created_at"),
+    a.from("assinatura").select("org_id, plano, status, preco_centavos, trial_ate, data_inicio, data_fim, provider, created_at"),
     a.from("usuario").select("email, role, org_id"),
   ]);
 
@@ -64,9 +64,14 @@ export async function GET() {
   const lojas = (orgs ?? []).map((o) => {
     const s = assinByOrg.get(o.id);
     const plano = (s?.plano ?? "solo") as PlanoId;
-    const emTrial =
-      s?.status === "trialing" && s?.trial_ate && new Date(s.trial_ate).getTime() > agora;
-    const status: string = emTrial ? "trialing" : s?.status ?? "active";
+    // status "de verdade" (espelha planoEfetivo): trial vencido, ciclo pago vencido
+    // além da carência e plano ativo sem cobrança no Stripe (cortesia do suporte)
+    // não contam como assinatura paga no MRR.
+    const fimPago = s?.data_fim ? new Date(s.data_fim).getTime() : null;
+    let status: string = s?.status ?? "canceled";
+    if (status === "trialing" && !(s?.trial_ate && new Date(s.trial_ate).getTime() > agora)) status = "trial_vencido";
+    else if (status === "active" && fimPago !== null && fimPago + CARENCIA_PAGAMENTO_MS < agora) status = "past_due";
+    else if (status === "active" && s?.provider !== "stripe") status = "cortesia";
     return {
       orgId: o.id,
       nome: o.nome ?? "(sem nome)",
@@ -81,7 +86,7 @@ export async function GET() {
     };
   });
 
-  // ---- agregados de faturamento (MRR = só assinaturas ATIVAS pagas) ----
+  // ---- agregados de faturamento (MRR = só assinaturas ATIVAS pagas no Stripe) ----
   let mrrCentavos = 0;
   let ativas = 0;
   let trial = 0;

@@ -55,6 +55,8 @@ const STATUS_INFO: Record<string, { txt: string; cls: string }> = {
   trialing: { txt: "Trial", cls: "bg-brand-500/15 text-brand-600" },
   past_due: { txt: "Pendente", cls: "bg-amber-500/15 text-amber-600" },
   canceled: { txt: "Cancelada", cls: "bg-red-500/15 text-red-600" },
+  trial_vencido: { txt: "Trial vencido", cls: "bg-amber-500/15 text-amber-600" },
+  cortesia: { txt: "Cortesia", cls: "bg-sky-500/15 text-sky-600" },
 };
 
 type Acesso = "ativo" | "desativado" | "banido";
