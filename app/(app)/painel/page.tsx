@@ -278,8 +278,12 @@ function PlanoCard() {
       </div>
       {emTrial && (
         <p className="mt-1 text-xs text-muted">
-          Recursos do <b>{caps.nome}</b>{ate ? <> até <b>{ate}</b></> : null}. Depois, plano{" "}
-          <b>{defContratado.nome}</b>.
+          Recursos do <b>{caps.nome}</b>{ate ? <> até <b>{ate}</b></> : null}.
+          {defContratado.id !== caps.id && (
+            <>
+              {" "}Depois, plano <b>{defContratado.nome}</b>.
+            </>
+          )}
         </p>
       )}
       <div className="mt-2 flex items-center justify-between gap-2 text-sm">

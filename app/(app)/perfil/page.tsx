@@ -70,11 +70,16 @@ function Perfil() {
           <Mail size={15} /> {email ? email : <Skeleton className="h-4 w-40" />}
         </div>
         {/* faturamento da loja é informação do dono — vendedor/entregador não vê */}
-        <div className={`grid ${role === "owner" ? "grid-cols-3" : "grid-cols-2"} gap-2 pt-1 stagger`}>
+        {/* no celular o faturado ocupa a linha inteira: valor em reais não cabe num terço */}
+        <div className={`grid grid-cols-2 ${role === "owner" ? "sm:grid-cols-3" : ""} gap-2 pt-1 stagger`}>
           <Stat label="Produtos" value={<CountUp value={produtos.length} />} />
           <Stat label="Vendas" value={<CountUp value={vendas.length} />} />
           {role === "owner" && (
-            <Stat label="Faturado" value={<CountUp value={faturamento} format={brl} />} />
+            <Stat
+              label="Faturado"
+              className="col-span-2 sm:col-span-1"
+              value={<CountUp value={faturamento} format={brl} />}
+            />
           )}
         </div>
       </div>
@@ -101,11 +106,11 @@ function Perfil() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function Stat({ label, value, className = "" }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className="surface-alt rounded-xl px-2 py-2.5 text-center min-w-0">
-      {/* sem truncate: valores como "R$ 10.640,00" quebram/encolhem em vez de virar "R$ 106..." */}
-      <div className="font-bold text-sm sm:text-base leading-tight tabular-nums break-words">{value}</div>
+    <div className={`surface-alt rounded-xl px-2 py-2.5 text-center min-w-0 ${className}`}>
+      {/* sem truncate ("R$ 106..."): o valor inteiro aparece; se faltar espaço, quebra */}
+      <div className="font-bold text-base leading-tight tabular-nums [overflow-wrap:anywhere]">{value}</div>
       <div className="text-[11px] text-muted">{label}</div>
     </div>
   );
