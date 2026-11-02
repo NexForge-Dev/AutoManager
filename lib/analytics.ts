@@ -132,7 +132,7 @@ export function calcularMetricas(
   const rankingRevendedoras = [...revMap.entries()]
     .map(([id, d]) => ({
       id,
-      nome: revendedoras.find((r) => r.id === id)?.nome || "-",
+      nome: revendedoras.find((r) => r.id === id)?.nome || "Revendedora removida",
       total: centavos(d.total),
       pendente: centavos(d.pendente),
     }))
