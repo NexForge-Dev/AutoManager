@@ -19,10 +19,17 @@ export function useConversasNaoLidas(): number {
     let ch: ReturnType<typeof client.channel> | null = null;
     let lista: { id: string; ultima_cliente_em: string | null }[] = [];
 
+    // localStorage pode lançar (armazenamento bloqueado): sem ele, tudo conta como não visto
+    const visto = (id: string) => {
+      try {
+        return Number(localStorage.getItem(vistoKey(id)) || 0);
+      } catch {
+        return 0;
+      }
+    };
     function recompute() {
-      if (typeof localStorage === "undefined") return;
       const n = lista.filter(
-        (c) => c.ultima_cliente_em && new Date(c.ultima_cliente_em).getTime() > Number(localStorage.getItem(vistoKey(c.id)) || 0)
+        (c) => c.ultima_cliente_em && new Date(c.ultima_cliente_em).getTime() > visto(c.id)
       ).length;
       setCount(n);
     }
@@ -33,6 +40,7 @@ export function useConversasNaoLidas(): number {
       .from("conversa")
       .select("id, ultima_cliente_em")
       .then(({ data }) => {
+        if (cancelado) return;
         lista = (data as any[]) || [];
         recompute();
       });
