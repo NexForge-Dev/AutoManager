@@ -1,4 +1,5 @@
 import type { Produto, Venda, ContaPagar } from "./types";
+import { diaMes, diaMesCurto, inicioDoDia, inicioDoMes as inicioDoMesSP, mesIndiceSP, ymdSP } from "./fuso";
 
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -69,11 +70,9 @@ export interface MetricasDashboard {
   vendasPorDia: { dia: string; total: number }[];
 }
 
+// limites de dia/mês no fuso da loja (America/Sao_Paulo), não no do navegador
 function inicioDoMes(offset = 0) {
-  const d = new Date();
-  d.setMonth(d.getMonth() - offset, 1);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  return inicioDoMesSP(Date.now(), -offset);
 }
 
 export function calcularMetricas(
@@ -128,18 +127,14 @@ export function calcularMetricas(
 
   // vendas últimos 14 dias
   const vendasPorDia: { dia: string; total: number }[] = [];
+  const agora = Date.now();
   for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    const fim = d.getTime() + 24 * 60 * 60 * 1000;
+    const ini = inicioDoDia(agora, -i);
+    const fim = inicioDoDia(agora, -i + 1);
     const total = vendas
-      .filter((v) => v.data >= d.getTime() && v.data < fim)
+      .filter((v) => v.data >= ini && v.data < fim)
       .reduce((a, v) => a + v.total, 0);
-    vendasPorDia.push({
-      dia: `${d.getDate()}/${d.getMonth() + 1}`,
-      total,
-    });
+    vendasPorDia.push({ dia: diaMesCurto(ini), total });
   }
 
   return {
@@ -190,8 +185,7 @@ export interface Relatorio {
 }
 
 function diaLabel(ts: number) {
-  const d = new Date(ts);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return diaMes(ts);
 }
 
 export function calcularRelatorio(vendas: Venda[], deMs: number, ateMs: number): Relatorio {
@@ -284,9 +278,7 @@ export interface ResumoContas {
 }
 
 function ymdHoje(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return ymdSP(Date.now());
 }
 
 export function resumoContas(contas: ContaPagar[]): ResumoContas {
@@ -374,17 +366,12 @@ export function calcularAnalytics(produtos: Produto[], vendas: Venda[]): Analyti
   // por mês (últimos 6)
   const porMes: { mes: string; total: number }[] = [];
   const nomesMes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const agoraMes = Date.now();
   for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-    d.setHours(0, 0, 0, 0);
-    const ini = d.getTime();
-    const fimD = new Date(d);
-    fimD.setMonth(fimD.getMonth() + 1);
-    const fim = fimD.getTime();
+    const ini = inicioDoMesSP(agoraMes, -i);
+    const fim = inicioDoMesSP(agoraMes, -i + 1);
     const total = validas.filter((v) => v.data >= ini && v.data < fim).reduce((a, v) => a + v.total, 0);
-    porMes.push({ mes: nomesMes[d.getMonth()], total });
+    porMes.push({ mes: nomesMes[mesIndiceSP(ini)], total });
   }
   const mesAtual = porMes[porMes.length - 1]?.total || 0;
   const mesAnt = porMes[porMes.length - 2]?.total || 0;

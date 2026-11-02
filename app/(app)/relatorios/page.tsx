@@ -9,6 +9,7 @@ import { registrarMetrica } from "@/lib/metricas/cliente";
 import CountUp from "@/components/CountUp";
 import { useDialog } from "@/components/Dialog";
 import type { Venda } from "@/lib/types";
+import { fimDeYmd, fimDoDia, inicioDeYmd, inicioDoAno, inicioDoDia, inicioDoMes, ymdSP } from "@/lib/fuso";
 const VendasArea = dynamic(() => import("@/components/charts/VendasArea"), {
   ssr: false,
   loading: () => <div style={{ height: 150 }} className="skeleton rounded-xl" />,
@@ -36,10 +37,6 @@ export default function RelatoriosPage() {
 
 type Preset = "hoje" | "7dias" | "mes" | "ano" | "custom";
 
-function ymd(d: Date) {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
 
 function Relatorios() {
   const { vendas, revendedoras, config, role, cancelarVenda, marcarVendaRecebida } = useStore();
@@ -49,48 +46,23 @@ function Relatorios() {
   const [processando, setProcessando] = useState<string | null>(null);
   const ehDono = role === "owner";
 
-  const hoje = new Date();
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-  const [de, setDe] = useState(ymd(inicioMes));
-  const [ate, setAte] = useState(ymd(hoje));
+  // dias/meses no fuso da loja (America/Sao_Paulo), não no do navegador
+  const [de, setDe] = useState(() => ymdSP(inicioDoMes(Date.now())));
+  const [ate, setAte] = useState(() => ymdSP(Date.now()));
 
   const { deMs, ateMs, label } = useMemo(() => {
-    const now = new Date();
-    const sod = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x.getTime();
-    };
-    const eod = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(23, 59, 59, 999);
-      return x.getTime();
-    };
-    if (preset === "hoje") return { deMs: sod(now), ateMs: eod(now), label: "Hoje" };
-    if (preset === "7dias") {
-      const d = new Date(now);
-      d.setDate(d.getDate() - 6);
-      return { deMs: sod(d), ateMs: eod(now), label: "Últimos 7 dias" };
-    }
-    if (preset === "mes") {
-      const d = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { deMs: sod(d), ateMs: eod(now), label: "Este mês" };
-    }
-    if (preset === "ano") {
-      const d = new Date(now.getFullYear(), 0, 1);
-      return { deMs: sod(d), ateMs: eod(now), label: "Este ano" };
-    }
-    // campo de data apagado: não deixa virar NaN nos cards
-    if (!de || !ate) {
-      const d = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { deMs: sod(d), ateMs: eod(now), label: "Este mês" };
-    }
+    const now = Date.now();
+    if (preset === "hoje") return { deMs: inicioDoDia(now), ateMs: fimDoDia(now), label: "Hoje" };
+    if (preset === "7dias") return { deMs: inicioDoDia(now, -6), ateMs: fimDoDia(now), label: "Últimos 7 dias" };
+    if (preset === "mes") return { deMs: inicioDoMes(now), ateMs: fimDoDia(now), label: "Este mês" };
+    if (preset === "ano") return { deMs: inicioDoAno(now), ateMs: fimDoDia(now), label: "Este ano" };
+    // campo de data apagado/inválido: não deixa virar NaN nos cards
+    const deCustom = inicioDeYmd(de);
+    const ateCustom = fimDeYmd(ate);
+    if (Number.isNaN(deCustom) || Number.isNaN(ateCustom))
+      return { deMs: inicioDoMes(now), ateMs: fimDoDia(now), label: "Este mês" };
     const br = (iso: string) => iso.split("-").reverse().join("/");
-    return {
-      deMs: sod(new Date(de + "T00:00:00")),
-      ateMs: eod(new Date(ate + "T00:00:00")),
-      label: `${br(de)} a ${br(ate)}`,
-    };
+    return { deMs: deCustom, ateMs: ateCustom, label: `${br(de)} a ${br(ate)}` };
   }, [preset, de, ate]);
 
   const r = useMemo(() => calcularRelatorio(vendas, deMs, ateMs), [vendas, deMs, ateMs]);
