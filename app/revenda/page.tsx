@@ -6,6 +6,7 @@ import { situacaoRevendedora } from "@/lib/destinoPosLogin";
 import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
 import { parseNumero } from "@/lib/csvProdutos";
+import type { Canal } from "@/lib/types";
 import { Gem, Loader2, Plus, Minus, ShoppingBag, LogOut, ClipboardList, Check, X } from "lucide-react";
 
 type Variacao = { id: string; nome: string; preco_ajuste: number; estoque_atual: number };
@@ -22,6 +23,16 @@ type Prod = {
 type Me = { revendedora_id: string; org_id: string; nome: string; comissao_percent: number; loja_nome: string; cor_marca: string | null; logo_url: string | null };
 type ItemCarrinho = { produtoId: string; variacaoId: string | null; nome: string; preco: number; qtd: number; max: number };
 type Forma = "dinheiro" | "pix" | "boleto" | "credito" | "debito";
+
+// mesmos canais (e rótulos) da tela Vender do app, pra bater nos relatórios da loja
+const CANAIS: { id: Canal; label: string }[] = [
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "instagram", label: "Instagram" },
+  { id: "loja", label: "Loja" },
+];
+
+// chave estável do item no carrinho: produto + variação
+const chaveItem = (produtoId: string, variacaoId: string | null) => `${produtoId}|${variacaoId ?? ""}`;
 
 const FORMAS: { id: Forma; label: string }[] = [
   { id: "dinheiro", label: "Dinheiro" },
@@ -40,14 +51,30 @@ export default function RevendaPage() {
   const [aba, setAba] = useState<"vender" | "vendas">("vender");
   const [catalogo, setCatalogo] = useState<Prod[]>([]);
   const [vendas, setVendas] = useState<any[]>([]);
+  // falha ao ler catálogo/vendas (sem isso a tela dizia "sem produtos")
+  const [erroDados, setErroDados] = useState(false);
+  const [recarregando, setRecarregando] = useState(false);
 
   async function carregar() {
-    const [{ data: cat }, { data: vds }] = await Promise.all([
-      sb.current.rpc("revendedora_catalogo"),
-      sb.current.rpc("revendedora_minhas_vendas"),
-    ]);
-    setCatalogo((cat as Prod[]) || []);
-    setVendas((vds as any[]) || []);
+    try {
+      const [cat, vds] = await Promise.all([
+        sb.current.rpc("revendedora_catalogo"),
+        sb.current.rpc("revendedora_minhas_vendas"),
+      ]);
+      if (cat.error || vds.error) throw cat.error || vds.error;
+      setCatalogo((cat.data as Prod[]) || []);
+      setVendas((vds.data as any[]) || []);
+      setErroDados(false);
+    } catch {
+      // mantém o que já estava na tela e mostra o aviso com "tentar de novo"
+      setErroDados(true);
+    }
+  }
+
+  async function recarregar() {
+    setRecarregando(true);
+    await carregar();
+    setRecarregando(false);
   }
 
   useEffect(() => {
@@ -79,7 +106,16 @@ export default function RevendaPage() {
   }, [router, tentativa]);
 
   async function sair() {
-    await sb.current.auth.signOut();
+    // limpa os dados da sessão (e a cor da loja) antes de sair
+    setCatalogo([]);
+    setVendas([]);
+    setMe(null);
+    aplicarCorMarca(null);
+    try {
+      await sb.current.auth.signOut();
+    } catch {
+      // sem rede: o signOut local já apagou a sessão do navegador
+    }
     router.replace("/acesso");
   }
 
@@ -96,7 +132,7 @@ export default function RevendaPage() {
       </div>
     );
 
-  if (me === undefined)
+  if (!me)
     return (
       <div className="min-h-screen grid place-items-center text-brand-500">
         <Loader2 className="animate-spin" />
@@ -137,10 +173,23 @@ export default function RevendaPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-4">
+        {erroDados && (
+          <div className="card mb-4 flex items-center justify-between gap-3 text-sm" role="alert">
+            <span className="text-red-600">Não foi possível carregar o catálogo e as vendas.</span>
+            <button
+              type="button"
+              onClick={recarregar}
+              disabled={recarregando}
+              className="btn-primary shrink-0 px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {recarregando ? <Loader2 className="animate-spin" size={14} /> : "Tentar de novo"}
+            </button>
+          </div>
+        )}
         {aba === "vender" ? (
-          <Vender me={me!} catalogo={catalogo} sb={sb.current} onVendido={carregar} />
+          <Vender me={me} catalogo={catalogo} erroDados={erroDados} sb={sb.current} onVendido={carregar} />
         ) : (
-          <MinhasVendas vendas={vendas} />
+          <MinhasVendas vendas={vendas} erroDados={erroDados} />
         )}
       </main>
     </div>
@@ -150,6 +199,8 @@ export default function RevendaPage() {
 function Tab({ on, onClick, icon, txt }: { on: boolean; onClick: () => void; icon: React.ReactNode; txt: string }) {
   return (
     <button
+      type="button"
+      aria-pressed={on}
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold ${on ? "bg-brand-600 text-white" : "surface-alt text-muted"}`}
     >
@@ -158,18 +209,39 @@ function Tab({ on, onClick, icon, txt }: { on: boolean; onClick: () => void; ico
   );
 }
 
-function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb: ReturnType<typeof createClient>; onVendido: () => Promise<void> }) {
+function Vender({
+  me,
+  catalogo,
+  erroDados,
+  sb,
+  onVendido,
+}: {
+  me: Me;
+  catalogo: Prod[];
+  erroDados: boolean;
+  sb: ReturnType<typeof createClient>;
+  onVendido: () => Promise<void>;
+}) {
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
   const [forma, setForma] = useState<Forma>("pix");
+  const [canal, setCanal] = useState<Canal>("whatsapp");
   const [parcelas, setParcelas] = useState(1);
   const [desconto, setDesconto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; txt: string } | null>(null);
 
+  // a confirmação de venda some sozinha depois de alguns segundos
+  useEffect(() => {
+    if (!msg?.ok) return;
+    const t = setTimeout(() => setMsg(null), 6000);
+    return () => clearTimeout(t);
+  }, [msg]);
+
   function addItem(p: Prod, v: Variacao | null) {
     const variacaoId = v ? v.id : null;
     const max = v ? v.estoque_atual : p.estoque_atual;
     if (max <= 0) return;
+    setMsg(null);
     setCarrinho((c) => {
       const i = c.findIndex((x) => x.produtoId === p.id && x.variacaoId === variacaoId);
       if (i >= 0) {
@@ -185,8 +257,11 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
     });
   }
 
-  function mudarQtd(idx: number, delta: number) {
+  function mudarQtd(chave: string, delta: number) {
+    setMsg(null);
     setCarrinho((c) => {
+      const idx = c.findIndex((x) => chaveItem(x.produtoId, x.variacaoId) === chave);
+      if (idx < 0) return c;
       const cp = [...c];
       const nova = cp[idx].qtd + delta;
       if (nova <= 0) return cp.filter((_, i) => i !== idx);
@@ -202,16 +277,22 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
   const comissao = (total * me.comissao_percent) / 100;
 
   async function registrar() {
-    if (carrinho.length === 0) return;
+    if (carrinho.length === 0 || enviando) return;
     setEnviando(true);
     setMsg(null);
-    const { data, error } = await sb.rpc("revendedora_registrar_venda", {
-      p_itens: carrinho.map((i) => ({ produto_id: i.produtoId, variacao_id: i.variacaoId, qtd: i.qtd })),
-      p_forma: forma,
-      p_parcelas: forma === "credito" ? parcelas : 1,
-      p_canal: "whatsapp",
-      p_desconto: desc,
-    });
+    let data: unknown = null;
+    let error: { message: string } | null = null;
+    try {
+      ({ data, error } = await sb.rpc("revendedora_registrar_venda", {
+        p_itens: carrinho.map((i) => ({ produto_id: i.produtoId, variacao_id: i.variacaoId, qtd: i.qtd })),
+        p_forma: forma,
+        p_parcelas: forma === "credito" ? parcelas : 1,
+        p_canal: canal,
+        p_desconto: desc,
+      }));
+    } catch {
+      error = { message: "rede" };
+    }
     setEnviando(false);
     if (error) {
       setMsg({ ok: false, txt: traduz(error.message) });
@@ -230,7 +311,9 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
       <div>
         <div className="text-sm font-semibold mb-2">Catálogo</div>
         {catalogo.length === 0 ? (
-          <div className="card text-center text-muted text-sm">A loja ainda não tem produtos disponíveis.</div>
+          erroDados ? null : (
+            <div className="card text-center text-muted text-sm">A loja ainda não tem produtos disponíveis.</div>
+          )
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {catalogo.map((p) => (
@@ -248,26 +331,49 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
             <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="-mr-2 grid h-11 w-11 place-items-center text-muted"><X size={18} /></button>
           </div>
           <div className="space-y-1.5 max-h-40 overflow-auto">
-            {carrinho.map((i, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-sm">
+            {carrinho.map((i) => {
+              const chave = chaveItem(i.produtoId, i.variacaoId);
+              return (
+              <div key={chave} className="flex items-center gap-2 text-sm">
                 <div className="flex-1 min-w-0 truncate">{i.nome}</div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => mudarQtd(idx, -1)} aria-label={`Diminuir quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center"><Minus size={16} /></button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={() => mudarQtd(chave, -1)} aria-label={`Diminuir quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center"><Minus size={16} /></button>
                   <span className="w-5 text-center">{i.qtd}</span>
-                  <button onClick={() => mudarQtd(idx, 1)} aria-label={`Aumentar quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={16} /></button>
+                  <button type="button" onClick={() => mudarQtd(chave, 1)} aria-label={`Aumentar quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={16} /></button>
                 </div>
-                <div className="w-16 text-right font-medium">{brl(i.preco * i.qtd)}</div>
+                <div className="w-20 shrink-0 text-right font-medium">{brl(i.preco * i.qtd)}</div>
               </div>
-            ))}
+              );
+            })}
+          </div>
+
+          {/* canal */}
+          <div>
+            <div className="label" id="rev-canal">Onde foi a venda?</div>
+            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="rev-canal">
+              {CANAIS.map((c) => (
+                <button
+                  type="button"
+                  key={c.id}
+                  aria-pressed={canal === c.id}
+                  onClick={() => setCanal(c.id)}
+                  className={`chip ${canal === c.id ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* pagamento */}
           <div>
-            <div className="label">Como foi o pagamento?</div>
-            <div className="flex flex-wrap gap-2">
+            <div className="label" id="rev-forma">Como foi o pagamento?</div>
+            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="rev-forma">
               {FORMAS.map((f) => (
                 <button
+                  type="button"
                   key={f.id}
+                  aria-pressed={forma === f.id}
                   onClick={() => setForma(f.id)}
                   className={`chip ${forma === f.id ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
                 >
@@ -278,8 +384,8 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
           </div>
           {forma === "credito" && (
             <div>
-              <label className="label">Parcelas no cartão</label>
-              <select className="input" value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))}>
+              <label htmlFor="rev-parcelas" className="label">Parcelas no cartão</label>
+              <select id="rev-parcelas" className="input" value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))}>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>
                     {n}x {n === 1 ? "(à vista)" : `de ${brl(total / n)}`}
@@ -291,8 +397,8 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
 
           <div className="grid grid-cols-2 gap-2 items-end">
             <div>
-              <label className="label">Desconto (R$)</label>
-              <input className="input" inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} placeholder="0,00" />
+              <label htmlFor="rev-desconto" className="label">Desconto (R$)</label>
+              <input id="rev-desconto" className="input" inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} placeholder="0,00" />
             </div>
             <div className="text-right">
               <div className="text-xs text-muted">Total</div>
@@ -301,15 +407,21 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
             </div>
           </div>
 
-          {msg && <p className={`text-sm ${msg.ok ? "text-green-600" : "text-red-600"}`}>{msg.txt}</p>}
+          {msg && (
+            <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-green-600" : "text-red-600"}`}>
+              {msg.txt}
+            </p>
+          )}
 
-          <button onClick={registrar} disabled={enviando} className="btn-primary w-full disabled:opacity-60">
-            {enviando ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />} Registrar venda
+          <button type="button" onClick={registrar} disabled={enviando || carrinho.length === 0} className="btn-primary w-full disabled:opacity-60">
+            {enviando ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />} {enviando ? "Registrando…" : "Registrar venda"}
           </button>
         </div>
       )}
 
-      {msg?.ok && carrinho.length === 0 && <p className="text-sm text-green-600 text-center">{msg.txt}</p>}
+      {msg?.ok && carrinho.length === 0 && (
+        <p role="status" className="text-sm text-green-600 text-center">{msg.txt}</p>
+      )}
     </div>
   );
 }
@@ -337,6 +449,7 @@ function ProdutoCard({ p, onAdd }: { p: Prod; onAdd: (p: Prod, v: Variacao | nul
 
         {!escolha ? (
           <button
+            type="button"
             onClick={() => (temGrade ? setEscolha(true) : onAdd(p, null))}
             disabled={esgotado}
             className="btn-primary mt-2 py-1.5 text-xs disabled:opacity-50"
@@ -347,16 +460,20 @@ function ProdutoCard({ p, onAdd }: { p: Prod; onAdd: (p: Prod, v: Variacao | nul
           <div className="mt-2 space-y-1">
             {p.variacoes.map((v) => (
               <button
+                type="button"
                 key={v.id}
                 onClick={() => { onAdd(p, v); setEscolha(false); }}
                 disabled={v.estoque_atual <= 0}
-                className="w-full text-left text-[11px] rounded-lg surface-alt px-2 py-1 disabled:opacity-40 flex justify-between"
+                className="w-full text-left text-[11px] rounded-lg surface-alt px-2 py-1 disabled:opacity-40 flex justify-between gap-1"
               >
-                <span className="truncate">{v.nome}</span>
-                <span className="text-muted">{v.estoque_atual > 0 ? `${v.estoque_atual} un` : "esgotado"}</span>
+                <span className="min-w-0">
+                  <span className="block truncate">{v.nome}</span>
+                  <span className="block font-semibold text-brand-500">{brl(p.preco_venda + Number(v.preco_ajuste || 0))}</span>
+                </span>
+                <span className="shrink-0 text-muted">{v.estoque_atual > 0 ? `${v.estoque_atual} un` : "esgotado"}</span>
               </button>
             ))}
-            <button onClick={() => setEscolha(false)} className="min-h-[40px] w-full rounded-lg px-3 text-sm text-muted underline">cancelar</button>
+            <button type="button" onClick={() => setEscolha(false)} className="min-h-[40px] w-full rounded-lg px-3 text-sm text-muted underline">cancelar</button>
           </div>
         )}
       </div>
@@ -366,8 +483,11 @@ function ProdutoCard({ p, onAdd }: { p: Prod; onAdd: (p: Prod, v: Variacao | nul
 
 const FORMA_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", boleto: "Boleto", credito: "Crédito", debito: "Débito" };
 
-function MinhasVendas({ vendas }: { vendas: any[] }) {
-  if (vendas.length === 0) return <div className="card text-center text-muted">Você ainda não registrou vendas.</div>;
+const STATUS_COMISSAO: Record<string, string> = { paga: "paga", pendente: "pendente", cancelada: "cancelada" };
+
+function MinhasVendas({ vendas, erroDados }: { vendas: any[]; erroDados: boolean }) {
+  if (vendas.length === 0)
+    return erroDados ? null : <div className="card text-center text-muted">Você ainda não registrou vendas.</div>;
   return (
     <div className="space-y-2">
       {vendas.map((v) => {
@@ -383,8 +503,8 @@ function MinhasVendas({ vendas }: { vendas: any[] }) {
             <div className="text-xs text-muted">{itens}</div>
             <div className="flex items-center justify-between text-xs">
               <span className="chip border-default">{pag}{v.forma_pagamento === "credito" && Number(v.parcelas) > 1 ? ` ${v.parcelas}x` : ""}</span>
-              <span className="text-brand-500">
-                comissão {brl(Number(v.comissao_total))} · {v.status_comissao === "paga" ? "paga" : "pendente"}
+              <span className={v.status_comissao === "cancelada" ? "text-muted line-through" : "text-brand-500"}>
+                comissão {brl(Number(v.comissao_total))} · {STATUS_COMISSAO[v.status_comissao] ?? "pendente"}
               </span>
             </div>
           </div>
@@ -395,10 +515,13 @@ function MinhasVendas({ vendas }: { vendas: any[] }) {
 }
 
 function traduz(msg: string) {
-  if (/sem_estoque/.test(msg)) return "Estoque insuficiente para um dos itens.";
-  if (/escolha_variacao/.test(msg)) return "Escolha a variação de um dos produtos.";
-  if (/sem_acesso/.test(msg)) return "Seu acesso expirou. Entre novamente.";
-  if (/sem_itens|qtd_invalida/.test(msg)) return "Adicione ao menos um item.";
-  if (/produto_invalido|variacao_invalida/.test(msg)) return "Um item não está mais disponível.";
-  return "Não foi possível registrar a venda.";
+  if (/sem_estoque/.test(msg)) return "Estoque insuficiente para um dos itens. Ajuste as quantidades.";
+  if (/escolha_variacao/.test(msg)) return "Escolha a variação (tamanho/cor) de um dos produtos.";
+  if (/sem_acesso/.test(msg)) return "Seu acesso à loja não está ativo. Saia e entre novamente.";
+  if (/sem_itens/.test(msg)) return "Adicione ao menos um item.";
+  if (/qtd_invalida/.test(msg)) return "Quantidade inválida em um dos itens.";
+  if (/produto_invalido|variacao_invalida/.test(msg)) return "Um item não está mais disponível. Remova-o e tente de novo.";
+  if (/canal_invalido/.test(msg)) return "Canal de venda inválido.";
+  if (/rede|fetch|network/i.test(msg)) return "Sem conexão. Confira a internet e tente de novo.";
+  return "Não foi possível registrar a venda. Tente de novo.";
 }

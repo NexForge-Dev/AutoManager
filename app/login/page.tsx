@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { registrarMetrica } from "@/lib/metricas/cliente";
+import { planoValido } from "@/lib/plans";
 import { Gem, Loader2, KeyRound } from "lucide-react";
 
 export default function LoginPage() {
@@ -18,7 +19,7 @@ export default function LoginPage() {
     }
     // plano clicado na landing (/login?plano=...): o onboarding já abre com ele marcado
     const plano = q.get("plano");
-    if (plano) {
+    if (planoValido(plano)) {
       try {
         sessionStorage.setItem("am_plano_landing", plano);
       } catch {}
@@ -33,7 +34,9 @@ export default function LoginPage() {
         if (!ativo || !data.user || data.user.is_anonymous) return;
         const destino = await destinoPosLogin();
         if (ativo) router.replace(destino);
-      });
+      })
+      // sem rede/RPC: só mostra o formulário normalmente
+      .catch(() => {});
     return () => {
       ativo = false;
     };
@@ -53,9 +56,14 @@ export default function LoginPage() {
       return;
     }
     setEnviandoReset(true);
-    const { error } = await createClient().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${location.origin}/redefinir-senha`,
-    });
+    let error: { message: string } | null = null;
+    try {
+      ({ error } = await createClient().auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${location.origin}/redefinir-senha`,
+      }));
+    } catch (e: any) {
+      error = { message: String(e?.message || "network") };
+    }
     setEnviandoReset(false);
     if (error) {
       setErro(traduzErro(error.message));
@@ -70,17 +78,26 @@ export default function LoginPage() {
     setAviso(null);
     setLoading(true);
     const supabase = createClient();
+    const mail = email.trim();
 
     try {
       let session;
       if (modo === "criar") {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: mail,
           password: senha,
           // com confirmação de e-mail ligada no Supabase, o link volta para o "Entrar"
           options: { emailRedirectTo: `${location.origin}/login?modo=entrar` },
         });
         if (error) throw error;
+        // com confirmação de e-mail ligada, um e-mail JÁ cadastrado volta sem erro,
+        // mas com identities vazio: avisa e leva para o "Entrar" em vez de fingir que criou
+        if (data.user && !data.session && data.user.identities?.length === 0) {
+          setErro("E-mail já cadastrado. Entre com a sua senha ou use \"Esqueci minha senha\".");
+          setModo("entrar");
+          setLoading(false);
+          return;
+        }
         if (data.user) registrarMetrica({ tipo: "cadastro", userId: data.user.id });
         session = data.session;
         if (!session) {
@@ -91,7 +108,7 @@ export default function LoginPage() {
           return;
         }
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+        const { data, error } = await supabase.auth.signInWithPassword({ email: mail, password: senha });
         if (error) throw error;
         session = data.session;
       }
@@ -213,7 +230,13 @@ export default function LoginPage() {
 function traduzErro(msg: string) {
   if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
   if (/already registered|already exists/i.test(msg)) return "E-mail já cadastrado. Tente entrar.";
-  if (/password should be at least/i.test(msg)) return "A senha precisa de pelo menos 6 caracteres.";
+  if (/email not confirmed/i.test(msg)) return "Confirme seu e-mail para entrar (veja a caixa de entrada e o spam).";
+  if (/password should be at least|weak|pwned/i.test(msg))
+    return "Senha fraca. Use pelo menos 8 caracteres, misturando letras e números.";
+  if (/invalid.*email|email.*invalid|unable to validate email/i.test(msg)) return "E-mail inválido.";
+  if (/signups? not allowed|signup.*disabled/i.test(msg)) return "Cadastro indisponível no momento. Tente mais tarde.";
   if (/rate limit|too many|security purposes/i.test(msg)) return "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.";
-  return msg;
+  if (/fetch|network/i.test(msg)) return "Sem conexão. Confira a internet e tente de novo.";
+  // nunca mostra a mensagem crua (em inglês) do Supabase
+  return "Não foi possível concluir agora. Tente de novo.";
 }

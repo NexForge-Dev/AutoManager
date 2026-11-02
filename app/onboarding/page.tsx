@@ -5,6 +5,8 @@ import { useStore } from "@/lib/store";
 import { SEGMENTOS } from "@/lib/seed";
 import type { Canal } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
+import { createClient } from "@/lib/supabase/client";
+import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { registrarMetrica, type Etapa } from "@/lib/metricas/cliente";
 
 // Passos desta tela -> etapas do funil no Painel NexForge ("descricao" faz parte de "loja").
@@ -21,6 +23,7 @@ import {
   planoDef,
   PLANOS,
   ORDEM_PLANOS,
+  planoValido,
   brlPreco,
   type PlanoId,
 } from "@/lib/plans";
@@ -60,12 +63,43 @@ export default function Onboarding() {
     if (!ready) hydrate();
   }, [ready, hydrate]);
 
+  // Só o DONO da loja faz o onboarding. Visitante anônimo (chat da loja),
+  // revendedora, conta sem loja ou membro da equipe vai para o próprio destino.
+  const [liberado, setLiberado] = useState(false);
+  useEffect(() => {
+    if (!ready || liberado) return;
+    let ativo = true;
+    (async () => {
+      const { data } = await createClient().auth.getUser();
+      if (!ativo) return;
+      if (!data.user || data.user.is_anonymous) {
+        router.replace("/login");
+        return;
+      }
+      const { semOrg, role } = useStore.getState();
+      if (semOrg || role !== "owner") {
+        let destino = "/login";
+        try {
+          destino = await destinoPosLogin();
+        } catch {}
+        if (ativo) router.replace(destino === "/onboarding" ? "/login" : destino);
+        return;
+      }
+      setLiberado(true);
+    })().catch(() => {
+      if (ativo) router.replace("/login");
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [ready, liberado, router]);
+
   // onboarding já concluído: sai daqui (evita re-rodar / sobrescrever a config).
   // Durante a geração NÃO redireciona aqui — a tela de carregamento controla o
   // momento de ir pro painel; senão o redirect cortava a animação no meio.
   useEffect(() => {
-    if (ready && completo && !gerando) router.replace("/painel");
-  }, [ready, completo, gerando, router]);
+    if (ready && liberado && completo && !gerando) router.replace("/painel");
+  }, [ready, liberado, completo, gerando, router]);
 
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
@@ -79,7 +113,7 @@ export default function Onboarding() {
   useEffect(() => {
     try {
       const p = sessionStorage.getItem("am_plano_landing");
-      if (p && p in PLANOS) setPlanoEscolhido(p as PlanoId);
+      if (planoValido(p)) setPlanoEscolhido(p);
     } catch {}
   }, []);
   const [qtdRev, setQtdRev] = useState("1-3");
@@ -151,15 +185,24 @@ export default function Onboarding() {
 
     // define o plano escolhido como trial de 1 mês (grátis); a rota é idempotente,
     // então "tentar de novo" pode repetir sem estender o trial
-    const res = await fetch("/api/onboarding/plano", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plano: planoEscolhido }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/onboarding/plano", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plano: planoEscolhido }),
+      });
+    } catch {
+      throw new Error("Sem conexão para ativar o teste grátis. Confira a internet e tente de novo.");
+    }
     // 409 = a loja já tem plano definido (assinatura paga ou cortesia do admin): segue o onboarding
     if (!res.ok && res.status !== 409) {
       const json = await res.json().catch(() => ({}));
-      throw new Error(json.erro || "Não foi possível ativar o teste grátis.");
+      throw new Error(
+        typeof json?.erro === "string" && json.erro
+          ? `Não foi possível ativar o teste grátis: ${json.erro}`
+          : "Não foi possível ativar o teste grátis."
+      );
     }
     await hydrate(); // recarrega a assinatura pro painel já refletir o trial
 
@@ -199,6 +242,14 @@ export default function Onboarding() {
     setDir("back");
     setStep((s) => Math.max(s - 1, 0));
   };
+
+  if (!liberado && !gerando) {
+    return (
+      <div className="min-h-screen grid place-items-center text-brand-500" role="status" aria-label="Carregando">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
+  }
 
   if (gerando) {
     return (
@@ -247,8 +298,9 @@ export default function Onboarding() {
                 do seu jeito, sem planilha.
               </p>
               <div>
-                <label className="label">Como o seu negócio se chama?</label>
+                <label htmlFor="ob-nome" className="label">Como o seu negócio se chama?</label>
                 <input
+                  id="ob-nome"
                   className="input"
                   placeholder="Ex.: Doces da Ana, Bijoux da Lu, Moda Bella…"
                   value={nomeLoja}
@@ -270,6 +322,7 @@ export default function Onboarding() {
                 </p>
               </div>
               <textarea
+                aria-label="Descrição da loja"
                 className="input"
                 rows={3}
                 placeholder="Ex.: Semijoias folheadas com garantia e entrega rápida."
@@ -387,15 +440,17 @@ export default function Onboarding() {
                 <p className="text-sm text-muted mb-3">Uso isso pra sugerir o preço de venda certinho pra você.</p>
                 <div className="flex flex-wrap gap-2">
                   {[50, 100, 200].map((m) => (
-                    <span
+                    <button
+                      type="button"
                       key={m}
+                      aria-pressed={margem === m}
                       onClick={() => setMargem(m)}
                       className={`chip transition active:scale-95 ${
                         margem === m ? "bg-brand-600 text-white border-brand-600" : "border-default"
                       }`}
                     >
                       {m}%
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -405,8 +460,10 @@ export default function Onboarding() {
                   <p className="text-sm text-muted mb-3">A comissão padrão de cada revendedora.</p>
                   <div className="flex flex-wrap gap-2">
                     {[20, 30, 40].map((c) => (
-                      <span
+                      <button
+                        type="button"
                         key={c}
+                        aria-pressed={comissao === c}
                         onClick={() => setComissao(c)}
                         className={`chip transition active:scale-95 ${
                           comissao === c
@@ -415,7 +472,7 @@ export default function Onboarding() {
                         }`}
                       >
                         {c}%
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -433,8 +490,9 @@ export default function Onboarding() {
                 </p>
               </div>
               <div>
-                <label className="label flex items-center gap-1"><MessageCircle size={13} /> WhatsApp</label>
+                <label htmlFor="ob-whatsapp" className="label flex items-center gap-1"><MessageCircle size={13} /> WhatsApp</label>
                 <input
+                  id="ob-whatsapp"
                   className="input"
                   inputMode="tel"
                   placeholder="Ex.: 11 99999-9999"
@@ -443,20 +501,21 @@ export default function Onboarding() {
                 />
               </div>
               <div>
-                <label className="label flex items-center gap-1"><Instagram size={13} /> Instagram</label>
-                <input className="input" placeholder="@sualoja" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+                <label htmlFor="ob-instagram" className="label flex items-center gap-1"><Instagram size={13} /> Instagram</label>
+                <input id="ob-instagram" className="input" placeholder="@sualoja" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
               </div>
               <div>
-                <label className="label flex items-center gap-1"><Facebook size={13} /> Facebook</label>
-                <input className="input" placeholder="sualoja" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+                <label htmlFor="ob-facebook" className="label flex items-center gap-1"><Facebook size={13} /> Facebook</label>
+                <input id="ob-facebook" className="input" placeholder="sualoja" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
               </div>
               <div>
-                <label className="label flex items-center gap-1"><Music2 size={13} /> TikTok</label>
-                <input className="input" placeholder="@sualoja" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+                <label htmlFor="ob-tiktok" className="label flex items-center gap-1"><Music2 size={13} /> TikTok</label>
+                <input id="ob-tiktok" className="input" placeholder="@sualoja" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
               </div>
               <div>
-                <label className="label flex items-center gap-1"><Mail size={13} /> E-mail da loja <span className="text-muted font-normal">(opcional)</span></label>
+                <label htmlFor="ob-email" className="label flex items-center gap-1"><Mail size={13} /> E-mail da loja <span className="text-muted font-normal">(opcional)</span></label>
                 <input
+                  id="ob-email"
                   className="input"
                   type="email"
                   placeholder="contato@sualoja.com"
@@ -471,7 +530,7 @@ export default function Onboarding() {
 
       <div className="pt-6">
         {step < totalSteps - 1 ? (
-          <button onClick={next} className="btn-primary w-full">
+          <button type="button" onClick={next} className="btn-primary w-full">
             Continuar <ChevronRight size={20} />
           </button>
         ) : (
@@ -617,7 +676,9 @@ function GeneratingScreen({
             {pronto ? "Tudo pronto! 🎉" : passoAtual.title}
           </p>
           <p className="text-sm text-muted mt-1">
-            {pronto ? `${loja} está no ar.` : passoAtual.sub}
+            {pronto
+              ? `${loja} foi criada. Para publicar a loja online, use "Minha Loja" no painel.`
+              : passoAtual.sub}
           </p>
         </div>
 
