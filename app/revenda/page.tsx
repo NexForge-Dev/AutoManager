@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { situacaoRevendedora } from "@/lib/destinoPosLogin";
 import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
 import { parseNumero } from "@/lib/csvProdutos";
@@ -61,7 +62,9 @@ export default function RevendaPage() {
         const { data, error } = await sb.current.rpc("revendedora_me");
         if (error) throw error;
         if (!data) {
-          router.replace("/acesso");
+          // vinculada mas bloqueada (plano/loja suspensa) -> /acesso explica o motivo
+          const situacao = await situacaoRevendedora();
+          router.replace(situacao === "suspensa" ? "/acesso?motivo=suspenso" : "/acesso");
           return;
         }
         const m = data as Me;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { lerConviteDoHash } from "@/lib/acessoRevendedora";
-import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { destinoPosLogin, MOTIVOS_ACESSO, motivoDaUrl } from "@/lib/destinoPosLogin";
 import { Gem, Loader2 } from "lucide-react";
 
 export default function AcessoPage() {
@@ -16,6 +16,16 @@ export default function AcessoPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doLink, setDoLink] = useState(false);
+
+  // /acesso?motivo=suspenso|sem_loja (destinoPosLogin): conta sem loja ativa.
+  // Mostra o motivo e encerra a sessão, para não ficar preso num login sem acesso.
+  useEffect(() => {
+    const motivo = motivoDaUrl(window.location.search);
+    if (!motivo) return;
+    setModo("entrar");
+    setErro(MOTIVOS_ACESSO[motivo]);
+    void createClient().auth.signOut();
+  }, []);
 
   // link enviado pela loja (/acesso#email=…&codigo=…): preenche e limpa a barra de endereço
   useEffect(() => {
@@ -33,7 +43,16 @@ export default function AcessoPage() {
   async function entrarERedirecionar() {
     // revendedora vai para /revenda; vendedora/entregador/dono que entrou por aqui
     // também é levado para a própria área, em vez de barrado
-    router.replace(await destinoPosLogin());
+    const destino = await destinoPosLogin();
+    const motivo = destino.startsWith("/acesso") ? motivoDaUrl(destino.slice(destino.indexOf("?"))) : null;
+    if (motivo) {
+      // já estamos no /acesso: mostra o motivo aqui mesmo e sai da sessão sem acesso
+      await createClient().auth.signOut();
+      setErro(MOTIVOS_ACESSO[motivo]);
+      setLoading(false);
+      return;
+    }
+    router.replace(destino);
   }
 
   async function submit(e: React.FormEvent) {
