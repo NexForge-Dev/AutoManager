@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { aplicarAparencia, aplicarFavicon, temaDoUsuario } from "@/lib/aparencia";
 import { homeDe, podeAcessar } from "@/lib/permissoes";
-import { createClient } from "@/lib/supabase/client";
+import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import AppShell from "./AppShell";
 import { Skeleton, SkeletonMetrics, SkeletonList } from "./Skeleton";
 
@@ -57,20 +57,18 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     if (jaMontado || !ready) return;
     // autenticado mas sem loja própria (revendedora/visitante que caiu no painel):
     // não pertence ao painel do dono — manda para o acesso da revendedora.
-    // Revendedora logada (login self-service) vai para o painel dela (/revenda);
-    // quem não é revendedora vai para o acesso. Mesmo critério de destinoPosLogin.
+    // Revendedora ativa vai para /revenda; suspensa ou sem loja vai para /acesso com o
+    // motivo (?motivo=suspenso|sem_loja). Usa a mesma regra de destinoPosLogin.
     if (semOrg) {
       let cancelado = false;
-      createClient()
-        .rpc("revendedora_me")
-        .then(
-          ({ data }) => {
-            if (!cancelado) router.replace(data ? "/revenda" : "/acesso");
-          },
-          () => {
-            if (!cancelado) router.replace("/acesso");
-          }
-        );
+      destinoPosLogin().then(
+        (destino) => {
+          if (!cancelado) router.replace(destino);
+        },
+        () => {
+          if (!cancelado) router.replace("/acesso");
+        }
+      );
       return () => {
         cancelado = true;
       };
