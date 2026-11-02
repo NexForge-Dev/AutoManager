@@ -6,9 +6,11 @@ import { brl } from "@/lib/analytics";
 import { uploadProdutoImagem } from "@/lib/uploadProdutoImagem";
 import { parseProdutosCSV, parseNumero, CSV_MODELO_HEADER, CSV_MODELO_EXEMPLO, type LinhaImport } from "@/lib/csvProdutos";
 import { baixarCSV } from "@/lib/export";
+import { sugerirPreco } from "@/lib/precos";
 import type { Produto, Variacao } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
+import Modal from "@/components/Modal";
 import { Plus, X, PackagePlus, Pencil, ImagePlus, Trash2, Layers, SlidersHorizontal, Search, Upload, FileSpreadsheet, AlertTriangle } from "lucide-react";
 
 export default function ProdutosPage() {
@@ -327,16 +329,12 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-40 flex items-end md:items-center justify-center">
-      <div className="surface w-full max-w-lg rounded-t-3xl md:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <FileSpreadsheet size={20} className="text-brand-500" /> Importar produtos
-          </h2>
-          <button onClick={onClose}>
-            <X />
-          </button>
-        </div>
+    <Modal
+      onClose={onClose}
+      largura="md:max-w-lg"
+      icone={<FileSpreadsheet size={20} className="text-brand-500" />}
+      titulo="Importar produtos"
+    >
 
         <p className="text-sm text-muted">
           Envie uma planilha <b>.csv</b> com as colunas <b>nome</b> e <b>preço</b> (e, se quiser,
@@ -417,8 +415,7 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
             ? `Importar ${linhas.length} produto(s)`
             : "Escolha um arquivo"}
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -457,13 +454,19 @@ function ProdutoForm({
   const [enviando, setEnviando] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
-  // sugere preço pela margem ao digitar custo (só no cadastro novo)
+  // sugere preço pela margem ao digitar custo (só no cadastro novo). Recalcula a
+  // cada tecla enquanto a pessoa não editar o preço à mão (antes congelava no 1º
+  // dígito: custo "25" virava preço "4.00").
+  const [precoEditado, setPrecoEditado] = useState(false);
   function onCusto(v: string) {
     setCusto(v);
+    if (editar || precoEditado) return;
     const c = parseNumero(v);
-    if (!isNaN(c) && !preco && !editar) {
-      setPreco((c * (1 + config.margemPadrao / 100)).toFixed(2));
-    }
+    setPreco(!isNaN(c) && c > 0 ? sugerirPreco(c, config.margemPadrao) : "");
+  }
+  function onPreco(v: string) {
+    setPreco(v);
+    setPrecoEditado(v.trim() !== "");
   }
 
   async function onUpload(files: FileList | null) {
@@ -557,14 +560,7 @@ function ProdutoForm({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-40 flex items-end md:items-center justify-center">
-      <div className="surface w-full max-w-md rounded-t-3xl md:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">{editar ? "Editar produto" : "Novo produto"}</h2>
-          <button onClick={onClose}>
-            <X />
-          </button>
-        </div>
+    <Modal onClose={onClose} titulo={editar ? "Editar produto" : "Novo produto"}>
 
         {/* fotos */}
         <div>
@@ -575,7 +571,9 @@ function ProdutoForm({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="h-16 w-16 rounded-lg object-cover border border-default" />
                 <button
+                  type="button"
                   onClick={() => setImagens((p) => p.filter((_, idx) => idx !== i))}
+                  aria-label="Remover foto"
                   className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
                 >
                   <X size={12} />
@@ -585,6 +583,7 @@ function ProdutoForm({
             <button
               onClick={() => fileRef.current?.click()}
               disabled={enviando}
+              aria-label="Adicionar foto"
               className="h-16 w-16 rounded-lg border border-dashed border-default flex items-center justify-center text-muted disabled:opacity-50"
             >
               {enviando ? "…" : <ImagePlus size={20} />}
@@ -635,7 +634,7 @@ function ProdutoForm({
           </div>
           <div>
             <label className="label">Preço venda (R$)</label>
-            <input className="input" inputMode="decimal" value={preco} onChange={(e) => setPreco(e.target.value)} />
+            <input className="input" inputMode="decimal" value={preco} onChange={(e) => onPreco(e.target.value)} />
           </div>
           <div>
             <label className="label">Preço &quot;de&quot; (R$)</label>
@@ -696,7 +695,7 @@ function ProdutoForm({
                       setVar(i, { precoAjuste: parseNumero(t) || 0 });
                     }}
                   />
-                  <button onClick={() => rmVar(i)} className="col-span-1 text-red-500 flex justify-center">
+                  <button type="button" onClick={() => rmVar(i)} aria-label="Remover variação" className="col-span-1 text-red-500 flex justify-center">
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -730,8 +729,7 @@ function ProdutoForm({
         <button onClick={salvar} disabled={salvando || enviando} className="btn-primary w-full disabled:opacity-60">
           {salvando ? "Salvando…" : editar ? "Salvar alterações" : "Salvar produto"}
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
