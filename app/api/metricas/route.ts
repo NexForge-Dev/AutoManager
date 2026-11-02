@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       return vazio();
     }
 
-    const sb = createServer();
+    const sb = await createServer();
     const {
       data: { user },
     } = await sb.auth.getUser();

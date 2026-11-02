@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { aplicarCorMarca } from "@/lib/brand";
 import { aplicarFavicon } from "@/lib/aparencia";
@@ -40,7 +41,8 @@ type Loja = {
   produtos: ProdutoPub[];
 };
 
-export default function LojaPage({ params }: { params: { slug: string } }) {
+export default function LojaPage() {
+  const { slug } = useParams<{ slug: string }>();
   const sb = useRef(createClient());
   const [loja, setLoja] = useState<Loja | null | undefined>(undefined);
   const [chat, setChat] = useState(false);
@@ -53,7 +55,7 @@ export default function LojaPage({ params }: { params: { slug: string } }) {
 
   useEffect(() => {
     setFalhaRede(false);
-    sb.current.rpc("loja_publica", { p_slug: params.slug }).then(({ data, error }) => {
+    sb.current.rpc("loja_publica", { p_slug: slug }).then(({ data, error }) => {
       // erro de rede/servidor não é "loja não existe": oferece tentar de novo
       if (error) {
         setFalhaRede(true);
@@ -65,7 +67,7 @@ export default function LojaPage({ params }: { params: { slug: string } }) {
       if (d?.fonte) setFontStack(carregarFonte(d.fonte));
       if (d) aplicarFavicon(d.logo_url, d.nome); // ícone/título da aba = logo e nome da loja
     });
-  }, [params.slug, tentativa]);
+  }, [slug, tentativa]);
 
   // badge de não lidas: se o cliente já conversou aqui, conta mensagens da LOJA
   // chegadas depois da última vez que ele abriu o chat (mesmo com o chat fechado).

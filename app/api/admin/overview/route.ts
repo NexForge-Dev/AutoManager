@@ -17,7 +17,7 @@ function admin() {
 }
 
 async function exigirSuperadmin() {
-  const sb = createServer();
+  const sb = await createServer();
   const {
     data: { user },
   } = await sb.auth.getUser();

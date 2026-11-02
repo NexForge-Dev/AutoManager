@@ -7,8 +7,6 @@ const nextConfig = {
   experimental: {
     // Tree-shaking de libs com muitos exports nomeados -> bundles bem menores.
     optimizePackageImports: ["lucide-react", "recharts"],
-    // habilita instrumentation.ts (validação das variáveis de ambiente na subida)
-    instrumentationHook: true,
   },
   async headers() {
     return [
