@@ -14,7 +14,7 @@
 // ============================================================================
 
 import type Stripe from "stripe";
-import { PLANOS, planoValido, type PlanoId, type StatusAssinatura } from "../plans";
+import { MIN_TRIAL_STRIPE_MS, PLANOS, planoValido, type PlanoId, type StatusAssinatura } from "../plans";
 
 export const PREFIXO_LOOKUP = "automanager_";
 
@@ -74,8 +74,6 @@ export interface ResultadoEvento {
 
 const VIVOS: StatusAssinatura[] = ["active", "past_due"];
 
-// O Stripe Checkout só aceita trial_end pelo menos 48 h no futuro.
-const MIN_TRIAL_STRIPE_MS = 48 * 3600 * 1000;
 
 /**
  * Quem assina DURANTE o teste grátis não perde o resto do "1º mês grátis": a

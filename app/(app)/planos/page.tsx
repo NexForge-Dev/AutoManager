@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlano } from "@/lib/usePlano";
@@ -8,7 +8,8 @@ import { ORDEM_PLANOS, PLANOS, brlPreco, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useMetricaAoAbrir } from "@/lib/metricas/cliente";
 import { useDialog } from "@/components/Dialog";
-import { Check, Sparkles, Star, Loader2, ArrowLeft, ShieldCheck } from "lucide-react";
+import { FUSO_LOJA } from "@/lib/fuso";
+import { Check, Sparkles, Star, Loader2, ArrowLeft, ShieldCheck, Info, X } from "lucide-react";
 
 export default function PlanosPage() {
   useMetricaAoAbrir({ tipo: "planos_vistos" });
@@ -21,7 +22,7 @@ export default function PlanosPage() {
 
 function Planos() {
   const router = useRouter();
-  const { assinatura, planoContratado, planoEfetivo, emTrial, diasTrial, uso } = usePlano();
+  const { assinatura, planoContratado, planoEfetivo, emTrial, diasTrial, cobrancaNoFimDoTrial, uso } = usePlano();
   // "plano atual" = pagando e com o plano valendo; trial vencido, cancelado ou
   // inadimplente precisa poder recontratar o mesmo plano
   const ehAtual = (id: PlanoId) =>
@@ -29,9 +30,56 @@ function Planos() {
   const { confirm, alerta } = useDialog();
   const hydrate = useStore((s) => s.hydrate);
   const [salvando, setSalvando] = useState<PlanoId | null>(null);
+  const [abrindoPortal, setAbrindoPortal] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  // trava síncrona: o disabled só vale no próximo render e um duplo clique rápido
+  // abriria dois checkouts
+  const ocupadoRef = useRef(false);
+  const ocupado = salvando !== null || abrindoPortal;
+
+  // fim do teste (= 1ª cobrança ao assinar agora), no fuso da loja
+  const fimTrial =
+    emTrial && assinatura?.trialAte
+      ? new Date(assinatura.trialAte).toLocaleDateString("pt-BR", {
+          timeZone: FUSO_LOJA,
+          day: "2-digit",
+          month: "2-digit",
+        })
+      : null;
+
+  // volta do Checkout do Stripe sem pagar (cancel_url = /planos?checkout=cancelado)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") !== "cancelado") return;
+    window.history.replaceState({}, "", "/planos");
+    setAviso("Pagamento não concluído. Nenhuma cobrança foi feita.");
+  }, []);
+
+  // Customer Portal do Stripe: regularizar cartão/fatura pendente
+  async function abrirPortal() {
+    if (ocupadoRef.current) return;
+    ocupadoRef.current = true;
+    setAbrindoPortal(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j.url) {
+        window.location.href = j.url;
+        return; // continua travado enquanto o navegador sai da página
+      }
+      await alerta({
+        titulo: "Não foi possível abrir o portal de pagamento",
+        mensagem: j.erro || "Tente novamente em instantes.",
+      });
+    } catch {
+      await alerta({ titulo: "Falha de conexão", mensagem: "Não consegui abrir o portal de pagamento. Tente novamente." });
+    }
+    ocupadoRef.current = false;
+    setAbrindoPortal(false);
+  }
 
   async function selecionar(novo: PlanoId) {
-    if (ehAtual(novo)) return;
+    if (ehAtual(novo) || ocupadoRef.current) return;
     const def = PLANOS[novo];
 
     // aviso de downgrade quando o uso atual estoura o novo limite
@@ -54,6 +102,8 @@ function Planos() {
     }
 
     // assina pelo Stripe (redireciona p/ o checkout) ou troca o plano da assinatura atual
+    if (ocupadoRef.current) return;
+    ocupadoRef.current = true;
     setSalvando(novo);
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -63,43 +113,86 @@ function Planos() {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.url) {
-        window.location.href = json.url; // checkout do Stripe
+        window.location.href = json.url; // checkout do Stripe (continua travado até sair da página)
         return;
       }
       if (res.ok && json.atualizado) {
-        await hydrate();
+        // o plano já mudou no servidor: falha ao recarregar não é falha da troca
+        await hydrate().catch(() => {});
+        ocupadoRef.current = false;
         setSalvando(null);
         await alerta({
           titulo: `Plano ${def.nome} ativo`,
-          mensagem: "A diferença de valor é ajustada proporcionalmente na sua próxima fatura.",
+          // a troca usa proration "always_invoice": a diferença é faturada na hora
+          mensagem: "Se houver diferença de valor, ela é cobrada (ou creditada) proporcionalmente agora.",
         });
         router.push("/configuracoes/plano");
         return;
       }
-      await alerta({ titulo: "Não foi possível iniciar o pagamento", mensagem: json.erro || "Tente novamente." });
+      ocupadoRef.current = false;
       setSalvando(null);
+      // pagamento pendente / cartão recusado: só dá para resolver no portal do Stripe
+      if (json.portal === true) {
+        const abrir = await confirm({
+          titulo: "Regularize o pagamento",
+          mensagem: json.erro || "Há um pagamento pendente na sua assinatura.",
+          confirmar: "Gerenciar pagamento",
+          cancelar: "Agora não",
+        });
+        if (abrir) await abrirPortal();
+        return;
+      }
+      await alerta({
+        titulo: "Não foi possível iniciar o pagamento",
+        mensagem: json.erro || "Tente novamente em instantes.",
+      });
     } catch {
-      await alerta({ titulo: "Falha de conexão", mensagem: "Não consegui iniciar o pagamento. Tente novamente." });
+      ocupadoRef.current = false;
       setSalvando(null);
+      await alerta({ titulo: "Falha de conexão", mensagem: "Não consegui iniciar o pagamento. Tente novamente." });
     }
   }
 
   return (
     <div className="space-y-5 pb-10">
       <header className="pt-1">
-        <button onClick={() => router.back()} className="text-sm text-muted flex items-center gap-1 mb-2">
+        {/* destino fixo: router.back() depois de cancelar no Stripe voltaria ao Checkout */}
+        <Link href="/configuracoes/plano" className="text-sm text-muted flex items-center gap-1 mb-2 w-fit">
           <ArrowLeft size={15} /> Voltar
-        </button>
+        </Link>
         <h1 className="text-2xl font-bold">Planos & assinatura</h1>
         <p className="text-sm text-muted">Escolha o plano que acompanha o crescimento da sua loja.</p>
       </header>
+
+      {aviso && (
+        <div role="status" className="card flex items-start gap-3 text-sm bg-amber-500/10 border-amber-500/30">
+          <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
+          <span className="flex-1">{aviso}</span>
+          <button
+            type="button"
+            onClick={() => setAviso(null)}
+            aria-label="Fechar aviso"
+            className="text-muted hover:text-strong shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {emTrial && (
         <div className="card bg-brand-500/5 border-brand-500/30 flex items-center gap-3">
           <Sparkles className="text-brand-500 shrink-0" />
           <div className="text-sm">
             <b>Teste grátis ativo</b> - você está com acesso total (Expansão) por mais{" "}
-            <b>{diasTrial} dia{diasTrial === 1 ? "" : "s"}</b>. Escolha um plano para continuar sem interrupção.
+            <b>{diasTrial} dia{diasTrial === 1 ? "" : "s"}</b>.{" "}
+            {cobrancaNoFimDoTrial ? (
+              <>
+                Assine agora sem custo: a 1ª cobrança só acontece quando o teste acabar
+                {fimTrial ? <>, em <b>{fimTrial}</b></> : null}.
+              </>
+            ) : (
+              <>Seu teste está no fim: ao assinar, a 1ª cobrança é feita na hora.</>
+            )}
           </div>
         </div>
       )}
@@ -128,6 +221,11 @@ function Planos() {
                   <span className="text-3xl font-extrabold">{brlPreco(p.precoCentavos)}</span>
                   <span className="text-muted text-sm">/mês</span>
                 </div>
+                {cobrancaNoFimDoTrial && !atual && (
+                  <div className="text-xs text-brand-500 font-medium mt-1">
+                    Grátis até o fim do teste{fimTrial ? ` (${fimTrial})` : ""}
+                  </div>
+                )}
               </div>
 
               <ul className="mt-4 space-y-2 flex-1">
@@ -140,14 +238,14 @@ function Planos() {
 
               <button
                 onClick={() => selecionar(id)}
-                disabled={atual || salvando !== null}
+                disabled={atual || ocupado}
                 className={`mt-5 w-full whitespace-nowrap ${
                   atual ? "btn-ghost opacity-70 cursor-default" : p.destaque ? "btn-primary" : "btn-ghost"
                 }`}
               >
                 {salvando === id ? (
                   <>
-                    <Loader2 className="animate-spin" size={18} /> Redirecionando…
+                    <Loader2 className="animate-spin" size={18} /> Aguarde…
                   </>
                 ) : atual ? (
                   <>
@@ -155,7 +253,7 @@ function Planos() {
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} /> Assinar {p.nome}
+                    <Sparkles size={16} /> {cobrancaNoFimDoTrial ? "Escolher" : "Assinar"} {p.nome}
                   </>
                 )}
               </button>
@@ -167,7 +265,8 @@ function Planos() {
       <div className="card flex items-start gap-3 text-sm text-muted">
         <ShieldCheck size={18} className="text-brand-500 shrink-0 mt-0.5" />
         <div>
-          Pagamento seguro pelo <b>Stripe</b>. A cobrança é mensal e recorrente; você cancela quando
+          Pagamento seguro pelo <b>Stripe</b>. A cobrança é mensal e recorrente
+          {cobrancaNoFimDoTrial ? " e só começa no fim do teste grátis" : ""}; você cancela quando
           quiser (
           <Link href="/cancelamento" className="font-medium text-brand-500 hover:underline">
             veja como cancelar

@@ -4,6 +4,26 @@ import { Lock, Sparkles, ArrowRight } from "lucide-react";
 import Modal from "./Modal";
 import type { PlanoDef } from "@/lib/plans";
 import { brlPreco } from "@/lib/plans";
+import { usePlano, type SituacaoAssinatura } from "@/lib/usePlano";
+
+// Conta no piso por falta de pagamento: o bloqueio não é "plano pequeno", é
+// assinatura sem pagamento ativo; o upgrade sugerido não resolveria sozinho.
+const AVISO_BLOQUEIO: Partial<Record<SituacaoAssinatura, string>> = {
+  sem_assinatura: "Sua loja ainda não tem um plano ativo, por isso os recursos pagos estão bloqueados.",
+  trial_vencido: "Seu teste grátis terminou, por isso os recursos pagos estão bloqueados até você assinar.",
+  cancelada: "Sua assinatura foi cancelada, por isso os recursos pagos estão bloqueados até você assinar de novo.",
+  pendente: "O pagamento da sua assinatura está pendente, por isso os recursos pagos estão bloqueados até ser regularizado.",
+};
+
+function AvisoBloqueio() {
+  const { bloqueado, situacao } = usePlano();
+  if (!bloqueado) return null;
+  return (
+    <p role="alert" className="text-sm text-red-600 max-w-md mx-auto">
+      {AVISO_BLOQUEIO[situacao]}
+    </p>
+  );
+}
 
 // Bloco de página inteira para recursos bloqueados (ex.: analytics avançado).
 export function UpgradeBlock({
@@ -24,7 +44,8 @@ export function UpgradeBlock({
         <div className="text-xl font-bold">{titulo}</div>
         <p className="text-sm text-muted max-w-md mx-auto mt-1">{descricao}</p>
       </div>
-      <Link href="/planos" className="btn-primary inline-flex w-auto px-6 mx-auto">
+      <AvisoBloqueio />
+      <Link href="/planos" className="btn-primary inline-flex w-auto max-w-full px-6 mx-auto text-center">
         <Sparkles size={16} />
         {planoNecessario
           ? `Desbloquear com o ${planoNecessario.nome} · ${brlPreco(planoNecessario.precoCentavos)}/mês`
@@ -56,12 +77,13 @@ export function UpgradeModal({
           <Sparkles className="text-brand-500" size={28} />
         </div>
         <p className="text-sm text-muted">{descricao}</p>
+        <AvisoBloqueio />
 
         {planoNecessario && (
           <div className="rounded-2xl border border-brand-500/30 bg-brand-500/5 p-4 text-left">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="font-bold">Plano {planoNecessario.nome}</span>
-              <span className="text-brand-500 font-bold">{brlPreco(planoNecessario.precoCentavos)}/mês</span>
+              <span className="text-brand-500 font-bold whitespace-nowrap">{brlPreco(planoNecessario.precoCentavos)}/mês</span>
             </div>
             <ul className="mt-2 space-y-1">
               {planoNecessario.beneficios.slice(0, 4).map((b) => (
