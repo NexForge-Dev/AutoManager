@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
 import { donoDaOrg } from "@/lib/donoDaOrg";
-import { PLANOS, type PlanoId } from "@/lib/plans";
+import { planoValido } from "@/lib/plans";
 import {
   adminClient,
   appUrl,
@@ -27,8 +27,8 @@ export async function POST(req: Request) {
   const dono = await donoDaOrg();
   if (!dono) return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
 
-  const { plano } = (await req.json().catch(() => ({}))) as { plano?: PlanoId };
-  if (!plano || !(plano in PLANOS)) return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
+  const { plano } = ((await req.json().catch(() => ({}))) ?? {}) as { plano?: unknown };
+  if (!planoValido(plano)) return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
   if (!dono.email) return NextResponse.json({ erro: "Sua conta não tem e-mail para o pagamento." }, { status: 400 });
 
   try {

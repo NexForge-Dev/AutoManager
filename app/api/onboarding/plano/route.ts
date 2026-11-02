@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { PLANOS, type PlanoId } from "@/lib/plans";
+import { PLANOS, planoValido, type PlanoId } from "@/lib/plans";
 import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
 
 // Painel NexForge: escolha do plano no onboarding = trial de 30 dias desse plano.
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   if (!dono) return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
 
   const { plano } = (await req.json().catch(() => ({}))) as { plano?: PlanoId };
-  if (!plano || !["ambulante", "solo", "equipe", "expansao"].includes(plano))
+  if (!planoValido(plano))
     return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
 
   const sb = admin();

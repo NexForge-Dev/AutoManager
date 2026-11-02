@@ -130,6 +130,15 @@ export const PLANOS: Record<PlanoId, PlanoDef> = {
 
 export const ORDEM_PLANOS: PlanoId[] = ["ambulante", "solo", "equipe", "expansao"];
 
+/**
+ * Valida um id de plano vindo de fora (body de requisição, metadata do Stripe).
+ * Usa Object.hasOwn: com `p in PLANOS`, chaves herdadas como "toString" ou
+ * "__proto__" passavam como plano e quebravam mais adiante (502 no checkout).
+ */
+export function planoValido(p: unknown): p is PlanoId {
+  return typeof p === "string" && Object.hasOwn(PLANOS, p);
+}
+
 export function planoDef(id: PlanoId | string | null | undefined): PlanoDef {
   return PLANOS[(id as PlanoId) ?? "solo"] ?? PLANOS.solo;
 }

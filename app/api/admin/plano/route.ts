@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { ehSuperadminUser } from "@/lib/admin";
-import { PLANOS, type PlanoId } from "@/lib/plans";
+import { PLANOS, planoValido, type PlanoId } from "@/lib/plans";
+import { uuidValido } from "@/lib/validacao";
 import { registrarAdminLog } from "@/lib/adminAudit";
 
 // Troca MANUAL de plano de uma loja pelo super-admin (cortesia / suporte).
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
     orgId?: string;
     plano?: PlanoId;
   };
-  if (!orgId || !plano || !["ambulante", "solo", "equipe", "expansao"].includes(plano))
+  if (!uuidValido(orgId) || !planoValido(plano))
     return NextResponse.json({ erro: "Dados inválidos" }, { status: 400 });
 
   const inicio = new Date();

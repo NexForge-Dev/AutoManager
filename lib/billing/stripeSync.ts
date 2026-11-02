@@ -14,7 +14,7 @@
 // ============================================================================
 
 import type Stripe from "stripe";
-import { PLANOS, type PlanoId, type StatusAssinatura } from "../plans";
+import { PLANOS, planoValido, type PlanoId, type StatusAssinatura } from "../plans";
 
 export const PREFIXO_LOOKUP = "automanager_";
 
@@ -73,7 +73,7 @@ const VIVOS: StatusAssinatura[] = ["active", "past_due"];
 const iso = (unix: number | null | undefined) => (unix ? new Date(unix * 1000).toISOString() : null);
 
 function ehPlano(p: unknown): p is PlanoId {
-  return typeof p === "string" && p in PLANOS;
+  return planoValido(p);
 }
 
 // Plano atual da assinatura. Os preços criados pelo `npm run stripe:sync` têm o
