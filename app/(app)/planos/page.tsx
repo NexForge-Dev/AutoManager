@@ -104,7 +104,7 @@ function Planos() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start stagger">
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-3 items-start stagger">
         {ORDEM_PLANOS.map((id) => {
           const p = PLANOS[id];
           const atual = ehAtual(id);
@@ -112,11 +112,11 @@ function Planos() {
             <div
               key={id}
               className={`card relative flex flex-col transition-transform duration-200 hover:-translate-y-1 ${
-                p.destaque ? "ring-2 ring-brand-500 shadow-card lg:scale-[1.03] lg:hover:scale-[1.05]" : ""
+                p.destaque ? "ring-2 ring-brand-500 shadow-card xl:scale-[1.03] xl:hover:scale-[1.05]" : ""
               }`}
             >
               {p.destaque && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap bg-brand-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                   <Star size={12} /> Mais vendido
                 </span>
               )}
@@ -141,7 +141,7 @@ function Planos() {
               <button
                 onClick={() => selecionar(id)}
                 disabled={atual || salvando !== null}
-                className={`mt-5 w-full ${
+                className={`mt-5 w-full whitespace-nowrap ${
                   atual ? "btn-ghost opacity-70 cursor-default" : p.destaque ? "btn-primary" : "btn-ghost"
                 }`}
               >
