@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { waLink } from "@/lib/contato";
 import { useStore } from "@/lib/store";
-import { linkWhatsappSuporte } from "@/lib/admin";
 import { brlPreco, ORDEM_PLANOS, PLANOS, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -647,7 +647,7 @@ function ChamadosView({
                 </a>
               )}
               {c.whatsapp && (
-                <a href={linkWhatsappSuporte()} className="flex items-center gap-1 hover:text-green-600">
+                <a href={waLink(c.whatsapp)} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-green-600">
                   <MessageCircle size={13} /> {c.whatsapp}
                 </a>
               )}

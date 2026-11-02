@@ -5,8 +5,14 @@ export function soDigitos(s: string | null | undefined): string {
   return (s || "").replace(/\D/g, "");
 }
 
-export function waLink(numero: string | null | undefined): string {
+// wa.me exige o código do país: "DDD + número" (10-11 dígitos) ganha o 55 do Brasil
+export function waNumero(numero: string | null | undefined): string {
   const d = soDigitos(numero);
+  return d.length === 10 || d.length === 11 ? `55${d}` : d;
+}
+
+export function waLink(numero: string | null | undefined): string {
+  const d = waNumero(numero);
   return d ? `https://wa.me/${d}` : "";
 }
 
