@@ -235,3 +235,18 @@ describe("trialEndParaCheckout", () => {
     expect(trialEndParaCheckout(null, agora)).toBeNull();
   });
 });
+
+describe("tratarEventoStripe — efeitos antes de marcar", () => {
+  it("se o efeito falha, o evento não fica processado (o Stripe reenvia)", async () => {
+    const mem = memoriaStore({ "org-1": { plano: "solo", status: "active", providerAssinaturaId: "sub_antiga" } });
+    const ev = evento("customer.subscription.created", { id: "sub_novo" }, "evt_efeito");
+    await expect(
+      tratarEventoStripe(ev, mem.store, async () => sub(), async () => {
+        throw new Error("stripe fora");
+      })
+    ).rejects.toThrow("stripe fora");
+    const r = await tratarEventoStripe(ev, mem.store, async () => sub(), async () => {});
+    expect(r.resultado).toBe("sincronizada");
+    expect((await tratarEventoStripe(ev, mem.store, async () => sub())).resultado).toBe("duplicado");
+  });
+});

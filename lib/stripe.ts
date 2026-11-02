@@ -92,15 +92,33 @@ export async function clienteDaOrg(admin: SupabaseClient, orgId: string, email: 
 // Efeitos depois de sincronizar: cancela a assinatura substituída (para não
 // cobrar dois planos) e manda as métricas ao Painel NexForge. `chave` deixa os
 // eventos idempotentes (id do evento Stripe ou da sessão de checkout).
-export async function posSincronizar(r: ResultadoEvento, chave: string): Promise<void> {
+// `estrito` (webhook): falha ao cancelar a assinatura anterior LANÇA, para o webhook
+// responder 500 e o Stripe reenviar o evento (o plano novo já foi gravado; o reenvio
+// é idempotente). Nos caminhos disparados pelo usuário só registra no log.
+export async function posSincronizar(r: ResultadoEvento, chave: string, estrito = false): Promise<void> {
   if (r.resultado !== "sincronizada" || !r.orgId || !r.plano) return;
 
-  if (r.cancelarAnterior) {
-    // conceder o plano novo é prioridade: falha aqui não derruba a ativação
+  // Uma assinatura viva por loja: cancela a substituída (cancelarAnterior) e qualquer
+  // outra assinatura viva MAIS ANTIGA do mesmo cliente (a mais nova vence). Listar no
+  // Stripe cobre o reenvio do webhook depois de uma falha: o banco já aponta para a
+  // nova, então cancelarAnterior não viria de novo.
+  if (r.status === "active" && r.assinaturaId) {
     try {
-      await stripe().subscriptions.cancel(r.cancelarAnterior);
+      const alvo = new Set<string>();
+      if (r.cancelarAnterior) alvo.add(r.cancelarAnterior);
+      if (r.clienteId && r.criadaEm) {
+        const { data } = await stripe().subscriptions.list({ customer: r.clienteId, status: "all", limit: 20 });
+        for (const s of data)
+          if (s.id !== r.assinaturaId && VIVA.includes(s.status) && s.created < r.criadaEm) alvo.add(s.id);
+      }
+      for (const id of alvo) {
+        if (id === r.assinaturaId) continue;
+        const antiga = await stripe().subscriptions.retrieve(id);
+        if (VIVA.includes(antiga.status) || antiga.status === "incomplete") await stripe().subscriptions.cancel(id);
+      }
     } catch (e) {
-      console.error("Falha ao cancelar assinatura Stripe anterior", r.cancelarAnterior, e);
+      console.error("Falha ao cancelar assinatura Stripe anterior", r.cancelarAnterior ?? "", e);
+      if (estrito) throw e;
     }
   }
 

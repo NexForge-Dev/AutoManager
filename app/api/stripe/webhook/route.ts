@@ -31,8 +31,12 @@ export async function POST(req: Request) {
   }
 
   try {
-    const r = await tratarEventoStripe(evento, supabaseBillingStore(adminClient()), (id) => stripe().subscriptions.retrieve(id));
-    await posSincronizar(r, evento.id);
+    const r = await tratarEventoStripe(
+      evento,
+      supabaseBillingStore(adminClient()),
+      (id) => stripe().subscriptions.retrieve(id),
+      (res) => posSincronizar(res, evento.id, true)
+    );
     await enviarMetricas();
     return NextResponse.json({ recebido: true, resultado: r.resultado });
   } catch (e) {

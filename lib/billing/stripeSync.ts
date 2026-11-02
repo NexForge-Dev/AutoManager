@@ -66,6 +66,10 @@ export interface ResultadoEvento {
   cancelarAnterior?: string;
   // evento de cobrança recusada (métrica payment_failed)
   pagamentoFalhou?: boolean;
+  // assinatura sincronizada (para cancelar outras mais antigas do mesmo cliente)
+  assinaturaId?: string;
+  clienteId?: string;
+  criadaEm?: number; // unix (s)
 }
 
 const VIVOS: StatusAssinatura[] = ["active", "past_due"];
@@ -195,13 +199,20 @@ async function sincronizar(
     statusAnterior: atual.status,
     status,
     cancelarAnterior: outra && VIVOS.includes(status) ? outra : undefined,
+    assinaturaId: sub.id,
+    clienteId: customerId || undefined,
+    criadaEm: sub.created,
   };
 }
 
+// `efeitos` roda ANTES de marcar o evento como processado: se ele falhar (ex.: não
+// conseguiu cancelar a assinatura substituída), o evento não fica marcado e o
+// Stripe reenvia — senão o reenvio virava "duplicado" e a cobrança dupla ficava.
 export async function tratarEventoStripe(
   event: Stripe.Event,
   store: BillingStore,
-  fetchSubscription: FetchSubscription
+  fetchSubscription: FetchSubscription,
+  efeitos?: (r: ResultadoEvento) => Promise<void>
 ): Promise<ResultadoEvento> {
   if (await store.jaProcessado(event.id)) return { resultado: "duplicado" };
 
@@ -230,6 +241,7 @@ export async function tratarEventoStripe(
     }
   }
 
+  if (efeitos) await efeitos(r);
   await store.marcarProcessado(event.id, event.type);
   return r;
 }
