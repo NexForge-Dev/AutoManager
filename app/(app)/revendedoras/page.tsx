@@ -5,7 +5,9 @@ import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
-import { Plus, X, MessageCircle, BadgeDollarSign, Target, Pencil, KeyRound, Check, Mail, Link2 } from "lucide-react";
+import Modal from "@/components/Modal";
+import { createClient } from "@/lib/supabase/client";
+import { Plus, MessageCircle, Power, BadgeDollarSign, Target, Pencil, KeyRound, Check, Mail, Link2 } from "lucide-react";
 import { linkConvite, mensagemConvite } from "@/lib/acessoRevendedora";
 import type { Revendedora } from "@/lib/types";
 import type { Resultado } from "@/lib/store";
@@ -102,6 +104,29 @@ function Revendedoras() {
     if (!res.ok) alerta({ titulo: "Não foi possível salvar a meta", mensagem: res.erro || "Tente novamente." });
   }
 
+  async function alternarAtiva(r: Revendedora) {
+    const desativar = r.ativa;
+    if (!desativar && noLimite) {
+      setUpsell(true);
+      return;
+    }
+    const ok = await confirm({
+      titulo: desativar ? `Desativar ${r.nome}?` : `Reativar ${r.nome}?`,
+      mensagem: desativar
+        ? "Ela deixa de contar no limite de revendedoras ativas do seu plano. O histórico de vendas e comissões continua guardado e você pode reativar quando quiser."
+        : "Ela volta a contar no limite de revendedoras ativas do seu plano.",
+      confirmar: desativar ? "Desativar" : "Reativar",
+      perigo: desativar,
+    });
+    if (!ok) return;
+    const res = await updateRevendedora(r.id, { ativa: !desativar });
+    if (!res.ok)
+      alerta({
+        titulo: desativar ? "Não foi possível desativar" : "Não foi possível reativar",
+        mensagem: res.erro || "Tente novamente.",
+      });
+  }
+
   // congela a lista de vendas somadas no momento do clique: só elas são pagas
   async function pagarComissao(id: string, nome: string, vendaIds: string[], valor: number) {
     const ok = await confirm({
@@ -134,7 +159,13 @@ function Revendedoras() {
           className="card w-full text-left bg-brand-500/5 border-brand-500/30 flex items-center justify-between"
         >
           <span className="text-sm">
-            Você atingiu o limite de <b>{fmtLimite(caps.maxRevendedoras)}</b> revendedoras.
+            {caps.maxRevendedoras === 0 ? (
+              "Seu plano não inclui revendedoras."
+            ) : (
+              <>
+                Você atingiu o limite de <b>{fmtLimite(caps.maxRevendedoras)}</b> revendedoras.
+              </>
+            )}
           </span>
           <span className="text-brand-500 text-sm font-semibold">Fazer upgrade →</span>
         </button>
@@ -143,10 +174,12 @@ function Revendedoras() {
       <UpgradeModal
         aberto={upsell}
         onClose={() => setUpsell(false)}
-        titulo="Limite de revendedoras atingido"
-        descricao={`Seu plano permite até ${fmtLimite(
-          caps.maxRevendedoras
-        )} revendedoras ativas. Faça upgrade para cadastrar mais.`}
+        titulo={caps.maxRevendedoras === 0 ? "Revendedoras não incluídas" : "Limite de revendedoras atingido"}
+        descricao={
+          caps.maxRevendedoras === 0
+            ? "Seu plano não inclui revendedoras. Faça upgrade para cadastrar e acompanhar a sua equipe de vendas."
+            : `Seu plano permite até ${fmtLimite(caps.maxRevendedoras)} revendedoras ativas. Faça upgrade para cadastrar mais.`
+        }
         planoNecessario={planoUpgrade}
       />
 
@@ -164,23 +197,45 @@ function Revendedoras() {
           const pct = r.metaMensal > 0 ? Math.min(100, (vendMes / r.metaMensal) * 100) : 0;
           const bateu = r.metaMensal > 0 && vendMes >= r.metaMensal;
           return (
-            <div key={r.id} className="card space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{r.nome}</div>
+            <div key={r.id} className={`card space-y-2 ${r.ativa ? "" : "opacity-70"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold flex items-center gap-2">
+                    <span className="truncate">{r.nome}</span>
+                    {!r.ativa && (
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 surface-alt text-muted">
+                        Desativada
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted">
                     {r.comissaoPercent}% · vendeu {brl(vendMes)} no mês
                   </div>
                 </div>
-                {r.whatsapp && (
-                  <a
-                    href={`https://wa.me/${waNumero(r.whatsapp)}`}
-                    target="_blank"
-                    className="text-green-600"
+                <div className="flex items-center shrink-0 -mr-2">
+                  {r.whatsapp && (
+                    <a
+                      href={`https://wa.me/${waNumero(r.whatsapp)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Conversar com ${r.nome} no WhatsApp`}
+                      className="grid place-items-center h-11 w-11 rounded-full text-green-600 hover:bg-[var(--hover)]"
+                    >
+                      <MessageCircle />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => alternarAtiva(r)}
+                    aria-label={r.ativa ? `Desativar ${r.nome}` : `Reativar ${r.nome}`}
+                    title={r.ativa ? "Desativar" : "Reativar"}
+                    className={`grid place-items-center h-11 w-11 rounded-full hover:bg-[var(--hover)] ${
+                      r.ativa ? "text-muted" : "text-brand-500"
+                    }`}
                   >
-                    <MessageCircle />
-                  </a>
-                )}
+                    <Power size={18} />
+                  </button>
+                </div>
               </div>
 
               {/* meta mensal */}
@@ -197,8 +252,13 @@ function Revendedoras() {
                       "Sem meta definida"
                     )}
                   </span>
-                  <button onClick={() => editarMeta(r.id, r.metaMensal)} className="text-brand-500">
-                    <Pencil size={13} />
+                  <button
+                    type="button"
+                    onClick={() => editarMeta(r.id, r.metaMensal)}
+                    aria-label="Editar meta do mês"
+                    className="grid place-items-center h-11 w-11 -my-3 -mr-3 rounded-full text-brand-500 hover:bg-[var(--hover)]"
+                  >
+                    <Pencil size={14} />
                   </button>
                 </div>
                 {r.metaMensal > 0 && (
@@ -241,14 +301,7 @@ function Revendedoras() {
       )}
 
       {aberto && (
-        <div className="fixed inset-0 !mt-0 bg-black/40 z-40 flex items-end md:items-center justify-center">
-          <div className="surface w-full max-w-md rounded-t-3xl md:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">Nova revendedora</h2>
-              <button onClick={() => setAberto(false)}>
-                <X />
-              </button>
-            </div>
+        <Modal onClose={() => setAberto(false)} titulo="Nova revendedora">
             <div>
               <label className="label">Nome</label>
               <input className="input" value={nome} onChange={(e) => setNome(e.target.value)} />
@@ -298,8 +351,7 @@ function Revendedoras() {
             <button onClick={salvar} className="btn-primary w-full">
               Salvar
             </button>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
@@ -312,9 +364,9 @@ function AcessoRevendedora({
   r: Revendedora;
   onUpdate: (id: string, patch: Partial<Revendedora>) => Promise<Resultado>;
 }) {
-  const { liberarAcessoRevendedora, revogarAcessoRevendedora } = useStore();
+  const { liberarAcessoRevendedora } = useStore();
   const nomeLoja = useStore((s) => s.config.nomeLoja);
-  const { alerta } = useDialog();
+  const { alerta, confirm } = useDialog();
   const [editando, setEditando] = useState(!r.email);
   const [email, setEmail] = useState(r.email ?? "");
   const [salvando, setSalvando] = useState(false);
@@ -345,9 +397,28 @@ function AcessoRevendedora({
     setCopiado(false);
   }
 
+  // Pede confirmação e mostra o erro se o banco recusar. Chama a RPC direto
+  // (o revogarAcessoRevendedora do store engole o erro) e só então atualiza a lista.
   async function revogar() {
+    const ok = await confirm({
+      titulo: "Cancelar liberação?",
+      mensagem: `O código enviado para ${r.nome} deixa de funcionar. Você pode liberar de novo depois para gerar outro.`,
+      confirmar: "Cancelar liberação",
+      cancelar: "Manter",
+      perigo: true,
+    });
+    if (!ok) return;
+    setLiberando(true);
+    const { error } = await createClient().rpc("revogar_revendedora", { p_id: r.id });
+    setLiberando(false);
+    if (error) {
+      alerta({ titulo: "Não foi possível cancelar a liberação", mensagem: "Tente novamente em instantes." });
+      return;
+    }
     setCodigo(null);
-    await revogarAcessoRevendedora(r.id);
+    useStore.setState((s) => ({
+      revendedoras: s.revendedoras.map((x) => (x.id === r.id ? { ...x, acessoLiberado: false } : x)),
+    }));
   }
 
   // link com e-mail e código já preenchidos: ela só toca e cria a senha
@@ -364,7 +435,12 @@ function AcessoRevendedora({
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch {
-      /* clipboard indisponível: o código segue visível para copiar à mão */
+      // clipboard indisponível (http, permissão negada): mostra o texto para copiar à mão
+      alerta({
+        titulo: "Copie o convite",
+        mensagem: `Não deu para copiar automaticamente. Selecione e copie o texto abaixo:\n\n${mensagem}`,
+        ok: "Fechar",
+      });
     }
   }
 
@@ -392,7 +468,12 @@ function AcessoRevendedora({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <button onClick={salvarEmail} disabled={salvando} className="btn-primary px-3 py-2 text-sm">
+          <button
+            onClick={salvarEmail}
+            disabled={salvando}
+            aria-label="Salvar e-mail"
+            className="btn-primary px-3 py-2 text-sm min-w-[44px] min-h-[44px]"
+          >
             {salvando ? "…" : <Check size={15} />}
           </button>
         </div>
@@ -401,8 +482,13 @@ function AcessoRevendedora({
           <span className="flex items-center gap-1.5 text-muted truncate">
             <Mail size={13} /> {r.email}
           </span>
-          <button onClick={() => setEditando(true)} className="text-brand-500 text-xs">
-            <Pencil size={13} />
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            aria-label="Editar e-mail"
+            className="grid place-items-center h-11 w-11 -my-3 -mr-3 shrink-0 rounded-full text-brand-500 hover:bg-[var(--hover)]"
+          >
+            <Pencil size={14} />
           </button>
         </div>
       )}
@@ -415,7 +501,7 @@ function AcessoRevendedora({
             r.acessoLiberado ? "surface-alt text-muted" : "btn-primary"
           }`}
         >
-          {liberando ? "Gerando…" : r.acessoLiberado ? "Cancelar liberação" : "Liberar acesso (gerar código)"}
+          {liberando ? (r.acessoLiberado ? "Cancelando…" : "Gerando…") : r.acessoLiberado ? "Cancelar liberação" : "Liberar acesso (gerar código)"}
         </button>
       )}
 
@@ -434,7 +520,7 @@ function AcessoRevendedora({
               <MessageCircle size={15} /> WhatsApp
             </a>
             <button onClick={copiar} className="btn-ghost py-2 text-sm flex items-center justify-center gap-1.5 whitespace-nowrap">
-              {copiado ? <Check size={15} /> : <Link2 size={15} />} {copiado ? "Copiado" : "Copiar link"}
+              {copiado ? <Check size={15} /> : <Link2 size={15} />} {copiado ? "Copiado" : "Copiar convite"}
             </button>
           </div>
           <p className="text-[11px] text-muted">
