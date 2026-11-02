@@ -4,6 +4,11 @@
 const TIPOS_OK = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const TAMANHO_MAX = 5 * 1024 * 1024; // 5 MB
 
+// extensão do arquivo salvo vem do TIPO validado, não do nome (que o usuário controla)
+export function extensaoDaImagem(file: File): string {
+  return { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" }[file.type] ?? "jpg";
+}
+
 export function validarImagem(file: File): void {
   if (!TIPOS_OK.includes(file.type))
     throw new Error("Formato não suportado. Use JPG, PNG, WEBP ou GIF.");

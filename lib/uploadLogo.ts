@@ -1,12 +1,12 @@
 import { createClient } from "./supabase/client";
-import { validarImagem } from "./imagem";
+import { extensaoDaImagem, validarImagem } from "./imagem";
 
 // Faz upload de uma imagem para o bucket "lojas" na pasta da org (nome fixo por
 // tipo, com upsert) e devolve a URL pública com cache-buster.
 async function uploadImagemLoja(orgId: string, file: File, base: string): Promise<string> {
   validarImagem(file);
   const supabase = createClient();
-  const ext = (file.name.split(".").pop() || "png").toLowerCase();
+  const ext = extensaoDaImagem(file);
   const path = `${orgId}/${base}.${ext}`;
 
   const { error } = await supabase.storage.from("lojas").upload(path, file, {
