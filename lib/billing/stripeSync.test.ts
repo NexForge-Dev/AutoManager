@@ -172,6 +172,24 @@ describe("tratarEventoStripe", () => {
     expect(pedido).toBe("sub_x");
   });
 
+  it("checkout abandonado que expira (incomplete_expired) não derruba o teste grátis", async () => {
+    const r = await tratarEventoStripe(evento("customer.subscription.updated", { id: "sub_novo" }), mem.store, async () =>
+      sub({ status: "incomplete_expired" })
+    );
+    expect(r.resultado).toBe("ignorado_substituida");
+    expect(mem.gravacoes).toHaveLength(0);
+    expect(mem.assinaturas["org-1"].status).toBe("trialing");
+  });
+
+  it("cancelamento da assinatura gravada na org é aplicado", async () => {
+    mem.assinaturas["org-1"] = { plano: "equipe", status: "active", providerAssinaturaId: "sub_novo" };
+    const r = await tratarEventoStripe(evento("customer.subscription.deleted", { id: "sub_novo" }), mem.store, async () =>
+      sub({ status: "canceled" })
+    );
+    expect(r.resultado).toBe("sincronizada");
+    expect(mem.gravacoes[0].dados.status).toBe("canceled");
+  });
+
   it("primeiro pagamento pendente (incomplete) não altera nada", async () => {
     const r = await tratarEventoStripe(evento("customer.subscription.created", { id: "sub_novo" }), mem.store, async () =>
       sub({ status: "incomplete" })

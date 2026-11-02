@@ -141,8 +141,11 @@ async function sincronizar(
   if (!atual) return { resultado: "ignorado_sem_org", orgId };
 
   const outra = atual.providerAssinaturaId && atual.providerAssinaturaId !== sub.id ? atual.providerAssinaturaId : null;
-  // evento de uma assinatura antiga encerrada: não mexe na assinatura viva atual
-  if (outra && VIVOS.includes(atual.status) && !VIVOS.includes(status)) {
+  // Assinatura encerrada que NÃO é a gravada na org não muda nada: ou é uma antiga já
+  // substituída, ou nunca chegou a valer (checkout com 1º pagamento não concluído que
+  // expirou: incomplete_expired). Sem isso, um boleto/3DS abandonado durante o teste
+  // grátis gravava "canceled" e derrubava a loja para o piso no meio do trial.
+  if (atual.providerAssinaturaId !== sub.id && !VIVOS.includes(status)) {
     return { resultado: "ignorado_substituida", orgId, plano };
   }
 
