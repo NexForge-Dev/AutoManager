@@ -177,7 +177,9 @@ begin
       ('chamado',     'chamado_tipo_valido',        $c$tipo in ('erro', 'duvida', 'sugestao')$c$),
       ('chamado',     'chamado_status_valido',      $c$status in ('aberto', 'resolvido')$c$),
       ('chamado',     'chamado_assunto_len',        $c$char_length(assunto) between 1 and 200$c$),
-      ('chamado',     'chamado_mensagem_len',       $c$char_length(mensagem) between 1 and 4000$c$)
+      ('chamado',     'chamado_mensagem_len',       $c$char_length(mensagem) between 1 and 4000$c$),
+      -- canais do app (lib/types.ts Canal); as RPCs de venda aceitavam qualquer texto
+      ('venda',       'venda_canal_valido',         $c$canal in ('loja', 'whatsapp', 'instagram')$c$)
     ) as t(tabela, nome, expr)
   loop
     if not exists (select 1 from pg_constraint where conname = c.nome) then

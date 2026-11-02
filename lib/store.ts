@@ -387,6 +387,7 @@ function erroAmigavel(msg: string | undefined): string {
   // regras do banco (migrations 0041/0042)
   if (/plano_sem_vendedores/.test(m))
     return "Seu acesso de vendedor está pausado pelo plano atual da loja. Fale com o dono.";
+  if (/venda_canal_valido/.test(m)) return "Canal de venda inválido.";
   if (/canal_invalido|_len"/.test(m)) return "Texto muito longo. Encurte e tente de novo.";
   if (/preco_nao_negativo|valor_positivo|taxa_nao_negativa/.test(m)) return "Informe um valor maior ou igual a zero.";
   if (/comissao_faixa|comissao_padrao_faixa/.test(m)) return "A comissão precisa ficar entre 0% e 100%.";
