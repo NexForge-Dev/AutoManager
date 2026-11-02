@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Plus, Minus } from "lucide-react";
+import { PLANOS, brlPreco } from "@/lib/plans";
+
+// preços vêm de lib/plans.ts (fonte única): o FAQ não fica desatualizado quando o preço muda
+const preco = (id: keyof typeof PLANOS) => brlPreco(PLANOS[id].precoCentavos);
 
 const PERGUNTAS: { q: string; a: string }[] = [
   {
@@ -18,7 +22,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "Preciso entender de tecnologia para usar?",
-    a: "Não. Se você usa WhatsApp, você usa o AutoManager. O cadastro inicial é guiado por 4 perguntas e o sistema monta sua loja sozinho. Dá pra registrar a primeira venda em poucos minutos.",
+    a: "Não. Se você usa WhatsApp, você usa o AutoManager. O cadastro inicial é guiado passo a passo e o sistema monta sua loja sozinho. Dá pra registrar a primeira venda em poucos minutos.",
   },
   {
     q: "Meus dados ficam seguros?",
@@ -26,7 +30,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "Posso importar meus produtos que já estão na planilha?",
-    a: "Pode. Você cadastra rápido pela tela ou nos ajuda a importar sua lista. Marca, preço de custo, preço de venda, fotos e variações (cor, tamanho, grade) entram sem retrabalho.",
+    a: "Pode. Em Estoque › Importar você envia a planilha (CSV, pode salvar direto do Excel) com nome, categoria, custo, preço, estoque, SKU e marca. Fotos e variações (cor, tamanho, grade) você completa depois na tela de cada produto.",
   },
   {
     q: "E se eu vendo no caderno hoje, perco meu histórico?",
@@ -38,7 +42,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "E se eu não tenho revendedora, só vendo sozinha ou na rua?",
-    a: "Funciona igual. Quem vende na rua usa o plano AMBULANTE (R$20/mês): controle de estoque, lojinha virtual, chat e relatórios, sem revendedoras nem entregas. Quer crescer com equipe? Sobe para SOLO ou EQUIPE em um clique.",
+    a: `Funciona igual. Quem vende na rua usa o plano AMBULANTE (${preco("ambulante")}/mês): controle de estoque, lojinha virtual, chat e relatórios, sem revendedoras nem entregas. Quer crescer com equipe? Sobe para SOLO ou EQUIPE em um clique.`,
   },
   {
     q: "A comissão é calculada sozinha mesmo?",
@@ -46,7 +50,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "Consigo ver quanto realmente lucro em cada produto?",
-    a: "Consegue. Como você cadastra o preço de custo e o de venda, o relatório mostra a margem real - por produto, por canal e por período. Você descobre o que dá lucro e o que só ocupa espaço.",
+    a: "Consegue. Como você cadastra o preço de custo e o de venda, o estoque mostra a margem de cada produto e os relatórios mostram o lucro real do período (já descontando custo e comissões). Você descobre o que dá lucro e o que só ocupa espaço.",
   },
   {
     q: "Tem loja online / vitrine para os clientes?",
@@ -70,7 +74,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "Quanto custa? Tem taxa escondida?",
-    a: "Os planos são AMBULANTE R$20, SOLO R$49, EQUIPE R$99 e EXPANSÃO R$199 por mês. Preço fechado, sem taxa por venda e sem surpresa na fatura. Você começa com teste grátis antes de pagar qualquer coisa.",
+    a: `Os planos são AMBULANTE ${preco("ambulante")}, SOLO ${preco("solo")}, EQUIPE ${preco("equipe")} e EXPANSÃO ${preco("expansao")} por mês. Preço fechado, sem taxa por venda e sem surpresa na fatura. Você começa com teste grátis antes de pagar qualquer coisa.`,
   },
   {
     q: "Preciso colocar cartão para testar?",
@@ -94,7 +98,7 @@ const PERGUNTAS: { q: string; a: string }[] = [
   },
   {
     q: "É caro? Cabe no bolso de quem está começando?",
-    a: "Foi pensado justamente para quem não pode pagar caro por um sistema. Começa grátis e o plano de entrada é R$20/mês (AMBULANTE) - bem menos do que você perde por mês com produto parado e venda esquecida.",
+    a: `Foi pensado justamente para quem não pode pagar caro por um sistema. Começa grátis e o plano de entrada é ${preco("ambulante")}/mês (AMBULANTE) - bem menos do que você perde por mês com produto parado e venda esquecida.`,
   },
   {
     q: "E se eu crescer? O sistema acompanha?",

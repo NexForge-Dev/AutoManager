@@ -77,9 +77,9 @@ const SEGMENTOS = ["Semijoias", "Roupas", "Cosméticos", "Doces", "Bijuterias", 
 
 const DORES = [
   { p: "Produto acabou e você só viu quando o cliente pediu.", s: "Alerta de estoque baixo antes de faltar — você repõe a tempo." },
-  { p: "Cliente pagou e você esqueceu de registrar.", s: "Recebimentos e fiado anotados no automático. Nada se perde." },
+  { p: "Cliente pagou e você esqueceu de registrar.", s: "Fiado e vendas a receber anotados na hora, com a lista do que falta cobrar." },
   { p: "Comissão calculada de cabeça — e quase sempre errada.", s: "Comissão exata por venda, sem calculadora e sem briga." },
-  { p: "Dinheiro entrando e você sem saber se deu lucro.", s: "Lucro real por produto, por canal e por período." },
+  { p: "Dinheiro entrando e você sem saber se deu lucro.", s: "Lucro real do período e margem de cada produto." },
   { p: "Tudo espalhado entre caderno, WhatsApp e planilha.", s: "Um painel só, no seu celular, sempre atualizado." },
   { p: "Revendedora vendendo e você sem saber quanto deve.", s: "Cada uma com login próprio; você acompanha em tempo real." },
 ];
@@ -88,7 +88,7 @@ const BENEFICIOS = [
   { icon: Boxes, t: "Nunca mais perca venda por falta de estoque", d: "O estoque baixa sozinho a cada venda e te avisa quando algo está acabando." },
   { icon: Timer, t: "Registre a venda em segundos", d: "No balcão ou pelo WhatsApp, com fiado e parcelas — em 1 toque." },
   { icon: Wallet, t: "Comissão certa, no automático", d: "Defina o percentual uma vez. O sistema calcula e mostra quanto pagar." },
-  { icon: LineChart, t: "Saiba o lucro real, sem achismo", d: "Relatório por produto, canal e período. Descubra o que dá retorno." },
+  { icon: LineChart, t: "Saiba o lucro real, sem achismo", d: "Lucro por período, margem de cada produto e vendas por canal. Descubra o que dá retorno." },
   { icon: Store, t: "Uma loja online pronta", d: "Vitrine com link próprio pra mandar no Insta e no Zap, com chat." },
   { icon: Users, t: "Sua equipe vendendo, você no controle", d: "Revendedoras com acesso próprio, vendendo pelo celular delas." },
 ];
