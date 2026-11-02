@@ -314,7 +314,7 @@ interface State {
     parcelas?: number;
     desconto?: number;
     fiado?: boolean;
-  }) => Promise<Venda | null>;
+  }) => Promise<{ venda: Venda | null; erro?: string }>;
   // marca como paga SÓ as vendas informadas (as que a tela somou/mostrou)
   marcarComissaoPaga: (revendedoraId: string, vendaIds: string[]) => Promise<Resultado>;
   marcarVendaRecebida: (vendaId: string) => Promise<Resultado>;
@@ -1357,14 +1357,15 @@ export const useStore = create<State>()((set, get) => {
       // valida estoque (por variação quando houver)
       for (const it of itens) {
         const prod = s.produtos.find((p) => p.id === it.produtoId);
-        if (!prod) return null;
+        if (!prod) return { venda: null, erro: "Um produto do carrinho não existe mais. Atualize a página." };
         if (it.variacaoId) {
           const v = prod.variacoes.find((x) => x.id === it.variacaoId);
-          if (!v || v.estoqueAtual < it.qtd) return null;
+          if (!v) return { venda: null, erro: `A variação escolhida de "${prod.nome}" não existe mais.` };
+          if (v.estoqueAtual < it.qtd) return { venda: null, erro: `Estoque insuficiente de "${prod.nome} - ${v.nome}".` };
         } else if (prod.variacoes.length > 0) {
-          return null; // produto com grade exige escolher variação
+          return { venda: null, erro: `"${prod.nome}" tem variações: escolha a variação.` };
         } else if (prod.estoqueAtual < it.qtd) {
-          return null;
+          return { venda: null, erro: `Estoque insuficiente de "${prod.nome}".` };
         }
       }
 
@@ -1437,7 +1438,7 @@ export const useStore = create<State>()((set, get) => {
         }),
       }));
 
-      if (!orgId) return venda;
+      if (!orgId) return { venda };
 
       // Tudo numa transação atômica no banco (valida estoque, grava venda+itens,
       // baixa estoque relativo e movimentos). O id vem do cliente p/ casar com o otimista.
@@ -1470,7 +1471,7 @@ export const useStore = create<State>()((set, get) => {
         }));
         // o cache pode estar velho (ex.: sem_estoque por venda em paralelo): ressincroniza
         void recarregarProdutos([...afetados]);
-        return null;
+        return { venda: null, erro: erroAmigavel(error.message) };
       }
 
       registrarMetrica({ tipo: "recurso", recurso: revendedoraId ? "venda_revendedora" : "venda_registrada" });
@@ -1490,7 +1491,7 @@ export const useStore = create<State>()((set, get) => {
       // estoque real (outras vendas podem ter baixado as mesmas peças)
       void recarregarProdutos([...baixaPorProduto.keys()]);
 
-      return confirmada;
+      return { venda: confirmada };
     },
 
     // Paga SÓ as vendas que a tela somou (ids explícitos). Antes marcava todas

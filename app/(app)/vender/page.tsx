@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
@@ -60,7 +60,8 @@ function Vender() {
 
   // estoque disponível de uma linha (produto simples ou variação)
   function estoqueLinha(pid: string, vid?: string | null) {
-    const prod = produtos.find((p) => p.id === pid)!;
+    const prod = produtos.find((p) => p.id === pid);
+    if (!prod) return 0;
     if (vid) return prod.variacoes.find((v) => v.id === vid)?.estoqueAtual ?? 0;
     return prod.estoqueAtual;
   }
@@ -84,22 +85,36 @@ function Vender() {
     });
   }
 
-  const itens = Object.entries(cart).map(([k, qtd]) => ({ ...parseKey(k), qtd }));
-  const bruto = itens.reduce((a, it) => {
-    const p = produtos.find((x) => x.id === it.produtoId)!;
-    const v = it.variacaoId ? p.variacoes.find((x) => x.id === it.variacaoId) : null;
-    return a + (p.precoVenda + (v ? v.precoAjuste : 0)) * it.qtd;
-  }, 0);
-  const desconto = Math.min(Math.max(parseNumero(descontoStr) || 0, 0), bruto);
-  const total = bruto - desconto;
+  // produto que sumiu do estoque (desativado/excluído em outra aba) sai do carrinho
+  const itens = Object.entries(cart)
+    .map(([k, qtd]) => ({ ...parseKey(k), qtd }))
+    .filter((it) => produtos.some((p) => p.id === it.produtoId && p.ativo));
+  const centavos = (n: number) => Math.round(n * 100) / 100;
+  const bruto = centavos(
+    itens.reduce((a, it) => {
+      const p = produtos.find((x) => x.id === it.produtoId)!;
+      const v = it.variacaoId ? p.variacoes.find((x) => x.id === it.variacaoId) : null;
+      return a + (p.precoVenda + (v ? v.precoAjuste : 0)) * it.qtd;
+    }, 0)
+  );
+  const desconto = centavos(Math.min(Math.max(parseNumero(descontoStr) || 0, 0), bruto));
+  const total = centavos(bruto - desconto);
   const rev = revendedoras.find((r) => r.id === revId);
-  const comissao = rev ? (total * rev.comissaoPercent) / 100 : 0;
+  const comissao = rev ? centavos((total * rev.comissaoPercent) / 100) : 0;
+  // canais ligados em Configurações (vazio = todos)
+  const canaisLoja = CANAIS.filter((c) => config.canais.includes(c.id));
+  const canaisVisiveis = canaisLoja.length > 0 ? canaisLoja : CANAIS;
+
+  const timerSucesso = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timerSucesso.current) clearTimeout(timerSucesso.current);
+  }, []);
 
   async function finalizar() {
     if (itens.length === 0 || registrando) return; // trava duplo clique
     setRegistrando(true);
     try {
-      const v = await registrarVenda({
+      const { venda: v, erro } = await registrarVenda({
         itens,
         canal,
         revendedoraId: revId || null,
@@ -111,7 +126,7 @@ function Vender() {
       if (!v) {
         await alerta({
           titulo: "Não foi possível registrar a venda",
-          mensagem: "Verifique o estoque e tente novamente.",
+          mensagem: erro || "Verifique o estoque e tente novamente.",
         });
         return;
       }
@@ -121,7 +136,8 @@ function Vender() {
       setDescontoStr("");
       setParcelas(1);
       setFiado(false);
-      setTimeout(() => setSucesso(null), 2500);
+      if (timerSucesso.current) clearTimeout(timerSucesso.current);
+      timerSucesso.current = setTimeout(() => setSucesso(null), 2500);
     } finally {
       setRegistrando(false);
     }
@@ -228,7 +244,7 @@ function Vender() {
             <div id="vender-opcoes" className={`${opcoesAbertas ? "" : "hidden"} md:block space-y-3`}>
             {/* canal */}
             <div className="flex gap-2 flex-wrap" role="group" aria-label="Canal da venda">
-              {CANAIS.map((c) => (
+              {canaisVisiveis.map((c) => (
                 <button
                   type="button"
                   key={c.id}
@@ -267,8 +283,9 @@ function Vender() {
             {/* parcelas (só no crédito) */}
             {forma === "credito" && (
               <div>
-                <label className="label">Parcelas no cartão</label>
+                <label className="label" htmlFor="venda-parcelas">Parcelas no cartão</label>
                 <select
+                  id="venda-parcelas"
                   className="input py-2"
                   value={parcelas}
                   onChange={(e) => setParcelas(Number(e.target.value))}
@@ -285,6 +302,7 @@ function Vender() {
             {config.usaRevendedoras && revendedoras.length > 0 && (
               <select
                 className="input"
+                aria-label="Revendedora da venda"
                 value={revId}
                 onChange={(e) => setRevId(e.target.value)}
               >
@@ -300,8 +318,9 @@ function Vender() {
             {/* desconto + fiado */}
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <label className="label">Desconto (R$)</label>
+                <label className="label" htmlFor="venda-desconto">Desconto (R$)</label>
                 <input
+                  id="venda-desconto"
                   className="input py-2"
                   inputMode="decimal"
                   placeholder="0,00"
@@ -347,7 +366,10 @@ function Vender() {
       )}
 
       {sucesso && (
-        <div className="modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm px-5">
+        <div
+          onClick={() => setSucesso(null)}
+          className="modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm px-5"
+        >
           <div role="status" aria-live="polite" className="modal-panel surface shadow-pop rounded-3xl p-8 text-center space-y-2">
             <div className="text-5xl ob-anim-pop">🎉</div>
             <div className="text-xl font-bold">Venda registrada!</div>
