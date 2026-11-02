@@ -224,7 +224,7 @@ function Painel() {
           <div className="space-y-2 stagger">
             {m.rankingRevendedoras.map((r, i) => (
               // nomes podem repetir (homônimas, "-" de revendedora removida): posição + nome
-              <div key={`${i}-${r.nome}`} className="flex items-center justify-between gap-2">
+              <div key={r.id ?? `${i}-${r.nome}`} className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 min-w-0">
                   <span className="text-muted w-5 shrink-0">{i + 1}º</span>
                   <span className="font-medium truncate">{r.nome}</span>
