@@ -12,8 +12,8 @@
 import Stripe from "stripe";
 import { createClient as createAdmin, type SupabaseClient } from "@supabase/supabase-js";
 import { PLANOS, type PlanoId } from "./plans";
-import { PREFIXO_LOOKUP, type BillingStore, type ResultadoEvento } from "./billing/stripeSync";
-import { propsPlano, registrarEvento } from "./metricas/servidor";
+import { PREFIXO_LOOKUP, metricaCobranca, type BillingStore, type ResultadoEvento } from "./billing/stripeSync";
+import { registrarEvento } from "./metricas/servidor";
 
 let cliente: Stripe | null = null;
 
@@ -122,24 +122,13 @@ export async function posSincronizar(r: ResultadoEvento, chave: string, estrito 
     }
   }
 
-  if (r.pagamentoFalhou) {
-    registrarEvento("payment_failed", r.orgId, {}, `recusa:${chave}`);
-    return;
-  }
+  const m = metricaCobranca(r, chave);
+  if (m) registrarEvento(m.evento, r.orgId, m.props, m.chave);
+}
 
-  const virouAtiva = r.status === "active" && r.statusAnterior !== "active";
-  if (r.status === "active" && r.statusAnterior === "active" && r.planoAnterior && r.planoAnterior !== r.plano) {
-    registrarEvento(
-      "plan_changed",
-      r.orgId,
-      { from_plan: r.planoAnterior, to_plan: r.plano, billing_period: "month", amount_cents: PLANOS[r.plano].precoCentavos },
-      `troca:${chave}`
-    );
-  } else if (virouAtiva) {
-    registrarEvento("plan_activated", r.orgId, propsPlano(r.plano), `ativa:${chave}`);
-  } else if (r.status === "canceled" && r.statusAnterior !== "canceled") {
-    registrarEvento("plan_canceled", r.orgId, { plan: r.plano }, `cancelada:${chave}`);
-  }
+// Lê a assinatura com a última fatura (amount_paid real, com cupom/desconto) para as métricas.
+export function lerAssinatura(id: string): Promise<Stripe.Subscription> {
+  return stripe().subscriptions.retrieve(id, { expand: ["latest_invoice"] });
 }
 
 // Sincronização disparada por nós (volta do checkout, troca de plano), não por um

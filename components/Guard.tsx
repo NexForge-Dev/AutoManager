@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { aplicarAparencia, aplicarFavicon, temaDoUsuario } from "@/lib/aparencia";
 import { homeDe, podeAcessar } from "@/lib/permissoes";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { registrarSessao } from "@/lib/metricas/cliente";
 import AppShell from "./AppShell";
 import { DialogProvider } from "./Dialog";
 import { Skeleton, SkeletonMetrics, SkeletonList } from "./Skeleton";
@@ -37,6 +38,13 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     if (jaMontado) return;
     if (!ready) hydrate();
   }, [jaMontado, ready, hydrate]);
+
+  // volta ao app já logado (sem passar pelo /login): também é session_started
+  // (uma vez por sessão do navegador; o login já marca, então não duplica)
+  useEffect(() => {
+    if (jaMontado || !ready || semOrg || !usuarioId) return;
+    registrarSessao(usuarioId);
+  }, [jaMontado, ready, semOrg, usuarioId]);
 
   useEffect(() => {
     if (jaMontado) return;

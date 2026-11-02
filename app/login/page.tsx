@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
-import { registrarMetrica } from "@/lib/metricas/cliente";
+import { registrarMetrica, registrarSessao } from "@/lib/metricas/cliente";
 import { planoValido } from "@/lib/plans";
 import { Gem, Loader2, KeyRound } from "lucide-react";
 
@@ -119,7 +119,7 @@ export default function LoginPage() {
         return;
       }
 
-      registrarMetrica({ tipo: "sessao" });
+      registrarSessao(session.user.id);
       router.replace(await destinoPosLogin());
     } catch (err: any) {
       setErro(traduzErro(err?.message || "Erro ao autenticar"));

@@ -70,6 +70,55 @@ export interface ResultadoEvento {
   assinaturaId?: string;
   clienteId?: string;
   criadaEm?: number; // unix (s)
+  // ---- métricas (Painel NexForge): valor REAL cobrado, não o preço de tabela ----
+  precoCentavos?: number; // preço recorrente do item (unit_amount)
+  emTrialStripe?: boolean; // assinatura em trial no Stripe (assinou durante o teste grátis)
+  valorPagoCentavos?: number | null; // amount_paid da última fatura (com cupom/desconto), se disponível
+  // evento invoice.paid: 1ª cobrança depois do trial (é aí que a assinatura "paga" de verdade)
+  primeiraCobrancaPosTrial?: { valorCentavos: number } | null;
+}
+
+export interface MetricaCobranca {
+  evento: "plan_activated" | "plan_changed" | "plan_canceled" | "payment_failed";
+  props: Record<string, string | number>;
+  chave: string;
+}
+
+/**
+ * Qual métrica de cobrança enviar ao Painel NexForge (EVENTS.md) para uma sincronização.
+ * - plan_activated leva o valor efetivamente cobrado (amount_paid da fatura, com cupom),
+ *   e só quando há cobrança: quem assina durante o teste grátis (trial no Stripe) só
+ *   "ativa" na 1ª fatura paga depois do trial.
+ * - chave de plan_activated = assinatura: confirmação e webhook não contam duas vezes.
+ */
+export function metricaCobranca(r: ResultadoEvento, chave: string): MetricaCobranca | null {
+  if (r.resultado !== "sincronizada" || !r.plano) return null;
+  if (r.pagamentoFalhou) return { evento: "payment_failed", props: {}, chave: `recusa:${chave}` };
+  const id = r.assinaturaId ?? chave;
+  const ativar = (valor: number) => ({
+    evento: "plan_activated" as const,
+    props: { plan: r.plano!, billing_period: "month", amount_cents: valor, currency: "BRL" },
+    chave: `ativa:${id}`,
+  });
+  if (r.primeiraCobrancaPosTrial && r.status === "active") return ativar(r.primeiraCobrancaPosTrial.valorCentavos);
+  if (r.status === "active" && r.statusAnterior === "active" && r.planoAnterior && r.planoAnterior !== r.plano)
+    return {
+      evento: "plan_changed",
+      props: {
+        from_plan: r.planoAnterior,
+        to_plan: r.plano,
+        billing_period: "month",
+        amount_cents: r.precoCentavos ?? PLANOS[r.plano].precoCentavos,
+      },
+      chave: `troca:${chave}`,
+    };
+  if (r.status === "active" && r.statusAnterior !== "active") {
+    if (r.emTrialStripe) return null; // ainda não cobrou nada: ativa na 1ª fatura paga
+    return ativar(r.valorPagoCentavos ?? r.precoCentavos ?? PLANOS[r.plano].precoCentavos);
+  }
+  if (r.status === "canceled" && r.statusAnterior !== "canceled")
+    return { evento: "plan_canceled", props: { plan: r.plano }, chave: `cancelada:${chave}` };
+  return null;
 }
 
 const VIVOS: StatusAssinatura[] = ["active", "past_due"];
@@ -129,6 +178,13 @@ export function statusInterno(s: Stripe.Subscription.Status): StatusAssinatura |
     default:
       return null; // incomplete
   }
+}
+
+// amount_paid da última fatura quando ela veio expandida (retrieve com expand latest_invoice)
+function valorPago(sub: Stripe.Subscription): number | null {
+  const inv = (sub as any).latest_invoice;
+  if (!inv || typeof inv === "string") return null;
+  return inv.status === "paid" && typeof inv.amount_paid === "number" ? inv.amount_paid : null;
 }
 
 function idDe(x: string | { id: string } | null | undefined): string | null {
@@ -200,6 +256,9 @@ async function sincronizar(
     assinaturaId: sub.id,
     clienteId: customerId || undefined,
     criadaEm: sub.created,
+    precoCentavos: item?.price?.unit_amount ?? PLANOS[plano].precoCentavos,
+    emTrialStripe: sub.status === "trialing",
+    valorPagoCentavos: valorPago(sub),
   };
 }
 
@@ -235,6 +294,15 @@ export async function tratarEventoStripe(
       const subId = assinaturaDaInvoice(obj);
       if (subId) r = await sincronizar(subId, store, fetchSubscription);
       if (event.type === "invoice.payment_failed" && r.resultado === "sincronizada") r.pagamentoFalhou = true;
+      if (event.type === "invoice.paid" && r.resultado === "sincronizada" && subId) {
+        // 1ª fatura paga depois do trial do Stripe (assinou durante o teste grátis)
+        const sub = await fetchSubscription(subId);
+        const fimTrial = sub.trial_end ?? null;
+        const pago = typeof obj?.amount_paid === "number" ? obj.amount_paid : 0;
+        const perto = (t: unknown) => typeof t === "number" && fimTrial !== null && Math.abs(t - fimTrial) < 3600;
+        if (pago > 0 && fimTrial && obj?.billing_reason === "subscription_cycle" && (perto(obj.period_end) || perto(obj.period_start)))
+          r.primeiraCobrancaPosTrial = { valorCentavos: pago };
+      }
       break;
     }
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { enviarMetricas } from "@/lib/metricas/servidor";
-import { adminClient, posSincronizar, stripe, supabaseBillingStore } from "@/lib/stripe";
+import { adminClient, lerAssinatura, posSincronizar, stripe, supabaseBillingStore } from "@/lib/stripe";
 import { tratarEventoStripe } from "@/lib/billing/stripeSync";
 
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const r = await tratarEventoStripe(
       evento,
       supabaseBillingStore(adminClient()),
-      (id) => stripe().subscriptions.retrieve(id),
+      lerAssinatura,
       (res) => posSincronizar(res, evento.id, true)
     );
     await enviarMetricas();

@@ -7,6 +7,7 @@ import {
   appUrl,
   assinaturaVivaDaOrg,
   clienteDaOrg,
+  lerAssinatura,
   posSincronizar,
   precoDoPlano,
   semIdempotencia,
@@ -31,6 +32,10 @@ export async function POST(req: Request) {
   if (!planoValido(plano)) return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
   if (!dono.email) return NextResponse.json({ erro: "Sua conta não tem e-mail para o pagamento." }, { status: 400 });
 
+  // plano escolhido (EVENTS.md): conta ANTES de qualquer chamada ao Stripe, que pode
+  // falhar; o envio acontece em todos os caminhos de resposta (ver finally)
+  registrarEvento("plan_selected", dono.orgId, { plan: plano, billing_period: "month" });
+
   try {
     const admin = adminClient();
 
@@ -51,7 +56,6 @@ export async function POST(req: Request) {
       );
 
     const preco = await precoDoPlano(plano);
-    registrarEvento("plan_selected", dono.orgId, { plan: plano, billing_period: "month" });
 
     const customer = await clienteDaOrg(admin, dono.orgId, dono.email);
     // fonte da verdade é o Stripe: pega também assinatura criada por outra aba/sessão
@@ -70,7 +74,6 @@ export async function POST(req: Request) {
         );
       const item = viva.items.data[0];
       if (item?.price.id === preco.id) {
-        await enviarMetricas();
         return NextResponse.json({ atualizado: true, plano });
       }
       // always_invoice cobra a diferença agora; pending_if_incomplete só aplica a troca
@@ -81,7 +84,6 @@ export async function POST(req: Request) {
         payment_behavior: "pending_if_incomplete",
       });
       if (atualizada.pending_update) {
-        await enviarMetricas();
         return NextResponse.json(
           { erro: "Não conseguimos cobrar a diferença do novo plano. Atualize o cartão em Gerenciar pagamento e tente de novo.", portal: true },
           { status: 402 }
@@ -91,10 +93,9 @@ export async function POST(req: Request) {
       const r = await tratarEventoStripe(
         { id: `troca:${viva.id}:${preco.id}`, type: "customer.subscription.updated", data: { object: { id: viva.id } } } as any,
         semIdempotencia(supabaseBillingStore(admin)),
-        (id) => stripe().subscriptions.retrieve(id)
+        lerAssinatura
       );
       await posSincronizar(r, `troca:${viva.id}:${preco.id}`);
-      await enviarMetricas();
       return NextResponse.json({ atualizado: true, plano: r.plano ?? plano });
     }
 
@@ -123,10 +124,13 @@ export async function POST(req: Request) {
     if (!sessao.url) return NextResponse.json({ erro: "O Stripe não retornou o link de pagamento." }, { status: 502 });
 
     registrarEvento("checkout_started", dono.orgId, { plan: plano, billing_period: "month" });
-    await enviarMetricas();
     return NextResponse.json({ url: sessao.url });
   } catch (e) {
     console.error("Falha ao iniciar assinatura Stripe", e);
     return NextResponse.json({ erro: "Não foi possível iniciar o pagamento agora. Tente novamente." }, { status: 502 });
+  } finally {
+    // envia o que ficou na fila (plan_selected, checkout_started, plan_changed...) também
+    // quando o Stripe falha ou a resposta é um 4xx; é idempotente (fila vazia = no-op)
+    await enviarMetricas();
   }
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { registrarSessao } from "@/lib/metricas/cliente";
 import { CheckCircle2, Gem, KeyRound, Loader2 } from "lucide-react";
 
 type Estado = "verificando" | "pronto" | "invalido" | "salvo";
@@ -158,6 +159,8 @@ export default function RedefinirSenhaPage() {
     }
     setSalvando(false);
     setEstado("salvo");
+    // a redefinição deixa a pessoa logada: é um início de sessão (login sem senha antiga)
+    registrarSessao(recuperacao.current);
     let destino = "/login?modo=entrar";
     try {
       destino = await destinoPosLogin();

@@ -8,7 +8,11 @@ const { precoDoPlano } = vi.hoisted(() => ({
 vi.mock("@/lib/donoDaOrg", () => ({
   donoDaOrg: async () => ({ userId: "u1", orgId: "o1", email: "dono@loja.com" }),
 }));
-vi.mock("@/lib/metricas/servidor", () => ({ registrarEvento: vi.fn(), enviarMetricas: vi.fn(async () => {}) }));
+const { registrarEvento, enviarMetricas } = vi.hoisted(() => ({
+  registrarEvento: vi.fn(),
+  enviarMetricas: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/metricas/servidor", () => ({ registrarEvento, enviarMetricas }));
 vi.mock("@/lib/billing/stripeSync", () => ({ tratarEventoStripe: vi.fn() }));
 vi.mock("@/lib/stripe", () => ({
   adminClient: () => ({
@@ -17,6 +21,7 @@ vi.mock("@/lib/stripe", () => ({
   appUrl: () => "http://localhost",
   assinaturaVivaDaOrg: vi.fn(),
   clienteDaOrg: vi.fn(),
+  lerAssinatura: vi.fn(),
   posSincronizar: vi.fn(),
   precoDoPlano,
   semIdempotencia: vi.fn(),
@@ -59,6 +64,15 @@ describe("POST /api/stripe/checkout — validação do plano", () => {
     // o dublê do Stripe lança: a rota responde o 502 genérico, mas passou da validação
     expect(res.status).toBe(502);
     expect(precoDoPlano).toHaveBeenCalledWith("equipe");
+  });
+
+  it("plan_selected é registrado e enviado mesmo quando o Stripe falha", async () => {
+    registrarEvento.mockClear();
+    enviarMetricas.mockClear();
+    const res = await POST(req('{"plano":"solo"}'));
+    expect(res.status).toBe(502);
+    expect(registrarEvento).toHaveBeenCalledWith("plan_selected", "o1", { plan: "solo", billing_period: "month" });
+    expect(enviarMetricas).toHaveBeenCalled();
   });
 });
 
