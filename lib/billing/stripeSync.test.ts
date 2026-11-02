@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type Stripe from "stripe";
-import { tratarEventoStripe, planoDaAssinatura, statusInterno, type BillingStore, type AssinaturaAtual, type GravarAssinatura } from "./stripeSync";
+import { tratarEventoStripe, planoDaAssinatura, statusInterno, trialEndParaCheckout, type BillingStore, type AssinaturaAtual, type GravarAssinatura } from "./stripeSync";
 
 // ---------------------------------------------------------------- dublês
 function memoriaStore(inicial: Record<string, AssinaturaAtual> = {}, clientes: Record<string, string> = {}) {
@@ -218,5 +218,20 @@ describe("tratarEventoStripe", () => {
   it("ignora checkout que não é de assinatura e eventos desconhecidos", async () => {
     expect((await tratarEventoStripe(evento("checkout.session.completed", { mode: "payment" }), mem.store, async () => sub())).resultado).toBe("ignorado");
     expect((await tratarEventoStripe(evento("charge.refunded", {}), mem.store, async () => sub())).resultado).toBe("ignorado");
+  });
+});
+
+describe("trialEndParaCheckout", () => {
+  const agora = Date.UTC(2026, 10, 2, 12);
+  const dias = (n: number) => new Date(agora + n * 86_400_000).toISOString();
+  it("teste vigente com mais de 48 h: a 1ª cobrança vai para o fim do teste", () => {
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: dias(20) }, agora)).toBe(Math.floor((agora + 20 * 86_400_000) / 1000));
+  });
+  it("menos de 48 h, teste vencido, assinatura paga ou sem linha: cobra já", () => {
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: dias(1) }, agora)).toBeNull();
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: dias(-3) }, agora)).toBeNull();
+    expect(trialEndParaCheckout({ status: "active", trial_ate: dias(20) }, agora)).toBeNull();
+    expect(trialEndParaCheckout({ status: "trialing", trial_ate: null }, agora)).toBeNull();
+    expect(trialEndParaCheckout(null, agora)).toBeNull();
   });
 });

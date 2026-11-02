@@ -70,6 +70,25 @@ export interface ResultadoEvento {
 
 const VIVOS: StatusAssinatura[] = ["active", "past_due"];
 
+// O Stripe Checkout só aceita trial_end pelo menos 48 h no futuro.
+const MIN_TRIAL_STRIPE_MS = 48 * 3600 * 1000;
+
+/**
+ * Quem assina DURANTE o teste grátis não perde o resto do "1º mês grátis": a
+ * assinatura nasce em trial no Stripe até o fim do teste interno e a 1ª cobrança
+ * acontece só nessa data. Devolve o trial_end (unix, segundos) ou null quando
+ * não há teste vigente (ou falta menos de 48 h: cobra já).
+ */
+export function trialEndParaCheckout(
+  atual: { status?: string | null; trial_ate?: string | null } | null | undefined,
+  agora = Date.now()
+): number | null {
+  if (!atual || atual.status !== "trialing" || !atual.trial_ate) return null;
+  const fim = new Date(atual.trial_ate).getTime();
+  if (!Number.isFinite(fim) || fim - agora < MIN_TRIAL_STRIPE_MS) return null;
+  return Math.floor(fim / 1000);
+}
+
 const iso = (unix: number | null | undefined) => (unix ? new Date(unix * 1000).toISOString() : null);
 
 function ehPlano(p: unknown): p is PlanoId {

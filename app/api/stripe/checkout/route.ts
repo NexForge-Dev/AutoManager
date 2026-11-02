@@ -13,7 +13,7 @@ import {
   stripe,
   supabaseBillingStore,
 } from "@/lib/stripe";
-import { tratarEventoStripe } from "@/lib/billing/stripeSync";
+import { tratarEventoStripe, trialEndParaCheckout } from "@/lib/billing/stripeSync";
 
 export const runtime = "nodejs";
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // assinatura antiga do Mercado Pago ainda ativa: assinar no Stripe cobraria em dobro
     const { data: atual } = await admin
       .from("assinatura")
-      .select("provider, provider_assinatura_id, status")
+      .select("provider, provider_assinatura_id, status, trial_ate")
       .eq("org_id", dono.orgId)
       .maybeSingle();
     if (atual?.provider === "mercadopago" && atual.provider_assinatura_id && atual.status !== "canceled")
@@ -103,13 +103,18 @@ export async function POST(req: Request) {
     for (const s of abertas.data) await stripe().checkout.sessions.expire(s.id).catch(() => {});
 
     const base = appUrl();
+    const trialEnd = trialEndParaCheckout(atual);
     const sessao = await stripe().checkout.sessions.create({
       mode: "subscription",
       customer,
       client_reference_id: dono.orgId,
       line_items: [{ price: preco.id, quantity: 1 }],
       metadata: { org_id: dono.orgId, plano },
-      subscription_data: { metadata: { org_id: dono.orgId, plano } },
+      subscription_data: {
+        metadata: { org_id: dono.orgId, plano },
+        // assinou durante o teste grátis: a 1ª cobrança fica para o fim do teste
+        ...(trialEnd ? { trial_end: trialEnd } : {}),
+      },
       locale: "pt-BR",
       allow_promotion_codes: true,
       success_url: `${base}/configuracoes/plano?checkout=sucesso&session_id={CHECKOUT_SESSION_ID}`,
