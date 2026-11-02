@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { capacidades, type Assinatura, type PlanoId, type StatusAssinatura } from "@/lib/plans";
 import { LIMITES_ATIVACAO, chaveLimite, ipDaRequisicao, todasDentroDoLimite } from "@/lib/rateLimit";
+import { emailValido, normalizarEmail, SENHA_MAX } from "@/lib/validacao";
 
 // Ativação self-service da revendedora: ela informa o e-mail que a loja liberou e
 // escolhe a própria senha no 1º acesso. Só funciona se o dono liberou o acesso
@@ -16,11 +17,13 @@ function admin() {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   // valida os tipos: um campo não-string (ex.: número) derrubava a rota com 500
-  const mail = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const mail = normalizarEmail(body?.email);
   const cod = typeof body?.codigo === "string" ? body.codigo.trim().toUpperCase() : "";
   const senha = typeof body?.senha === "string" ? body.senha : "";
-  if (!mail || !senha || senha.length < 6)
+  if (!mail || !senha || senha.length < 6 || senha.length > SENHA_MAX)
     return NextResponse.json({ erro: "Informe o e-mail e uma senha de pelo menos 6 caracteres." }, { status: 400 });
+  // formato antes de tudo: e-mail com curinga/metacaractere (%, *, espaço...) nem chega ao banco
+  if (!emailValido(mail)) return NextResponse.json({ erro: "E-mail inválido." }, { status: 400 });
   if (!cod)
     return NextResponse.json({ erro: "Informe o código de acesso que a loja enviou para você." }, { status: 400 });
 
@@ -37,26 +40,34 @@ export async function POST(req: Request) {
       { status: 429, headers: { "Retry-After": String(LIMITES_ATIVACAO.porIp.janelaSegundos) } }
     );
 
-  // Mensagem única para os casos de "não elegível" (não cadastrada, não liberada,
-  // código errado/expirado, plano sem revendedoras): evita que se descubra quais
-  // e-mails estão cadastrados ou se um e-mail existe.
-  const naoElegivel = NextResponse.json(
-    { erro: "E-mail ou código inválido. Confirme com a loja o e-mail liberado e o código de acesso." },
-    { status: 403 }
-  );
+  // Resposta ÚNICA (mesmo status e corpo) para "não elegível" (não cadastrada, não
+  // liberada, código errado/expirado, plano sem revendedoras) E para qualquer falha
+  // depois do código: antes, código certo + falha posterior devolvia 400 e virava
+  // um oráculo de "acertei o código". Também não revela se o e-mail existe.
+  const naoElegivel = () =>
+    NextResponse.json(
+      {
+        erro:
+          "E-mail ou código inválido. Confirme com a loja o e-mail liberado e o código de acesso. " +
+          "Se você já ativou antes, use a opção Entrar.",
+      },
+      { status: 403 }
+    );
 
   // revendedoras liberadas e ainda não ativadas com este e-mail (pode haver mais
-  // de uma loja com o mesmo e-mail: o código decide qual).
+  // de uma loja com o mesmo e-mail: o código decide qual). Igualdade EXATA: o banco
+  // guarda revendedora.email normalizado (lower/trim, trigger da 0041). Com ilike,
+  // % e _ do e-mail digitado viravam curingas.
   const { data: candidatas } = await sb
     .from("revendedora")
     .select("id, nome, org_id, acesso_liberado, user_id, ativa")
-    .ilike("email", mail)
+    .eq("email", mail)
     .eq("acesso_liberado", true)
     .is("user_id", null)
     .eq("ativa", true)
     .limit(20);
 
-  if (!candidatas || candidatas.length === 0) return naoElegivel;
+  if (!candidatas || candidatas.length === 0) return naoElegivel();
 
   // código de convite (tabela revendedora_convite, sem acesso p/ anon/authenticated
   // — migration 0035): precisa bater e não estar expirado (uso único — apagado no fim).
@@ -70,9 +81,9 @@ export async function POST(req: Request) {
   const convite = (convites ?? []).find(
     (c) => (c.codigo || "").toUpperCase() === cod && new Date(c.expira).getTime() >= Date.now()
   );
-  if (!convite) return naoElegivel;
+  if (!convite) return naoElegivel();
   const rev = candidatas.find((c) => c.id === convite.revendedora_id);
-  if (!rev) return naoElegivel;
+  if (!rev) return naoElegivel();
 
   // o plano atual da loja inclui revendedoras? (Ambulante = 0 -> bloqueia o acesso).
   // espelha private.permite_revendedoras; evita criar login que não vai conseguir entrar.
@@ -92,7 +103,7 @@ export async function POST(req: Request) {
         trialAte: assin.trial_ate ? new Date(assin.trial_ate).getTime() : null,
       }
     : null;
-  if (capacidades(assinatura).maxRevendedoras === 0) return naoElegivel;
+  if (capacidades(assinatura).maxRevendedoras === 0) return naoElegivel();
 
   // cria o login. O papel 'revendedora' vai no app_metadata (só a service_role
   // grava) -> o trigger NÃO cria org/usuario. user_metadata.convite só evita que o
@@ -108,13 +119,9 @@ export async function POST(req: Request) {
     app_metadata: { role: "revendedora" },
   });
   if (errCreate) {
-    const dup = /already|exists|registered/i.test(errCreate.message);
-    // genérico: não confirma que o e-mail é de uma revendedora cadastrada,
-    // mas ainda orienta quem já ativou a usar "Entrar".
-    return NextResponse.json(
-      { erro: dup ? "Se você já ativou antes, use a opção Entrar." : "Não foi possível concluir a ativação. Tente novamente." },
-      { status: 400 }
-    );
+    // mesma resposta do código errado (a mensagem já orienta quem ativou a usar "Entrar")
+    console.error("[ativar] createUser falhou", rev.id, errCreate.message);
+    return naoElegivel();
   }
 
   // vincula o login à revendedora e consome o código (uso único)
@@ -125,7 +132,8 @@ export async function POST(req: Request) {
   if (errLink) {
     // desfaz o usuário órfão se não conseguiu vincular
     await sb.auth.admin.deleteUser(created.user.id).catch(() => {});
-    return NextResponse.json({ erro: "Não foi possível concluir a ativação. Tente novamente." }, { status: 500 });
+    console.error("[ativar] vínculo falhou", rev.id, errLink.message);
+    return naoElegivel();
   }
 
   // consome o código (uso único). Falha aqui não invalida a ativação: com

@@ -22,11 +22,25 @@ export function chaveLimite(escopo: string, valor: string): string {
   return `${escopo}:${h}`;
 }
 
-/** IP do cliente atrás do proxy da Vercel (primeiro do x-forwarded-for). */
+const primeiro = (v: string | null) => v?.split(",")[0]?.trim() || "";
+const ultimo = (v: string | null) => v?.split(",").map((s) => s.trim()).filter(Boolean).pop() || "";
+
+/**
+ * IP do cliente para o rate limit, só de fontes em que o cliente não manda:
+ *  1. x-vercel-forwarded-for — gravado pela borda da Vercel;
+ *  2. x-real-ip — idem (e padrão de proxies reversos);
+ *  3. ÚLTIMO salto do x-forwarded-for — quem o anexou foi o nosso proxy. O
+ *     PRIMEIRO valor vem de quem fez a requisição: dava para trocar de "IP" a
+ *     cada tentativa e furar o limite por IP.
+ */
 export function ipDaRequisicao(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  const ip = xff?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim();
-  return ip || "desconhecido";
+  const h = req.headers;
+  return (
+    primeiro(h.get("x-vercel-forwarded-for")) ||
+    primeiro(h.get("x-real-ip")) ||
+    ultimo(h.get("x-forwarded-for")) ||
+    "desconhecido"
+  );
 }
 
 /**

@@ -74,11 +74,34 @@ describe("rate limit", () => {
     expect(chaveLimite("ativar:email", "maria@exemplo.com")).toBe(k);
   });
 
-  it("ipDaRequisicao usa o primeiro do x-forwarded-for", () => {
+  describe("ipDaRequisicao (só cabeçalhos que o cliente não controla)", () => {
     const req = (h: Record<string, string>) => new Request("http://x/", { headers: h });
-    expect(ipDaRequisicao(req({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("1.2.3.4");
-    expect(ipDaRequisicao(req({ "x-real-ip": "5.6.7.8" }))).toBe("5.6.7.8");
-    expect(ipDaRequisicao(req({}))).toBe("desconhecido");
+
+    it("prefere o x-vercel-forwarded-for gravado pela borda", () => {
+      expect(
+        ipDaRequisicao(req({ "x-vercel-forwarded-for": "8.8.8.8", "x-real-ip": "5.6.7.8", "x-forwarded-for": "1.1.1.1, 9.9.9.9" }))
+      ).toBe("8.8.8.8");
+    });
+
+    it("depois o x-real-ip", () => {
+      expect(ipDaRequisicao(req({ "x-real-ip": "5.6.7.8", "x-forwarded-for": "1.1.1.1, 9.9.9.9" }))).toBe("5.6.7.8");
+    });
+
+    it("no x-forwarded-for usa o ÚLTIMO salto (o primeiro é forjável)", () => {
+      expect(ipDaRequisicao(req({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("10.0.0.1");
+      expect(ipDaRequisicao(req({ "x-forwarded-for": " 7.7.7.7 " }))).toBe("7.7.7.7");
+      expect(ipDaRequisicao(req({ "x-forwarded-for": "1.2.3.4, 10.0.0.1, " }))).toBe("10.0.0.1");
+    });
+
+    it("trocar o primeiro valor do x-forwarded-for não muda a chave", () => {
+      const a = ipDaRequisicao(req({ "x-forwarded-for": "1.1.1.1, 203.0.113.9" }));
+      const b = ipDaRequisicao(req({ "x-forwarded-for": "2.2.2.2, 203.0.113.9" }));
+      expect(a).toBe(b);
+    });
+
+    it("sem cabeçalho nenhum: desconhecido", () => {
+      expect(ipDaRequisicao(req({}))).toBe("desconhecido");
+    });
   });
 
   it("limites da ativação são de força bruta, não de uso normal", () => {
