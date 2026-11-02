@@ -6,6 +6,7 @@ import { aplicarAparencia, aplicarFavicon, temaDoUsuario } from "@/lib/aparencia
 import { homeDe, podeAcessar } from "@/lib/permissoes";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import AppShell from "./AppShell";
+import { DialogProvider } from "./Dialog";
 import { Skeleton, SkeletonMetrics, SkeletonList } from "./Skeleton";
 
 // Sinaliza que já existe um Guard/AppShell montado acima (layout persistente).
@@ -28,6 +29,9 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   const role = useStore((s) => s.role);
   const semOrg = useStore((s) => s.semOrg);
   const usuarioId = useStore((s) => s.usuarioId);
+  const superadmin = useStore((s) => s.superadmin);
+  // super-admin sem loja própria abre o /admin sem a shell da loja (não há loja para mostrar)
+  const adminSemLoja = superadmin && semOrg && (path === "/admin" || path.startsWith("/admin/"));
 
   useEffect(() => {
     if (jaMontado) return;
@@ -59,6 +63,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     // não pertence ao painel do dono — manda para o acesso da revendedora.
     // Revendedora ativa vai para /revenda; suspensa ou sem loja vai para /acesso com o
     // motivo (?motivo=suspenso|sem_loja). Usa a mesma regra de destinoPosLogin.
+    if (adminSemLoja) return;
     if (semOrg) {
       let cancelado = false;
       destinoPosLogin().then(
@@ -80,7 +85,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     }
     // bloqueia rota fora do papel
     if (!podeAcessar(role, path)) router.replace(homeDe(role));
-  }, [jaMontado, ready, completo, role, path, router, semOrg]);
+  }, [jaMontado, ready, completo, role, path, router, semOrg, adminSemLoja]);
 
   // Já há um Guard/AppShell acima (no layout) -> não duplica, só repassa.
   if (jaMontado) return <>{children}</>;
@@ -88,6 +93,15 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   // continua abaixo: estados de loading / shell
 
   if (!ready) return <AppLoadingSkeleton />;
+
+  if (adminSemLoja)
+    return (
+      <GuardMontado.Provider value={true}>
+        <DialogProvider>
+          <main className="max-w-3xl mx-auto px-4 pt-4 pb-12 md:px-8 md:pt-8">{children}</main>
+        </DialogProvider>
+      </GuardMontado.Provider>
+    );
 
   // Enquanto o redirecionamento acima não acontece, NUNCA renderiza a tela de
   // uma rota que o papel não pode ver (vendedor/motoboy veriam telas do dono).
