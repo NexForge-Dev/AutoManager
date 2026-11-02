@@ -3,6 +3,7 @@ import { enviarMetricas, registrarEvento } from "@/lib/metricas/servidor";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { capacidades, limiteDoRecurso, type Assinatura, type PlanoId } from "@/lib/plans";
+import { emailValido, erroAuthPtBr, normalizarEmail, NOME_MAX, SENHA_MAX, SENHA_MIN, uuidValido } from "@/lib/validacao";
 
 // Cria/remove membros (vendedor, motoboy) com login+senha definidos pelo admin.
 // Usa a service_role (somente servidor) p/ criar usuários no Auth, mas SÓ depois
@@ -37,13 +38,17 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const nome = typeof body?.nome === "string" ? body.nome.trim() || null : null;
-  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const email = normalizarEmail(body?.email);
   const senha = typeof body?.senha === "string" ? body.senha : "";
   const role = body?.role;
-  if (!email || !senha || senha.length < 6)
-    return NextResponse.json({ erro: "E-mail e senha (mín. 6) obrigatórios" }, { status: 400 });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return NextResponse.json({ erro: "E-mail inválido" }, { status: 400 });
+  // mesmo mínimo da tela de redefinir senha; máximo = limite do bcrypt no GoTrue
+  if (!email || senha.length < SENHA_MIN)
+    return NextResponse.json({ erro: `E-mail e senha (mín. ${SENHA_MIN} caracteres) obrigatórios` }, { status: 400 });
+  if (senha.length > SENHA_MAX)
+    return NextResponse.json({ erro: `A senha pode ter no máximo ${SENHA_MAX} caracteres.` }, { status: 400 });
+  if (!emailValido(email)) return NextResponse.json({ erro: "E-mail inválido" }, { status: 400 });
+  if (nome && nome.length > NOME_MAX)
+    return NextResponse.json({ erro: `Nome muito longo (máx. ${NOME_MAX} caracteres).` }, { status: 400 });
   // whitelist: convite só cria papéis internos NÃO-dono (nunca owner/superadmin).
   // O banco reforça isso em private.vincular_convite (0035).
   if (role !== "vendedor" && role !== "motoboy")
@@ -109,17 +114,14 @@ export async function POST(req: Request) {
     // vínculo real com a loja: só a service_role grava app_metadata
     app_metadata: { org_id: dono.orgId, role },
   });
-  if (error)
+  if (error) {
+    // nunca devolve a mensagem crua do GoTrue/Postgres (inglês, detalhes internos)
+    console.error("[membros] createUser falhou", error.message);
     return NextResponse.json(
-      {
-        erro: /already|exists|registered/i.test(error.message)
-          ? "E-mail já cadastrado"
-          : /papel_nao_permitido|limite_vendedores/i.test(error.message)
-            ? "Seu plano não permite adicionar este membro. Faça upgrade."
-            : error.message,
-      },
+      { erro: erroAuthPtBr(error.message, "Não foi possível criar o membro agora. Tente novamente.") },
       { status: 400 }
     );
+  }
 
   // confere que o trigger vinculou o membro à loja; senão desfaz o login órfão
   const { data: vinculo, error: eVinc } = await admin()
@@ -144,20 +146,26 @@ export async function DELETE(req: Request) {
   if (!dono) return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
 
   const { id } = await req.json().catch(() => ({}));
-  if (!id || id === dono.userId)
+  if (!uuidValido(id) || id === dono.userId)
     return NextResponse.json({ erro: "ID inválido" }, { status: 400 });
 
   // garante que o alvo pertence à mesma org antes de excluir
   const sbAdmin = admin();
   const { data: alvo } = await sbAdmin
     .from("usuario")
-    .select("org_id")
+    .select("org_id, role")
     .eq("id", id)
     .maybeSingle();
   if (!alvo || alvo.org_id !== dono.orgId)
     return NextResponse.json({ erro: "Membro não encontrado" }, { status: 404 });
+  // o login do dono nunca é apagado por aqui (nem o de um co-dono da mesma loja)
+  if (alvo.role === "owner")
+    return NextResponse.json({ erro: "Não é possível remover o dono da loja." }, { status: 403 });
 
   const { error } = await sbAdmin.auth.admin.deleteUser(id);
-  if (error) return NextResponse.json({ erro: error.message }, { status: 400 });
+  if (error) {
+    console.error("[membros] deleteUser falhou", id, error.message);
+    return NextResponse.json({ erro: "Não foi possível remover o membro agora. Tente novamente." }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

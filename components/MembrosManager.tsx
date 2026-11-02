@@ -43,8 +43,8 @@ export default function MembrosManager() {
 
   async function salvar() {
     setErro(null);
-    if (!email || senha.length < 6) {
-      setErro("Informe e-mail e senha de pelo menos 6 caracteres.");
+    if (!email || senha.length < 8) {
+      setErro("Informe e-mail e senha de pelo menos 8 caracteres.");
       return;
     }
     setSalvando(true);
@@ -146,7 +146,7 @@ export default function MembrosManager() {
           <input
             className="input"
             type="password"
-            placeholder="Senha (mín. 6)"
+            placeholder="Senha (mín. 8)"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
           />
