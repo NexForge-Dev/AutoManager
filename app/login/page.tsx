@@ -116,6 +116,7 @@ export default function LoginPage() {
         <Link href="/" className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-6">
           <Gem className="text-brand-600" /> AutoManager
         </Link>
+        <h1 className="sr-only">Entrar no AutoManager</h1>
         <div className="card space-y-4">
           <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
             <button

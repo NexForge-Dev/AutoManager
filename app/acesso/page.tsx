@@ -74,9 +74,9 @@ export default function AcessoPage() {
   return (
     <div className="min-h-screen grid place-items-center px-5 bg-[var(--bg)]">
       <div className="w-full max-w-sm reveal">
-        <div className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-2">
+        <h1 className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-2">
           <Gem className="text-brand-600" /> Área da Vendedora
-        </div>
+        </h1>
         <p className="text-center text-sm text-muted mb-6">Revendedoras e equipe da loja: acesse o catálogo e registre suas vendas.</p>
 
         <div className="card space-y-4">

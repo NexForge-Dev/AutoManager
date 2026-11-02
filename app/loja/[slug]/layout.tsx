@@ -37,6 +37,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const descricao = loja.descricao || `Confira os produtos de ${loja.nome}.`;
   const imagem = loja.capa_url || loja.logo_url;
+  // sem capa/logo: a imagem padrão do AutoManager (app/opengraph-image.tsx) — o
+  // openGraph deste layout substitui o da raiz, então ela precisa vir explícita
+  const imagemOg = imagem || "/opengraph-image";
   return {
     title: { absolute: loja.nome },
     description: descricao,
@@ -47,13 +50,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title: loja.nome,
       description: descricao,
       url: `/loja/${slug}`,
-      ...(imagem ? { images: [{ url: imagem }] } : {}),
+      images: [{ url: imagemOg }],
     },
     twitter: {
-      card: imagem ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: loja.nome,
       description: descricao,
-      ...(imagem ? { images: [imagem] } : {}),
+      images: [imagemOg],
     },
   };
 }
