@@ -376,7 +376,7 @@ function LojasView({
     if (plano === l.plano) return;
     const ok = await confirm({
       titulo: `Mudar para ${PLANOS[plano].nome}?`,
-      mensagem: `"${l.nome}" — de ${PLANOS[l.plano].nome} para ${PLANOS[plano].nome}.\n\nA troca é aplicada na hora, sem cobrança. Se a loja tiver uma assinatura ativa no Stripe, ela continua sendo cobrada lá até ser cancelada.`,
+      mensagem: `"${l.nome}" — de ${PLANOS[l.plano].nome} para ${PLANOS[plano].nome}.\n\nA troca é aplicada na hora, sem cobrança e sem vencimento (cortesia), e encerra o teste grátis. Num plano menor, o que passar do limite (revendedoras, vendedores, motoboys/entregas) fica bloqueado — nada é apagado. Loja com assinatura ativa no Stripe não recebe plano manual: cancele a assinatura antes.`,
       confirmar: "Mudar plano",
     });
     if (!ok) return;
