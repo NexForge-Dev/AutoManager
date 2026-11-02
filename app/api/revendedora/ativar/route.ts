@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { capacidades, type Assinatura, type PlanoId, type StatusAssinatura } from "@/lib/plans";
+import { LIMITES_ATIVACAO, chaveLimite, ipDaRequisicao, todasDentroDoLimite } from "@/lib/rateLimit";
 
 // Ativação self-service da revendedora: ela informa o e-mail que a loja liberou e
 // escolhe a própria senha no 1º acesso. Só funciona se o dono liberou o acesso
@@ -24,6 +25,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "Informe o código de acesso que a loja enviou para você." }, { status: 400 });
 
   const sb = admin();
+
+  // força bruta do código: limita por IP e por e-mail (contador no banco, 0038)
+  const permitido = await todasDentroDoLimite(sb, [
+    { chave: chaveLimite("ativar:ip", ipDaRequisicao(req)), regra: LIMITES_ATIVACAO.porIp },
+    { chave: chaveLimite("ativar:email", mail), regra: LIMITES_ATIVACAO.porEmail },
+  ]);
+  if (!permitido)
+    return NextResponse.json(
+      { erro: "Muitas tentativas. Aguarde 15 minutos e tente de novo." },
+      { status: 429, headers: { "Retry-After": String(LIMITES_ATIVACAO.porIp.janelaSegundos) } }
+    );
 
   // Mensagem única para os casos de "não elegível" (não cadastrada, não liberada,
   // código errado/expirado, plano sem revendedoras): evita que se descubra quais
