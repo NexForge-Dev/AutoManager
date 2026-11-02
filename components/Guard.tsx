@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { aplicarAparencia, aplicarFavicon } from "@/lib/aparencia";
 import { homeDe, podeAcessar } from "@/lib/permissoes";
+import { createClient } from "@/lib/supabase/client";
 import AppShell from "./AppShell";
 import { Skeleton, SkeletonMetrics, SkeletonList } from "./Skeleton";
 
@@ -47,9 +48,23 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     if (jaMontado || !ready) return;
     // autenticado mas sem loja própria (revendedora/visitante que caiu no painel):
     // não pertence ao painel do dono — manda para o acesso da revendedora.
+    // Revendedora logada (login self-service) vai para o painel dela (/revenda);
+    // quem não é revendedora vai para o acesso. Mesmo critério de destinoPosLogin.
     if (semOrg) {
-      router.replace("/acesso");
-      return;
+      let cancelado = false;
+      createClient()
+        .rpc("revendedora_me")
+        .then(
+          ({ data }) => {
+            if (!cancelado) router.replace(data ? "/revenda" : "/acesso");
+          },
+          () => {
+            if (!cancelado) router.replace("/acesso");
+          }
+        );
+      return () => {
+        cancelado = true;
+      };
     }
     // só o dono passa pelo onboarding; membros já entram numa loja pronta
     if (!completo && role === "owner") {
@@ -66,6 +81,12 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   // continua abaixo: estados de loading / shell
 
   if (!ready) return <AppLoadingSkeleton />;
+
+  // Enquanto o redirecionamento acima não acontece, NUNCA renderiza a tela de
+  // uma rota que o papel não pode ver (vendedor/motoboy veriam telas do dono).
+  const redirecionando =
+    semOrg || (!completo && role === "owner") || !podeAcessar(role, path);
+  if (redirecionando) return <AppLoadingSkeleton />;
 
   return (
     <GuardMontado.Provider value={true}>
