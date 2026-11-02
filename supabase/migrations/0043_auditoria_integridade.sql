@@ -190,3 +190,17 @@ begin
     end;
   end loop;
 end $$;
+
+-- ============================================================ [A6] privilégios residuais
+-- Os grants padrão do Supabase dão TRUNCATE/TRIGGER/REFERENCES a anon e
+-- authenticated em toda tabela nova. TRUNCATE ignora a RLS; a Data API não o
+-- expõe, mas não há motivo para o privilégio existir (defesa em profundidade).
+do $$
+declare t text;
+begin
+  for t in select c.relname from pg_class c
+           where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+  loop
+    execute format('revoke truncate, trigger, references on public.%I from anon, authenticated', t);
+  end loop;
+end $$;
