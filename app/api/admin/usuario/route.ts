@@ -4,9 +4,12 @@ import { createClient as createAdmin } from "@supabase/supabase-js";
 import { ehSuperadminUser } from "@/lib/admin";
 import { registrarAdminLog } from "@/lib/adminAudit";
 import { assinaturaVivaDaOrg, stripe } from "@/lib/stripe";
+import { erroInterno } from "@/lib/erroApi";
+import { uuidValido } from "@/lib/validacao";
 
 // Moderação de contas pelo super-admin (cortesia / abuso):
-//   - desativar : suspende a loja (bloqueia login de todos os usuários dela). Reversível.
+//   - desativar : suspende a loja (bloqueia login de todos os usuários dela, inclusive
+//                 das revendedoras, e encerra as sessões abertas). Reversível.
 //   - banir     : bloqueia login (igual desativar no efeito, rótulo punitivo).  Reversível.
 //   - reativar  : reabre o acesso (remove o ban) de uma loja desativada/banida.
 //   - deletar   : APAGA a loja, todos os dados e as contas de auth. Irreversível.
@@ -44,7 +47,7 @@ export async function POST(req: Request) {
     orgId?: string;
     acao?: Acao;
   };
-  if (!orgId || !["desativar", "banir", "reativar", "deletar"].includes(acao ?? ""))
+  if (!uuidValido(orgId) || !["desativar", "banir", "reativar", "deletar"].includes(acao ?? ""))
     return NextResponse.json({ erro: "Dados inválidos" }, { status: 400 });
 
   const a = admin();
@@ -54,16 +57,25 @@ export async function POST(req: Request) {
     .from("usuario")
     .select("id, email")
     .eq("org_id", orgId);
-  if (erroUsuarios)
-    return NextResponse.json({ erro: erroUsuarios.message }, { status: 500 });
+  if (erroUsuarios) return erroInterno("admin/usuario", erroUsuarios);
+
+  // logins das revendedoras da loja (não têm linha em public.usuario): o ban da
+  // loja também vale para elas, senão seguiam vendendo pelo /revenda.
+  const { data: revs, error: erroRevs } = await a
+    .from("revendedora")
+    .select("user_id")
+    .eq("org_id", orgId)
+    .not("user_id", "is", null);
+  if (erroRevs) return erroInterno("admin/usuario", erroRevs);
 
   // trava de segurança: nunca agir sobre a própria conta do super-admin
-  const ids = (usuarios ?? []).map((u) => u.id);
+  const idsMembros = (usuarios ?? []).map((u) => u.id);
+  const ids = [...new Set([...idsMembros, ...(revs ?? []).map((r) => r.user_id as string)])];
   if (ids.includes(su.id))
     return NextResponse.json({ erro: "Não é possível moderar a conta de administração." }, { status: 400 });
   for (const id of ids) {
     const { data: au, error: eAu } = await a.auth.admin.getUserById(id);
-    if (eAu) return NextResponse.json({ erro: eAu.message }, { status: 500 });
+    if (eAu) return erroInterno("admin/usuario", eAu);
     if (ehSuperadminUser(au.user))
       return NextResponse.json({ erro: "Não é possível moderar a conta de administração." }, { status: 400 });
   }
@@ -100,12 +112,13 @@ export async function POST(req: Request) {
         acao: "deletar",
         alvoOrgId: orgId,
         alvoDescricao,
-        detalhe: { usuarios_removidos: ids.length },
+        detalhe: { usuarios_removidos: ids.length, revendedoras: ids.length - idsMembros.length },
       });
       return NextResponse.json({ ok: true, acao });
     }
 
     // bloquear (desativar/banir) ou liberar (reativar) o login de todos os usuários
+    // da loja — membros e revendedoras
     const banir = acao === "desativar" || acao === "banir";
     for (const id of ids) {
       const { error: e } = await a.auth.admin.updateUserById(id, {
@@ -114,21 +127,29 @@ export async function POST(req: Request) {
       if (e) console.error("Falha ao alterar ban do usuário", id, e.message);
     }
 
+    // org.acesso corta na hora o que o ban não corta: o banco só libera dados de
+    // loja 'ativo' (current_org_id, vitrine e RPCs das revendedoras — 0041/0042).
     const acesso = acao === "banir" ? "banido" : acao === "desativar" ? "desativado" : "ativo";
     const { error } = await a.from("org").update({ acesso }).eq("id", orgId);
     if (error) throw new Error(error.message);
+
+    // o ban não derruba sessões abertas: apaga os refresh tokens (0042). Sem a
+    // RPC (banco antigo) segue — o JWT expira sozinho e org.acesso já bloqueia.
+    if (banir && ids.length > 0) {
+      const { error: eSess } = await a.rpc("admin_encerrar_sessoes", { p_usuarios: ids });
+      if (eSess) console.error("Falha ao encerrar sessões da loja", orgId, eSess.message);
+    }
 
     await registrarAdminLog(a, {
       actorEmail,
       acao: acao!,
       alvoOrgId: orgId,
       alvoDescricao,
-      detalhe: { acesso, usuarios_afetados: ids.length },
+      detalhe: { acesso, usuarios_afetados: ids.length, revendedoras: ids.length - idsMembros.length },
     });
 
     return NextResponse.json({ ok: true, acao, acesso });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "erro";
-    return NextResponse.json({ erro: msg }, { status: 500 });
+    return erroInterno("admin/usuario", e, "Não foi possível concluir a moderação agora. Tente novamente.");
   }
 }
