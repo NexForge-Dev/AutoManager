@@ -2,8 +2,9 @@
 import { createContext, useContext, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { aplicarAparencia, aplicarFavicon } from "@/lib/aparencia";
+import { aplicarAparencia, aplicarFavicon, temaDoUsuario } from "@/lib/aparencia";
 import { homeDe, podeAcessar } from "@/lib/permissoes";
+import { createClient } from "@/lib/supabase/client";
 import AppShell from "./AppShell";
 import { Skeleton, SkeletonMetrics, SkeletonList } from "./Skeleton";
 
@@ -26,6 +27,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   const nomeLoja = useStore((s) => s.config.nomeLoja);
   const role = useStore((s) => s.role);
   const semOrg = useStore((s) => s.semOrg);
+  const usuarioId = useStore((s) => s.usuarioId);
 
   useEffect(() => {
     if (jaMontado) return;
@@ -34,22 +36,44 @@ export default function Guard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (jaMontado) return;
-    aplicarAparencia({ corMarca, temaBase, appFonte, appRaio });
-  }, [jaMontado, corMarca, temaBase, appFonte, appRaio]);
+    if (!ready) return; // antes de hidratar vale o cache anti-flash (já com a escolha do usuário)
+    // claro/escuro escolhido pelo usuário no Perfil vale por cima do tema da loja
+    aplicarAparencia({ corMarca, temaBase: temaDoUsuario(usuarioId, temaBase), appFonte, appRaio });
+  }, [jaMontado, ready, usuarioId, corMarca, temaBase, appFonte, appRaio]);
 
-  // ícone da aba (favicon) = logo da loja; troca sozinho quando o dono muda a logo
+  // ícone da aba (favicon) = logo da loja; troca sozinho quando o dono muda a logo.
+  // E de novo (só o ícone) a cada rota: o Next reinsere os ícones do metadata no <head> ao navegar,
+  // e o nosso link (só ele é movido) volta para o fim para continuar valendo.
   useEffect(() => {
     if (jaMontado) return;
     aplicarFavicon(logoUrl, nomeLoja || null);
   }, [jaMontado, logoUrl, nomeLoja]);
+  useEffect(() => {
+    if (jaMontado) return;
+    aplicarFavicon(logoUrl, null);
+  }, [jaMontado, logoUrl, path]);
 
   useEffect(() => {
     if (jaMontado || !ready) return;
     // autenticado mas sem loja própria (revendedora/visitante que caiu no painel):
     // não pertence ao painel do dono — manda para o acesso da revendedora.
+    // Revendedora logada (login self-service) vai para o painel dela (/revenda);
+    // quem não é revendedora vai para o acesso. Mesmo critério de destinoPosLogin.
     if (semOrg) {
-      router.replace("/acesso");
-      return;
+      let cancelado = false;
+      createClient()
+        .rpc("revendedora_me")
+        .then(
+          ({ data }) => {
+            if (!cancelado) router.replace(data ? "/revenda" : "/acesso");
+          },
+          () => {
+            if (!cancelado) router.replace("/acesso");
+          }
+        );
+      return () => {
+        cancelado = true;
+      };
     }
     // só o dono passa pelo onboarding; membros já entram numa loja pronta
     if (!completo && role === "owner") {
@@ -66,6 +90,12 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   // continua abaixo: estados de loading / shell
 
   if (!ready) return <AppLoadingSkeleton />;
+
+  // Enquanto o redirecionamento acima não acontece, NUNCA renderiza a tela de
+  // uma rota que o papel não pode ver (vendedor/motoboy veriam telas do dono).
+  const redirecionando =
+    semOrg || (!completo && role === "owner") || !podeAcessar(role, path);
+  if (redirecionando) return <AppLoadingSkeleton />;
 
   return (
     <GuardMontado.Provider value={true}>

@@ -239,21 +239,82 @@ export function aplicarAparencia(a: Aparencia) {
 }
 
 // ----------------------------------------------------------------------------
+// Preferência claro/escuro de cada usuário (atalho do Perfil). Fica no
+// localStorage por usuário e vale por cima do tema base da loja — mas só
+// enquanto o tema base for o mesmo de quando a pessoa escolheu: se o dono trocar
+// o tema em Configurações, a escolha antiga deixa de valer.
+// ----------------------------------------------------------------------------
+const CHAVE_TEMA_USUARIO = "tema-usuario:";
+
+type PrefTema = { tema: string; base: string };
+
+// Pura (testável): dado o valor salvo e o tema base atual da loja, devolve o
+// tema a aplicar.
+export function resolverTemaUsuario(salvo: string | null, temaBaseLoja: string | null): string | null {
+  const base = temaBaseDef(temaBaseLoja).key;
+  if (!salvo) return temaBaseLoja;
+  try {
+    const p = JSON.parse(salvo) as PrefTema;
+    if (p && typeof p.tema === "string" && p.base === base && TEMAS_BASE.some((t) => t.key === p.tema))
+      return p.tema;
+  } catch {
+    /* valor inválido: ignora */
+  }
+  return temaBaseLoja;
+}
+
+export function temaDoUsuario(usuarioId: string | null, temaBaseLoja: string | null): string | null {
+  if (!usuarioId || typeof window === "undefined") return temaBaseLoja;
+  try {
+    return resolverTemaUsuario(localStorage.getItem(CHAVE_TEMA_USUARIO + usuarioId), temaBaseLoja);
+  } catch {
+    return temaBaseLoja;
+  }
+}
+
+// tema=null (ou igual ao da loja) apaga a preferência
+export function salvarTemaDoUsuario(usuarioId: string | null, tema: string | null, temaBaseLoja: string | null) {
+  if (!usuarioId || typeof window === "undefined") return;
+  const base = temaBaseDef(temaBaseLoja).key;
+  try {
+    const k = CHAVE_TEMA_USUARIO + usuarioId;
+    if (!tema || tema === base) localStorage.removeItem(k);
+    else localStorage.setItem(k, JSON.stringify({ tema, base } satisfies PrefTema));
+  } catch {
+    /* ignora */
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Favicon dinâmico: o ícone da aba do navegador vira a logo da loja. Troca
 // sozinho quando o dono muda a logo (chamado no Guard) e na vitrine pública
 // usa a logo daquela loja. Sem logo, cai no /icon.svg padrão.
 // ----------------------------------------------------------------------------
 const CHAVE_FAVICON = "favicon";
 
-function definirIconLink(rel: string, href: string) {
-  if (typeof document === "undefined") return;
-  const head = document.head;
-  // remove os links existentes desse rel e recria — força o navegador a reler o ícone
-  head.querySelectorAll(`link[rel="${rel}"]`).forEach((el) => el.remove());
-  const link = document.createElement("link");
-  link.rel = rel;
-  link.href = href;
-  head.appendChild(link);
+// Atributo que marca os <link> de ícone que NÓS criamos. Os <link rel="icon">
+// gerados pelo `metadata.icons` do Next pertencem ao React: removê-los ou
+// mutá-los quebra a navegação client-side ("Cannot read properties of null
+// (reading 'removeChild')" quando o React tenta desmontá-los). Por isso só
+// mexemos no nosso próprio link — criado uma vez e depois só com o href trocado.
+export const ATTR_FAVICON = "data-am-favicon";
+
+// Garante um único <link rel={rel} data-am-favicon> e atualiza o href. Fica por
+// último no <head> para ter precedência sobre os ícones padrão do Next.
+// `doc` é injetável para teste.
+export function definirIconLink(rel: string, href: string, doc?: Document) {
+  const d = doc ?? (typeof document === "undefined" ? undefined : document);
+  if (!d) return;
+  const head = d.head;
+  let link = head.querySelector<HTMLLinkElement>(`link[${ATTR_FAVICON}="${rel}"]`);
+  if (!link) {
+    link = d.createElement("link");
+    link.setAttribute(ATTR_FAVICON, rel);
+    link.rel = rel;
+  }
+  if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+  // reanexa no fim (move só o nosso nó; os do React ficam intactos)
+  if (head.lastElementChild !== link) head.appendChild(link);
 }
 
 // Aplica a logo como favicon (e, opcionalmente, o nome da loja como título da aba).
@@ -292,6 +353,6 @@ if(c.font)r.style.fontFamily=c.font;
 }
 var lg=localStorage.getItem('${CHAVE_FAVICON}');
 if(lg){['icon','apple-touch-icon'].forEach(function(rel){
-var l=document.createElement('link');l.rel=rel;l.href=lg;document.head.appendChild(l);
+var l=document.createElement('link');l.rel=rel;l.href=lg;l.setAttribute('${ATTR_FAVICON}',rel);document.head.appendChild(l);
 });}
 }catch(e){}})();`;

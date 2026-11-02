@@ -73,19 +73,51 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     setEstado(null);
   }
 
-  // foco no input ao abrir prompt; Esc cancela; Enter confirma
+  // Foco inicial: input no prompt; senão "Cancelar" em ações perigosas e o botão
+  // principal nas demais. Esc cancela. Enter: num botão, deixa o clique nativo
+  // acontecer (Enter em "Cancelar" cancela!); no input do prompt, confirma.
+  const confirmarRef = useRef<HTMLButtonElement>(null);
+  const cancelarRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!estado) return;
-    if (estado.tipo === "prompt") setTimeout(() => inputRef.current?.focus(), 30);
+    const anterior = document.activeElement as HTMLElement | null;
+    const t = setTimeout(() => {
+      if (estado.tipo === "prompt") inputRef.current?.focus();
+      else if (estado.tipo === "confirm" && estado.opts.perigo) cancelarRef.current?.focus();
+      else confirmarRef.current?.focus();
+    }, 30);
+    return () => {
+      clearTimeout(t);
+      if (anterior && document.contains(anterior)) anterior.focus({ preventScroll: true });
+    };
+  }, [estado]);
+
+  useEffect(() => {
+    if (!estado) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") fechar(estado!.tipo === "prompt" ? null : false);
-      if (e.key === "Enter" && estado!.tipo !== "alerta" && !(e.target instanceof HTMLTextAreaElement)) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        fechar(estado!.tipo === "prompt" ? null : false);
+        return;
+      }
+      if (e.key !== "Enter") return;
+      const alvo = e.target as HTMLElement | null;
+      if (estado!.tipo === "prompt") {
+        if (alvo === inputRef.current) {
+          e.preventDefault();
+          fechar(valor);
+        }
+        return;
+      }
+      // foco num botão/link: o Enter nativo já clica nele
+      if (alvo && alvo.closest("button,a,[role=button]")) return;
+      if (estado!.tipo === "confirm" && !(alvo instanceof HTMLTextAreaElement)) {
         e.preventDefault();
-        fechar(estado!.tipo === "prompt" ? valor : true);
+        fechar(true);
       }
     }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado, valor]);
 
@@ -96,11 +128,13 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
         <div
           className="modal-backdrop fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
           onClick={() => fechar(estado.tipo === "prompt" ? null : false)}
-          role="dialog"
-          aria-modal="true"
+          data-dialog-ativo=""
         >
           <div
-            className="sheet-panel sm:modal-panel surface shadow-pop w-full sm:max-w-sm rounded-t-2xl sm:rounded-3xl border border-default p-5 space-y-4"
+            role={estado.tipo === "confirm" ? "alertdialog" : "dialog"}
+            aria-modal="true"
+            aria-labelledby="am-dialog-titulo"
+            className="sheet-panel sm:modal-panel surface shadow-pop w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl border border-default p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
@@ -110,7 +144,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <h2 className="font-bold text-lg leading-tight">{estado.opts.titulo}</h2>
+                <h2 id="am-dialog-titulo" className="font-bold text-lg leading-tight">{estado.opts.titulo}</h2>
                 {estado.opts.mensagem && (
                   <p className="text-sm text-muted mt-1 whitespace-pre-line">{estado.opts.mensagem}</p>
                 )}
@@ -138,11 +172,18 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
 
             <div className="flex gap-2 pt-1">
               {estado.tipo !== "alerta" && (
-                <button onClick={() => fechar(estado.tipo === "prompt" ? null : false)} className="btn-ghost flex-1">
+                <button
+                  ref={cancelarRef}
+                  type="button"
+                  onClick={() => fechar(estado.tipo === "prompt" ? null : false)}
+                  className="btn-ghost flex-1"
+                >
                   {(estado.opts as ConfirmOpts).cancelar ?? "Cancelar"}
                 </button>
               )}
               <button
+                ref={confirmarRef}
+                type="button"
                 onClick={() => fechar(estado.tipo === "prompt" ? valor : estado.tipo === "alerta" ? null : true)}
                 className={`flex-1 btn ${
                   estado.tipo !== "prompt" && (estado as any).opts.perigo

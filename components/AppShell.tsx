@@ -22,7 +22,6 @@ import {
   Inbox,
   Wallet,
   Menu,
-  X,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
@@ -31,6 +30,7 @@ import { useRecebimentosPendentes } from "@/lib/useRecebimentos";
 import type { PlanoDef } from "@/lib/plans";
 import PageTransition from "./PageTransition";
 import { DialogProvider } from "./Dialog";
+import Modal from "./Modal";
 
 type Item = {
   href: string;
@@ -52,7 +52,7 @@ const ITENS: Item[] = [
   { href: "/entregas", label: "Entregas", icon: Truck, roles: ["owner", "motoboy"], mobile: true },
   { href: "/reposicao", label: "Repor", icon: TrendingUp, roles: ["owner"], mobile: true },
   { href: "/minha-loja", label: "Minha Loja", icon: Store, roles: ["owner"] },
-  { href: "/revendedoras", label: "Equipe", icon: Users, roles: ["owner"] },
+  { href: "/revendedoras", label: "Revendedoras", icon: Users, roles: ["owner"] },
   { href: "/conversas", label: "Conversas", icon: MessageCircle, roles: ["owner"] },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, roles: ["owner"] },
   { href: "/financeiro", label: "Financeiro", icon: Wallet, roles: ["owner"] },
@@ -98,10 +98,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <DialogProvider>
     <div className="min-h-screen md:flex">
       {/* -------- sidebar (desktop) -------- */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default p-4">
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default p-4 pb-2">
         <Link
           href="/painel"
-          className="flex items-center gap-2 font-extrabold text-brand-500 px-2 py-3"
+          className="shrink-0 flex items-center gap-2 font-extrabold text-brand-500 px-2 py-2"
         >
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -111,7 +111,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <span className="truncate">{nomeLoja || "AutoManager"}</span>
         </Link>
-        <nav className="mt-4 flex flex-col gap-1">
+        {/* 16 itens não cabem em 768px de altura: a lista rola (min-h-0 no flex) */}
+        <nav className="mt-2 -mx-2 px-2 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-0.5 pb-2">
           {navDesktop.map((n) => {
             const active = path === n.href;
             const Icon = n.icon;
@@ -120,7 +121,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 key={n.href}
                 href={n.href}
                 aria-current={active ? "page" : undefined}
-                className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition-all duration-200 active:scale-[.98] ${
+                className={`group relative shrink-0 flex items-center gap-3 rounded-xl px-3 py-2 font-medium transition-all duration-200 active:scale-[.98] ${
                   active
                     ? "bg-brand-600 text-white shadow-card"
                     : "text-muted hover:text-strong hover:translate-x-0.5"
@@ -164,7 +165,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 md:pl-60">
         <main
           className={`${
-            path === "/minha-loja" ? "max-w-7xl" : "max-w-3xl"
+            path === "/minha-loja" ? "max-w-7xl" : path === "/planos" ? "max-w-6xl" : "max-w-3xl"
           } mx-auto px-4 pt-4 pb-28 md:px-8 md:pt-8 md:pb-12`}
         >
           <PageTransition>{children}</PageTransition>
@@ -236,20 +237,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* -------- "Mais" (mobile): demais telas -------- */}
       {maisAberto && (
-        <div
-          className="md:hidden fixed inset-0 z-50 bg-black/40 flex items-end modal-backdrop"
-          onClick={() => setMaisAberto(false)}
+        <Modal
+          onClose={() => setMaisAberto(false)}
+          titulo="Menu"
+          fecharLabel="Fechar menu"
+          backdropClassName="md:hidden"
+          className="space-y-2"
         >
-          <div
-            className="surface w-full rounded-t-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] modal-panel"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="font-bold">Menu</span>
-              <button onClick={() => setMaisAberto(false)} aria-label="Fechar menu" className="p-1 text-muted">
-                <X size={20} />
-              </button>
-            </div>
             <div className="grid grid-cols-3 gap-2">
               {resto.map((n) => {
                 const Icon = n.icon;
@@ -276,8 +270,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
     </DialogProvider>

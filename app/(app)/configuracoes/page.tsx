@@ -414,11 +414,12 @@ function CategoriasSection() {
           <span key={c} className="chip border-default flex items-center gap-1.5">
             {c}
             <button
+              type="button"
               onClick={() => persistir(lista.filter((x) => x !== c))}
-              className="text-muted hover:text-red-500"
-              aria-label={`Remover ${c}`}
+              className="grid place-items-center h-11 w-11 -my-3 -mr-3 rounded-full text-muted hover:text-red-500"
+              aria-label={`Remover categoria ${c}`}
             >
-              <X size={13} />
+              <X size={14} />
             </button>
           </span>
         ))}

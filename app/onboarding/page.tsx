@@ -110,6 +110,12 @@ export default function Onboarding() {
   ];
   const totalSteps = steps.length;
   const stepKey = steps[Math.min(step, totalSteps - 1)];
+  // Progresso exibido com total FIXO (todos os passos possíveis): escolher um
+  // plano sem revendedoras não muda mais o "de N" no meio do caminho — o passo
+  // pulado só avança a barra.
+  const PASSOS_VISIVEIS = ["nome", "descricao", "conteudo", "plano", "revendedoras", "lucro", "contato"];
+  const totalVisivel = PASSOS_VISIVEIS.length;
+  const passoVisivel = Math.max(0, PASSOS_VISIVEIS.indexOf(stepKey));
   const usaRevendedoras = temRevendedoras && qtdRev !== "0";
 
   // garante que a quantidade de revendedoras seja uma opção válida do plano
@@ -210,15 +216,15 @@ export default function Onboarding() {
       {/* progresso */}
       <div className="mb-8">
         <div className="flex items-center justify-between text-xs font-semibold text-muted mb-2">
-          <span>Passo {step + 1} de {totalSteps}</span>
-          <span>{Math.round(((step + 1) / totalSteps) * 100)}%</span>
+          <span>Passo {passoVisivel + 1} de {totalVisivel}</span>
+          <span>{Math.round(((passoVisivel + 1) / totalVisivel) * 100)}%</span>
         </div>
         <div className="flex gap-1.5">
-          {Array.from({ length: totalSteps }).map((_, i) => (
+          {Array.from({ length: totalVisivel }).map((_, i) => (
             <div
               key={i}
               className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${
-                i <= step ? "bg-brand-600" : "surface-alt"
+                i <= passoVisivel ? "bg-brand-600" : "surface-alt"
               }`}
             />
           ))}

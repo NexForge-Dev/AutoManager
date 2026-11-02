@@ -214,13 +214,17 @@ body {
   from { opacity: 0; transform: translateY(16px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.modal-backdrop { animation: ui-backdrop-in 0.2s ease both; }
-.modal-panel { animation: ui-modal-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes ui-sheet-in {
   from { opacity: 0; transform: translateY(100%); }
   to { opacity: 1; transform: translateY(0); }
 }
-.sheet-panel { animation: ui-sheet-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* em @layer utilities para gerar as variantes (sm:modal-panel, md:modal-panel):
+   sheet no celular, pop-in centralizado a partir do breakpoint */
+@layer utilities {
+  .modal-backdrop { animation: ui-backdrop-in 0.2s ease both; }
+  .modal-panel { animation: ui-modal-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .sheet-panel { animation: ui-sheet-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}
 
 /* ---- landing: grid de fundo + scroll reveal + brilho ---- */
 .lp-grid-bg {

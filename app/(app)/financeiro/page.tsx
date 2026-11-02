@@ -6,10 +6,10 @@ import { brl, resumoContas } from "@/lib/analytics";
 import type { ContaPagar } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
+import Modal from "@/components/Modal";
 import {
   Wallet,
   Plus,
-  X,
   Check,
   Trash2,
   CalendarClock,
@@ -281,14 +281,7 @@ function ContaForm({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-40 flex items-end md:items-center justify-center">
-      <div className="surface w-full max-w-md rounded-t-3xl md:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Nova conta a pagar</h2>
-          <button onClick={onClose}>
-            <X />
-          </button>
-        </div>
+    <Modal onClose={onClose} titulo="Nova conta a pagar">
         <div>
           <label className="label">Descrição</label>
           <input
@@ -339,7 +332,6 @@ function ContaForm({ onClose }: { onClose: () => void }) {
         <button onClick={salvar} disabled={salvando} className="btn-primary w-full disabled:opacity-60">
           {salvando ? "Salvando…" : "Salvar conta"}
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }

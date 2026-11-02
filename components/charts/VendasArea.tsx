@@ -69,6 +69,7 @@ export default function VendasArea({
             axisLine={false}
             interval={interval}
             stroke="var(--text-muted)"
+            padding={{ left: 14, right: 14 }}
           />
           <Tooltip
             content={<TooltipCustom formatLabel={formatLabel} />}

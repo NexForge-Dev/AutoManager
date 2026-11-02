@@ -114,7 +114,7 @@ const FAQ_LANDING = [
 
 export default function Landing() {
   return (
-    <main style={TEMA_DARK} className="min-h-screen bg-[var(--bg)] text-strong antialiased">
+    <main style={TEMA_DARK} className="min-h-screen overflow-x-clip bg-[var(--bg)] text-strong antialiased">
       {/* ======================= NAV ======================= */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">

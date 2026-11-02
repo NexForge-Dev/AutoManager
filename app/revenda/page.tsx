@@ -116,12 +116,17 @@ export default function RevendaPage() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <div className="font-bold leading-tight truncate">{me?.loja_nome}</div>
+            <h1 className="font-bold leading-tight truncate text-base">{me?.loja_nome}</h1>
             <div className="text-xs text-muted truncate">
               {me?.nome} · comissão {me?.comissao_percent}%
             </div>
           </div>
-          <button onClick={sair} className="text-muted" aria-label="Sair">
+          <button
+            type="button"
+            onClick={sair}
+            className="grid place-items-center h-11 w-11 -mr-2 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong"
+            aria-label="Sair da conta"
+          >
             <LogOut size={20} />
           </button>
         </div>
@@ -240,16 +245,16 @@ function Vender({ me, catalogo, sb, onVendido }: { me: Me; catalogo: Prod[]; sb:
         <div className="card space-y-3 sticky bottom-4 shadow-xl">
           <div className="flex items-center justify-between font-semibold">
             <span className="flex items-center gap-2"><ShoppingBag size={16} className="text-brand-500" /> Venda</span>
-            <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="-mr-2 grid h-10 w-10 place-items-center text-muted"><X size={18} /></button>
+            <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="-mr-2 grid h-11 w-11 place-items-center text-muted"><X size={18} /></button>
           </div>
           <div className="space-y-1.5 max-h-40 overflow-auto">
             {carrinho.map((i, idx) => (
               <div key={idx} className="flex items-center gap-2 text-sm">
                 <div className="flex-1 min-w-0 truncate">{i.nome}</div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => mudarQtd(idx, -1)} aria-label={`Diminuir quantidade de ${i.nome}`} className="h-10 w-10 rounded-full surface-alt grid place-items-center"><Minus size={16} /></button>
+                  <button onClick={() => mudarQtd(idx, -1)} aria-label={`Diminuir quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center"><Minus size={16} /></button>
                   <span className="w-5 text-center">{i.qtd}</span>
-                  <button onClick={() => mudarQtd(idx, 1)} aria-label={`Aumentar quantidade de ${i.nome}`} className="h-10 w-10 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={16} /></button>
+                  <button onClick={() => mudarQtd(idx, 1)} aria-label={`Aumentar quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={16} /></button>
                 </div>
                 <div className="w-16 text-right font-medium">{brl(i.preco * i.qtd)}</div>
               </div>

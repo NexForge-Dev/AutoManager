@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Lock, Sparkles, X, ArrowRight } from "lucide-react";
+import { Lock, Sparkles, ArrowRight } from "lucide-react";
+import Modal from "./Modal";
 import type { PlanoDef } from "@/lib/plans";
 import { brlPreco } from "@/lib/plans";
 
@@ -49,32 +50,12 @@ export function UpgradeModal({
 }) {
   if (!aberto) return null;
   return (
-    <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-5"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className="modal-panel surface shadow-pop w-full max-w-sm rounded-3xl p-6 space-y-4 text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            aria-label="Fechar"
-            className="grid place-items-center h-9 w-9 -mr-2 -mt-2 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="mx-auto h-16 w-16 rounded-2xl bg-brand-500/10 grid place-items-center -mt-2">
+    <Modal onClose={onClose} titulo={titulo} largura="md:max-w-sm" className="space-y-4">
+      <div className="text-center space-y-4">
+        <div className="mx-auto h-16 w-16 rounded-2xl bg-brand-500/10 grid place-items-center">
           <Sparkles className="text-brand-500" size={28} />
         </div>
-        <div>
-          <div className="text-lg font-bold">{titulo}</div>
-          <p className="text-sm text-muted mt-1">{descricao}</p>
-        </div>
+        <p className="text-sm text-muted">{descricao}</p>
 
         {planoNecessario && (
           <div className="rounded-2xl border border-brand-500/30 bg-brand-500/5 p-4 text-left">
@@ -95,10 +76,10 @@ export function UpgradeModal({
         <Link href="/planos" className="btn-primary w-full">
           <Sparkles size={16} /> Fazer upgrade
         </Link>
-        <button onClick={onClose} className="text-sm text-muted w-full">
+        <button type="button" onClick={onClose} className="text-sm text-muted w-full min-h-[44px]">
           Agora não
         </button>
       </div>
-    </div>
+    </Modal>
   );
 }
