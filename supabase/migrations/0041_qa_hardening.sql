@@ -22,7 +22,12 @@ set search_path = ''
 as $$
   select current_user in ('authenticated', 'anon')
 $$;
-grant execute on function private.via_api_cliente() to anon, authenticated;
+grant execute on function private.via_api_cliente() to anon, authenticated, service_role;
+-- [geral] os triggers INVOKER abaixo chamam funções de private também quando
+-- quem escreve é a service_role (ativação da revendedora, moderação do admin,
+-- webhook): sem USAGE no schema o UPDATE dela falhava com "permission denied
+-- for schema private". A service_role já ignora RLS; isto não amplia acesso.
+grant usage on schema private to service_role;
 
 -- ============================================================ [#8] org.acesso
 -- [#8] current_org_id passa a exigir loja ATIVA: um JWT emitido antes do ban/
