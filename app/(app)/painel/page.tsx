@@ -72,6 +72,8 @@ function Painel() {
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
+          {/* só com pendências: não há importação automática de recebimentos */}
+          {recebimentosPendentes > 0 && (
           <Link
             href="/recebimentos"
             className="relative grid place-items-center h-10 w-10 rounded-xl text-muted hover:text-strong hover:bg-[var(--hover)] active:scale-90 transition"
@@ -87,6 +89,7 @@ function Painel() {
               </span>
             )}
           </Link>
+          )}
           <Link
             href="/relatorios"
             className="grid place-items-center h-10 w-10 rounded-xl text-muted hover:text-strong hover:bg-[var(--hover)] active:scale-90 transition"
