@@ -41,11 +41,17 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     aplicarAparencia({ corMarca, temaBase: temaDoUsuario(usuarioId, temaBase), appFonte, appRaio });
   }, [jaMontado, ready, usuarioId, corMarca, temaBase, appFonte, appRaio]);
 
-  // ícone da aba (favicon) = logo da loja; troca sozinho quando o dono muda a logo
+  // ícone da aba (favicon) = logo da loja; troca sozinho quando o dono muda a logo.
+  // E de novo (só o ícone) a cada rota: o Next reinsere os ícones do metadata no <head> ao navegar,
+  // e o nosso link (só ele é movido) volta para o fim para continuar valendo.
   useEffect(() => {
     if (jaMontado) return;
     aplicarFavicon(logoUrl, nomeLoja || null);
   }, [jaMontado, logoUrl, nomeLoja]);
+  useEffect(() => {
+    if (jaMontado) return;
+    aplicarFavicon(logoUrl, null);
+  }, [jaMontado, logoUrl, path]);
 
   useEffect(() => {
     if (jaMontado || !ready) return;
