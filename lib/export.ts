@@ -1,4 +1,5 @@
 // Exportação de dados - CSV (abre no Excel) e impressão/PDF.
+import { partesSP } from "./fuso";
 
 export function baixarCSV(nomeArquivo: string, header: string[], linhas: (string | number)[][]) {
   const esc = (v: string | number) => {
@@ -25,14 +26,16 @@ export function baixarBlob(nomeArquivo: string, blob: Blob) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // revogar logo após o click cancela o download no Safari/Firefox
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** Data "dd/mm/aaaa" e hora "hh:mm" no fuso da loja (America/Sao_Paulo). */
 export function dataHora(ts: number) {
-  const d = new Date(ts);
+  const d = partesSP(ts);
   const p = (n: number) => String(n).padStart(2, "0");
   return {
-    data: `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`,
-    hora: `${p(d.getHours())}:${p(d.getMinutes())}`,
+    data: `${p(d.dia)}/${p(d.mes)}/${d.ano}`,
+    hora: `${p(d.hora)}:${p(d.minuto)}`,
   };
 }

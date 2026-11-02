@@ -11,7 +11,7 @@ import MembrosManager from "@/components/MembrosManager";
 import ThemeToggle from "@/components/ThemeToggle";
 import CountUp from "@/components/CountUp";
 import { Skeleton } from "@/components/Skeleton";
-import { brl } from "@/lib/analytics";
+import { brl, centavos } from "@/lib/analytics";
 import { Store, Mail, Palette, LogOut, BadgeCheck, ChevronRight } from "lucide-react";
 
 export default function PerfilPage() {
@@ -48,7 +48,10 @@ function Perfil() {
     router.replace("/login");
   }
 
-  const faturamento = vendas.reduce((a, v) => a + v.total, 0);
+  // canceladas não são faturamento nem venda
+  const validas = vendas.filter((v) => v.statusPagamento !== "cancelada");
+  const faturamento = centavos(validas.reduce((a, v) => a + v.total, 0));
+  const ehDono = role === "owner";
 
   return (
     <div className="space-y-4">
@@ -71,19 +74,19 @@ function Perfil() {
         <div className="flex items-center gap-2 text-sm text-muted">
           <Mail size={15} /> {email ? email : <Skeleton className="h-4 w-40" />}
         </div>
-        {/* faturamento da loja é informação do dono — vendedor/entregador não vê */}
+        {/* números da loja (produtos, vendas, faturado) são informação do dono — vendedor/entregador não vê */}
         {/* no celular o faturado ocupa a linha inteira: valor em reais não cabe num terço */}
-        <div className={`grid grid-cols-2 ${role === "owner" ? "sm:grid-cols-3" : ""} gap-2 pt-1 stagger`}>
-          <Stat label="Produtos" value={<CountUp value={produtos.length} />} />
-          <Stat label="Vendas" value={<CountUp value={vendas.length} />} />
-          {role === "owner" && (
+        {ehDono && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 stagger">
+            <Stat label="Produtos" value={<CountUp value={produtos.length} />} />
+            <Stat label="Vendas" value={<CountUp value={validas.length} />} />
             <Stat
               label="Faturado"
               className="col-span-2 sm:col-span-1"
               value={<CountUp value={faturamento} format={brl} />}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* tema */}
@@ -99,7 +102,7 @@ function Perfil() {
       <PlanoLinha />
 
       {/* equipe (vendedor / entregador) — só o dono, papéis conforme o plano */}
-      {role === "owner" && <MembrosManager />}
+      {ehDono && <MembrosManager />}
 
       <button onClick={sair} className="btn-ghost w-full text-red-500">
         <LogOut size={18} /> Sair da conta

@@ -69,3 +69,12 @@ describe("fuso da loja (America/Sao_Paulo)", () => {
     expect(meiaNoiteSP(2018, 12, 1)).toBe(utc("2018-12-01T02:00:00Z"));
   });
 });
+
+describe("dataHora (export) no fuso da loja", () => {
+  it("formata data/hora de SP, não do navegador", async () => {
+    const { dataHora } = await import("./export");
+    // 01/11 01:00 UTC = 31/10 22:00 em SP
+    expect(dataHora(utc("2026-11-01T01:00:00Z"))).toEqual({ data: "31/10/2026", hora: "22:00" });
+    expect(dataHora(utc("2026-11-02T03:05:00Z"))).toEqual({ data: "02/11/2026", hora: "00:05" });
+  });
+});

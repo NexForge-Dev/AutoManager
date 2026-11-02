@@ -46,7 +46,32 @@ export default function MinhaLojaPage() {
   );
 }
 
-const CORES = ["#db2777", "#7c3aed", "#2563eb", "#0d9488", "#ea580c", "#dc2626", "#ca8a04", "#111827"];
+const CORES: { hex: string; nome: string }[] = [
+  { hex: "#db2777", nome: "Rosa" },
+  { hex: "#7c3aed", nome: "Roxo" },
+  { hex: "#2563eb", nome: "Azul" },
+  { hex: "#0d9488", nome: "Verde-azulado" },
+  { hex: "#ea580c", nome: "Laranja" },
+  { hex: "#dc2626", nome: "Vermelho" },
+  { hex: "#ca8a04", nome: "Mostarda" },
+  { hex: "#111827", nome: "Grafite" },
+];
+
+// mesmo formato que o banco aceita para org.slug (<= 60, minúsculas/números, hífens entre partes)
+const SLUG_MAX = 60;
+const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** Normaliza o que o usuário digitou: sem acento, minúsculo, hífen único entre partes, até 60. */
+function limparSlug(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, SLUG_MAX)
+    .replace(/-+$/g, "");
+}
 
 function MinhaLoja() {
   const { config, orgId, produtos, setConfig, definirSlug } = useStore();
@@ -77,6 +102,9 @@ function MinhaLoja() {
 
   const [erro, setErro] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  // área de transferência indisponível/negada: mostra o link para copiar à mão
+  const [copiaManual, setCopiaManual] = useState(false);
+  const [alternando, setAlternando] = useState(false);
   const [salvandoSlug, setSalvandoSlug] = useState(false);
   const [enviandoLogo, setEnviandoLogo] = useState(false);
 
@@ -93,28 +121,39 @@ function MinhaLoja() {
   const semEstoque = visiveis.filter((p) => p.estoqueAtual <= 0).length;
 
   async function toggleAtiva() {
+    if (alternando) return; // trava toque duplo
     setErro(null);
     const ativar = !config.lojaAtiva;
-    if (ativar && !config.slug) {
-      const s = slugSugerido(config.nomeLoja || "minha-loja");
-      const r = await definirSlug(s);
+    setAlternando(true);
+    try {
+      if (ativar && !config.slug) {
+        const s = limparSlug(slugSugerido(config.nomeLoja || "minha-loja")) || "minha-loja";
+        const r = await definirSlug(s);
+        if (!r.ok) {
+          setErro(r.erro || "Não foi possível gerar o link");
+          return;
+        }
+        setSlug(s);
+      }
+      const r = await setConfig({ lojaAtiva: ativar });
       if (!r.ok) {
-        setErro(r.erro || "Não foi possível gerar o link");
+        setErro(r.erro || (ativar ? "Não foi possível colocar a loja no ar." : "Não foi possível tirar a loja do ar."));
         return;
       }
-      setSlug(s);
+      if (ativar) registrarMetrica({ tipo: "recurso", recurso: "loja_online_publicada" });
+    } finally {
+      setAlternando(false);
     }
-    const r = await setConfig({ lojaAtiva: ativar });
-    if (ativar && r?.ok !== false) registrarMetrica({ tipo: "recurso", recurso: "loja_online_publicada" });
   }
 
   async function salvarSlug() {
     setErro(null);
-    const limpo = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "");
-    if (!limpo) {
-      setErro("Informe um link válido");
+    const limpo = limparSlug(slug);
+    if (!limpo || !SLUG_RE.test(limpo)) {
+      setErro("Link inválido: use letras, números e hífen (até 60 caracteres).");
       return;
     }
+    if (limpo !== slug) setSlug(limpo); // mostra como ficou (sem acento, espaços ou "--")
     if (limpo === config.slug) return;
     setSalvandoSlug(true);
     const r = await definirSlug(limpo);
@@ -171,12 +210,15 @@ function MinhaLoja() {
     setEnviandoLogo(true);
     try {
       const u = await uploadLogo(orgId, file);
+      const res = await setConfig({ logoUrl: u });
+      if (!res.ok) throw new Error(res.erro || "A imagem foi enviada, mas não foi salva na loja.");
+      // só mostra a logo nova depois de salva (senão a prévia mostraria algo que não está na loja)
       setLogoUrl(u);
-      await setConfig({ logoUrl: u });
     } catch (err: any) {
-      alerta({ titulo: "Não foi possível enviar a logo", mensagem: err?.message || "erro" });
+      alerta({ titulo: "Não foi possível enviar a logo", mensagem: err?.message || "Tente novamente." });
     } finally {
       setEnviandoLogo(false);
+      e.target.value = ""; // permite reenviar o mesmo arquivo
     }
   }
 
@@ -186,25 +228,43 @@ function MinhaLoja() {
     setEnviandoCapa(true);
     try {
       const u = await uploadCapa(orgId, file);
+      const res = await setConfig({ lojaCapaUrl: u });
+      if (!res.ok) throw new Error(res.erro || "A imagem foi enviada, mas não foi salva na loja.");
       setCapaUrl(u);
-      await setConfig({ lojaCapaUrl: u });
     } catch (err: any) {
-      alerta({ titulo: "Não foi possível enviar a capa", mensagem: err?.message || "erro" });
+      alerta({ titulo: "Não foi possível enviar a capa", mensagem: err?.message || "Tente novamente." });
     } finally {
       setEnviandoCapa(false);
+      e.target.value = "";
     }
   }
 
   async function removerCapa() {
+    if (enviandoCapa) return;
+    const anterior = capaUrl;
+    setEnviandoCapa(true);
     setCapaUrl(null);
-    await setConfig({ lojaCapaUrl: null });
+    const res = await setConfig({ lojaCapaUrl: null });
+    setEnviandoCapa(false);
+    if (!res.ok) {
+      setCapaUrl(anterior);
+      alerta({ titulo: "Não foi possível remover a capa", mensagem: res.erro || "Tente novamente." });
+    }
   }
 
-  function copiar() {
+  async function copiar() {
     if (!url) return;
-    navigator.clipboard?.writeText(url);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 1500);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("sem clipboard");
+      await navigator.clipboard.writeText(url);
+      setCopiaManual(false);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    } catch {
+      // http sem HTTPS, navegador antigo ou permissão negada
+      setCopiado(false);
+      setCopiaManual(true);
+    }
   }
 
   // feedback "Salvo ✓" — minha-loja persiste no onBlur, então confirmamos visualmente
@@ -221,6 +281,13 @@ function MinhaLoja() {
     if (Object.keys(patch).every((k) => (atual[k] ?? null) === (patch[k] ?? null))) return;
     const res = await setConfig(patch as any);
     if (!res.ok) {
+      // o store desfez a config; a aparência na tela volta para a salva
+      const c = useStore.getState().config;
+      if ("corMarca" in patch) setCor(c.corMarca);
+      if ("temaBase" in patch) setTemaBase(c.temaBase);
+      if ("appFonte" in patch) setAppFonte(c.appFonte);
+      if ("appRaio" in patch) setAppRaio(c.appRaio);
+      if ("lojaFonte" in patch) setFonte(c.lojaFonte ?? "padrao");
       alerta({ titulo: "Não foi possível salvar", mensagem: res.erro || "Tente novamente." });
       return;
     }
@@ -244,12 +311,22 @@ function MinhaLoja() {
           <p className="text-sm text-muted">Monte sua loja online: link, identidade, contato e vitrine.</p>
         </div>
         <button
+          type="button"
           onClick={toggleAtiva}
-          className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+          disabled={alternando}
+          aria-pressed={config.lojaAtiva}
+          title={config.lojaAtiva ? "Tirar a loja do ar" : "Colocar a loja no ar"}
+          className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition disabled:opacity-60 ${
             config.lojaAtiva ? "bg-brand-600 text-white" : "surface-alt text-muted"
           }`}
         >
-          {config.lojaAtiva ? <Eye size={16} /> : <EyeOff size={16} />}
+          {alternando ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : config.lojaAtiva ? (
+            <Eye size={16} />
+          ) : (
+            <EyeOff size={16} />
+          )}
           {config.lojaAtiva ? "No ar" : "Fora do ar"}
         </button>
       </header>
@@ -268,16 +345,29 @@ function MinhaLoja() {
               </p>
             )}
             <div>
-              <label className="label">Endereço da loja</label>
+              <label className="label" htmlFor="loja-slug">Endereço da loja</label>
               <div className="flex gap-2">
-                <span className="input flex items-center text-sm text-muted truncate max-w-[45%]">{origin}/loja/</span>
-                <input className="input flex-1" value={slug} placeholder="minha-loja" onChange={(e) => setSlug(e.target.value)} onBlur={salvarSlug} />
+                <span className="input flex items-center text-sm text-muted truncate max-w-[45%] min-w-0">{origin}/loja/</span>
+                <input
+                  id="loja-slug"
+                  className="input flex-1 min-w-0"
+                  value={slug}
+                  placeholder="minha-loja"
+                  maxLength={80}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => setSlug(e.target.value)}
+                  onBlur={salvarSlug}
+                />
               </div>
-              {salvandoSlug && <p className="text-xs text-muted mt-1">Salvando…</p>}
+              <p className="text-xs text-muted mt-1">
+                {salvandoSlug ? "Salvando…" : "Letras minúsculas, números e hífen, até 60 caracteres."}
+              </p>
             </div>
             {url && (
               <div className="flex gap-2">
-                <button onClick={copiar} className="btn-ghost flex-1 py-2 text-sm">
+                <button type="button" onClick={copiar} className="btn-ghost flex-1 py-2 text-sm">
                   {copiado ? <Check size={15} /> : <Copy size={15} />} {copiado ? "Copiado!" : "Copiar link"}
                 </button>
                 <a href={url} target="_blank" rel="noreferrer" className="btn-ghost flex-1 py-2 text-sm">
@@ -285,7 +375,23 @@ function MinhaLoja() {
                 </a>
               </div>
             )}
-            {erro && <p className="text-sm text-red-500">{erro}</p>}
+            {url && copiaManual && (
+              <div>
+                <p className="text-xs text-muted mb-1">Não deu para copiar automaticamente. Copie o link abaixo:</p>
+                <input
+                  className="input text-sm"
+                  readOnly
+                  value={url}
+                  aria-label="Link da loja"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+              </div>
+            )}
+            {erro && (
+              <p className="text-sm text-red-500" role="alert">
+                {erro}
+              </p>
+            )}
           </section>
 
           {/* Identidade */}
@@ -315,7 +421,7 @@ function MinhaLoja() {
               <div className="rounded-xl overflow-hidden border border-default surface-alt aspect-[16/6] relative grid place-items-center">
                 {capaUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={capaUrl} alt="capa" className="h-full w-full object-cover" />
+                  <img src={capaUrl} alt="Imagem de capa da loja" className="h-full w-full object-cover" />
                 ) : (
                   <div className="text-muted flex flex-col items-center gap-1 text-xs">
                     <ImagePlus size={22} />
@@ -325,12 +431,12 @@ function MinhaLoja() {
               </div>
               <input ref={capaRef} type="file" accept="image/*" hidden onChange={onCapa} />
               <div className="flex gap-2 mt-2">
-                <button onClick={() => capaRef.current?.click()} disabled={enviandoCapa} className="btn-ghost py-2 px-3 text-sm">
+                <button type="button" onClick={() => capaRef.current?.click()} disabled={enviandoCapa} className="btn-ghost py-2 px-3 text-sm disabled:opacity-60">
                   {enviandoCapa ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                   {capaUrl ? "Trocar capa" : "Enviar capa"}
                 </button>
                 {capaUrl && (
-                  <button onClick={removerCapa} className="btn-ghost py-2 px-3 text-sm text-red-500">
+                  <button type="button" onClick={removerCapa} disabled={enviandoCapa} className="btn-ghost py-2 px-3 text-sm text-red-500 disabled:opacity-60">
                     <Trash2 size={16} /> Remover
                   </button>
                 )}
@@ -345,13 +451,13 @@ function MinhaLoja() {
                 <div className="h-16 w-16 rounded-xl surface-alt grid place-items-center overflow-hidden border border-default">
                   {logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={logoUrl} alt="logo" className="h-full w-full object-cover" />
+                    <img src={logoUrl} alt="Logo da loja" className="h-full w-full object-cover" />
                   ) : (
                     <ImageIcon size={22} className="text-muted" />
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" hidden onChange={onLogo} />
-                <button onClick={() => fileRef.current?.click()} disabled={enviandoLogo} className="btn-ghost py-2 px-3 text-sm">
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={enviandoLogo} className="btn-ghost py-2 px-3 text-sm disabled:opacity-60">
                   {enviandoLogo ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                   {logoUrl ? "Trocar logo" : "Enviar logo"}
                 </button>
@@ -364,17 +470,20 @@ function MinhaLoja() {
               <div className="flex flex-wrap items-center gap-2">
                 {CORES.map((c) => (
                   <button
-                    key={c}
-                    onClick={() => escolherCor(c)}
-                    className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95 ${cor === c ? "border-white ring-2 ring-brand-500" : "border-transparent"}`}
-                    style={{ background: c }}
-                    aria-label={c}
+                    key={c.hex}
+                    type="button"
+                    onClick={() => escolherCor(c.hex)}
+                    className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95 ${cor === c.hex ? "border-white ring-2 ring-brand-500" : "border-transparent"}`}
+                    style={{ background: c.hex }}
+                    aria-label={`Cor ${c.nome}`}
+                    aria-pressed={cor === c.hex}
+                    title={c.nome}
                   />
                 ))}
                 <label className="h-8 w-8 rounded-full border border-default grid place-items-center cursor-pointer overflow-hidden">
-                  <input type="color" className="h-10 w-10 cursor-pointer" value={cor || "#db2777"} onChange={(e) => escolherCor(e.target.value)} />
+                  <input type="color" aria-label="Escolher outra cor" className="h-10 w-10 cursor-pointer" value={cor || "#db2777"} onChange={(e) => escolherCor(e.target.value)} />
                 </label>
-                <button onClick={() => escolherCor(null)} className="text-xs text-muted ml-1 underline">
+                <button type="button" onClick={() => escolherCor(null)} className="text-xs text-muted ml-1 underline">
                   padrão
                 </button>
               </div>
@@ -561,7 +670,8 @@ function MinhaLoja() {
             {semEstoque > 0 && (
               <p className="text-xs text-amber-600 flex items-start gap-1">
                 <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-                {semEstoque} produto(s) sem estoque aparecem como “Esgotado”. Desative-os em Produtos para ocultar.
+                {semEstoque} produto(s) sem estoque aparecem como “Esgotado”. Para ocultá-los, abra o produto em
+                Produtos e desmarque “Produto ativo”.
               </p>
             )}
           </section>

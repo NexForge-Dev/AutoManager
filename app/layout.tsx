@@ -47,7 +47,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    // o script APARENCIA_NO_FLASH muda class/style do <html> antes da hidratação
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: APARENCIA_NO_FLASH }} />
       </head>

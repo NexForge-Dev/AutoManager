@@ -25,7 +25,7 @@ const ROLE_ICON: Record<Role, any> = {
 export default function MembrosManager() {
   const { membros, usuarioId, criarMembro, removerMembro } = useStore();
   const { caps } = usePlano();
-  const { confirm } = useDialog();
+  const { confirm, alerta } = useDialog();
 
   const papeisDisponiveis: Role[] = [
     ...(caps.allowVendedores ? ["vendedor" as Role] : []),
@@ -40,15 +40,19 @@ export default function MembrosManager() {
   const [papel, setPapel] = useState<Role>(papeisDisponiveis[0] || "vendedor");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [removendo, setRemovendo] = useState<string | null>(null);
+  // o plano pode carregar depois do 1º render: nunca envia um papel que o plano não libera
+  const papelEfetivo: Role = papeisDisponiveis.includes(papel) ? papel : papeisDisponiveis[0] || "vendedor";
 
   async function salvar() {
+    if (salvando) return;
     setErro(null);
-    if (!email || senha.length < 8) {
+    if (!email.trim() || senha.length < 8) {
       setErro("Informe e-mail e senha de pelo menos 8 caracteres.");
       return;
     }
     setSalvando(true);
-    const r = await criarMembro({ nome, email, senha, role: papel });
+    const r = await criarMembro({ nome, email: email.trim(), senha, role: papelEfetivo });
     setSalvando(false);
     if (!r.ok) {
       setErro(r.erro || "Falha ao criar acesso");
@@ -67,7 +71,12 @@ export default function MembrosManager() {
           <Users size={18} className="text-brand-500" /> Equipe de acesso
         </div>
         {papeisDisponiveis.length > 0 && (
-          <button onClick={() => setAberto((v) => !v)} className="btn-ghost py-1.5 px-3 text-sm">
+          <button
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            aria-expanded={aberto}
+            className="btn-ghost py-1.5 px-3 text-sm"
+          >
             <UserPlus size={16} /> Adicionar
           </button>
         )}
@@ -106,17 +115,26 @@ export default function MembrosManager() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={async () => {
+                    if (removendo) return;
                     const ok = await confirm({
                       titulo: "Remover acesso?",
                       mensagem: `${m.nome || m.email} perderá o login deste painel.`,
                       confirmar: "Remover",
                       perigo: true,
                     });
-                    if (ok) removerMembro(m.id);
+                    if (!ok) return;
+                    setRemovendo(m.id);
+                    const r = await removerMembro(m.id);
+                    setRemovendo(null);
+                    if (!r.ok)
+                      alerta({ titulo: "Não foi possível remover o acesso", mensagem: r.erro || "Tente novamente." });
                   }}
-                  className="text-red-500 shrink-0"
+                  disabled={removendo === m.id}
+                  className="text-red-500 shrink-0 grid place-items-center h-9 w-9 rounded-lg hover:bg-[var(--hover)] disabled:opacity-50"
                   title="Remover acesso"
+                  aria-label={`Remover acesso de ${m.nome || m.email}`}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -131,27 +149,60 @@ export default function MembrosManager() {
         <div className="rounded-xl border border-default p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-medium text-sm">Novo acesso</span>
-            <button onClick={() => setAberto(false)} className="text-muted">
+            <button
+              type="button"
+              onClick={() => setAberto(false)}
+              className="text-muted grid place-items-center h-8 w-8 rounded-lg hover:bg-[var(--hover)]"
+              aria-label="Fechar formulário de novo acesso"
+            >
               <X size={16} />
             </button>
           </div>
-          <input className="input" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+          <label htmlFor="membro-nome" className="sr-only">
+            Nome
+          </label>
           <input
+            id="membro-nome"
+            className="input"
+            placeholder="Nome"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            disabled={salvando}
+          />
+          <label htmlFor="membro-email" className="sr-only">
+            E-mail de login
+          </label>
+          <input
+            id="membro-email"
             className="input"
             type="email"
+            autoComplete="off"
             placeholder="E-mail de login"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={salvando}
           />
+          <label htmlFor="membro-senha" className="sr-only">
+            Senha (mínimo 8 caracteres)
+          </label>
           <input
+            id="membro-senha"
             className="input"
             type="password"
+            autoComplete="new-password"
             placeholder="Senha (mín. 8)"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
+            disabled={salvando}
           />
           {papeisDisponiveis.length > 1 ? (
-            <select className="input" value={papel} onChange={(e) => setPapel(e.target.value as Role)}>
+            <select
+              className="input"
+              aria-label="Papel"
+              value={papelEfetivo}
+              onChange={(e) => setPapel(e.target.value as Role)}
+              disabled={salvando}
+            >
               {papeisDisponiveis.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABEL[r]}
@@ -161,8 +212,12 @@ export default function MembrosManager() {
           ) : (
             <p className="text-xs text-muted">Papel: {ROLE_LABEL[papeisDisponiveis[0]]}</p>
           )}
-          {erro && <p className="text-sm text-red-500">{erro}</p>}
-          <button onClick={salvar} disabled={salvando} className="btn-primary w-full disabled:opacity-60">
+          {erro && (
+            <p className="text-sm text-red-500" role="alert">
+              {erro}
+            </p>
+          )}
+          <button type="button" onClick={salvar} disabled={salvando} className="btn-primary w-full disabled:opacity-60">
             {salvando ? "Criando…" : "Criar acesso"}
           </button>
           <p className="text-[11px] text-muted">

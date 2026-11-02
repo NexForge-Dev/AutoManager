@@ -36,6 +36,12 @@ type Ctx = {
 
 const DialogCtx = createContext<Ctx | null>(null);
 
+function resolverCancelado(e: Estado) {
+  if (e.tipo === "confirm") e.resolve(false);
+  else if (e.tipo === "prompt") e.resolve(null);
+  else e.resolve();
+}
+
 export function useDialog(): Ctx {
   const ctx = useContext(DialogCtx);
   if (!ctx) throw new Error("useDialog precisa do <DialogProvider>");
@@ -46,23 +52,33 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [estado, setEstado] = useState<Estado | null>(null);
   const [valor, setValor] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  // diálogo aberto agora (ref: os callbacks abaixo são estáveis e não veem o state)
+  const atualRef = useRef<Estado | null>(null);
+
+  // Um diálogo novo substitui o aberto: antes, a promise do anterior é resolvida
+  // como "cancelado" (false / null), senão quem chamou ficaria esperando para sempre.
+  const abrir = useCallback((novo: Estado) => {
+    const anterior = atualRef.current;
+    if (anterior) resolverCancelado(anterior);
+    atualRef.current = novo;
+    setEstado(novo);
+  }, []);
 
   const confirm = useCallback(
-    (opts: ConfirmOpts) =>
-      new Promise<boolean>((resolve) => setEstado({ tipo: "confirm", opts, resolve })),
-    []
+    (opts: ConfirmOpts) => new Promise<boolean>((resolve) => abrir({ tipo: "confirm", opts, resolve })),
+    [abrir]
   );
   const prompt = useCallback(
     (opts: PromptOpts) =>
       new Promise<string | null>((resolve) => {
         setValor(opts.valorInicial ?? "");
-        setEstado({ tipo: "prompt", opts, resolve });
+        abrir({ tipo: "prompt", opts, resolve });
       }),
-    []
+    [abrir]
   );
   const alerta = useCallback(
-    (opts: AlertaOpts) => new Promise<void>((resolve) => setEstado({ tipo: "alerta", opts, resolve })),
-    []
+    (opts: AlertaOpts) => new Promise<void>((resolve) => abrir({ tipo: "alerta", opts, resolve })),
+    [abrir]
   );
 
   function fechar(resultado: boolean | string | null) {
@@ -70,6 +86,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     if (estado.tipo === "confirm") estado.resolve(resultado === true);
     else if (estado.tipo === "prompt") estado.resolve(resultado === false ? null : (resultado as string | null));
     else estado.resolve();
+    if (atualRef.current === estado) atualRef.current = null;
     setEstado(null);
   }
 
