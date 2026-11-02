@@ -129,6 +129,7 @@ function Admin() {
   const [logs, setLogs] = useState<AdminLog[] | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [filtro, setFiltro] = useState<"abertos" | "todos">("abertos");
+  const [erroChamados, setErroChamados] = useState<string | null>(null);
 
   async function carregar() {
     setCarregando(true);
@@ -141,7 +142,8 @@ function Admin() {
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
     ]);
-    setChamados(lista);
+    setChamados(lista.chamados);
+    setErroChamados(lista.erro ?? null);
     setOverview(res);
     setLogs(logsRes?.logs ?? null);
     setCarregando(false);
@@ -162,7 +164,12 @@ function Admin() {
           : x
       )
     );
-    await resolverChamado(c.id, resolvido);
+    const r = await resolverChamado(c.id, resolvido);
+    if (!r.ok) {
+      // volta ao estado anterior e avisa (antes ficava "resolvido" só na tela)
+      setChamados((cs) => cs.map((x) => (x.id === c.id ? c : x)));
+      setErroChamados(r.erro || "Não foi possível atualizar o chamado.");
+    }
   }
 
   if (!autorizado) {
@@ -232,6 +239,7 @@ function Admin() {
           filtro={filtro}
           setFiltro={setFiltro}
           alternar={alternar}
+          erro={erroChamados}
         />
       )}
     </div>
@@ -576,11 +584,13 @@ function ChamadosView({
   filtro,
   setFiltro,
   alternar,
+  erro,
 }: {
   chamados: Chamado[];
   filtro: "abertos" | "todos";
   setFiltro: (f: "abertos" | "todos") => void;
   alternar: (c: Chamado) => void;
+  erro: string | null;
 }) {
   const lista = filtro === "abertos" ? chamados.filter((c) => c.status !== "resolvido") : chamados;
 
@@ -600,7 +610,12 @@ function ChamadosView({
         ))}
       </div>
 
-      {lista.length === 0 ? (
+      {erro && (
+        <div role="alert" className="card text-sm text-red-500">
+          {erro}
+        </div>
+      )}
+      {lista.length === 0 && !erro ? (
         <div className="card text-center text-muted py-10 flex flex-col items-center gap-2">
           <Inbox size={32} />
           {filtro === "abertos" ? "Nenhum chamado em aberto 🎉" : "Nenhum chamado ainda."}

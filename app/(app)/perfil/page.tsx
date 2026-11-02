@@ -43,6 +43,8 @@ function Perfil() {
     });
     if (!ok) return;
     await createClient().auth.signOut();
+    // não deixa os dados desta loja na memória para a próxima conta do navegador
+    useStore.getState().limpar();
     router.replace("/login");
   }
 

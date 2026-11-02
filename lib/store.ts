@@ -347,8 +347,11 @@ interface State {
     emailContato?: string;
     whatsapp?: string;
   }) => Promise<{ ok: boolean; erro?: string }>;
-  listarChamados: () => Promise<Chamado[]>;
-  resolverChamado: (id: string, resolvido: boolean) => Promise<void>;
+  // erro = não conseguiu ler (a tela mostra o erro em vez de "nenhum chamado")
+  listarChamados: () => Promise<{ chamados: Chamado[]; erro?: string }>;
+  resolverChamado: (id: string, resolvido: boolean) => Promise<Resultado>;
+  // sair: limpa os dados da loja da memória (outra conta no mesmo navegador não vê nada)
+  limpar: () => void;
 }
 
 // retorno padrão das ações que gravam no banco (a tela mostra `erro` se falhar)
@@ -1826,18 +1829,41 @@ export const useStore = create<State>()((set, get) => {
         .from("chamado")
         .select("*")
         .order("created_at", { ascending: false });
-      if (error) return [];
-      return (data || []).map(mapChamado);
+      if (error) return { chamados: [], erro: erroAmigavel(error.message) };
+      return { chamados: (data || []).map(mapChamado) };
     },
 
     resolverChamado: async (id, resolvido) => {
-      await sb()
+      const { error } = await sb()
         .from("chamado")
         .update({
           status: resolvido ? "resolvido" : "aberto",
           resolved_at: resolvido ? new Date().toISOString() : null,
         })
         .eq("id", id);
+      if (error) return { ok: false, erro: erroAmigavel(error.message) };
+      return { ok: true };
     },
+
+    limpar: () =>
+      set({
+        ready: false,
+        orgId: null,
+        usuarioId: null,
+        email: null,
+        superadmin: false,
+        role: "owner",
+        semOrg: false,
+        config: configInicial,
+        assinatura: null,
+        produtos: [],
+        revendedoras: [],
+        vendas: [],
+        movimentos: [],
+        membros: [],
+        entregas: [],
+        entradasPendentes: [],
+        contasPagar: [],
+      }),
   };
 });
