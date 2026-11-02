@@ -5,7 +5,8 @@ import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
-import { Plus, X, MessageCircle, BadgeDollarSign, Target, Pencil, KeyRound, Check, Mail } from "lucide-react";
+import { Plus, X, MessageCircle, BadgeDollarSign, Target, Pencil, KeyRound, Check, Mail, Link2 } from "lucide-react";
+import { linkConvite, mensagemConvite } from "@/lib/acessoRevendedora";
 import type { Revendedora } from "@/lib/types";
 import type { Resultado } from "@/lib/store";
 import { usePlano } from "@/lib/usePlano";
@@ -234,8 +235,8 @@ function Revendedoras() {
       {/* link de acesso das revendedoras */}
       {revendedoras.some((r) => r.email) && (
         <div className="card text-xs text-muted">
-          As revendedoras acessam pela página{" "}
-          <span className="font-mono text-brand-500">/acesso</span> com o e-mail cadastrado.
+          Libere o acesso e envie o link pelo WhatsApp: a revendedora toca no link e cria a senha. Depois ela entra
+          pela tela de login normal, com o e-mail e a senha dela.
         </div>
       )}
 
@@ -312,6 +313,7 @@ function AcessoRevendedora({
   onUpdate: (id: string, patch: Partial<Revendedora>) => Promise<Resultado>;
 }) {
   const { liberarAcessoRevendedora, revogarAcessoRevendedora } = useStore();
+  const nomeLoja = useStore((s) => s.config.nomeLoja);
   const { alerta } = useDialog();
   const [editando, setEditando] = useState(!r.email);
   const [email, setEmail] = useState(r.email ?? "");
@@ -348,10 +350,17 @@ function AcessoRevendedora({
     await revogarAcessoRevendedora(r.id);
   }
 
+  // link com e-mail e código já preenchidos: ela só toca e cria a senha
+  const link = codigo && r.email ? linkConvite(window.location.origin, r.email, codigo) : null;
+  const mensagem = link && codigo ? mensagemConvite({ nomeRevendedora: r.nome, nomeLoja, link, codigo }) : "";
+  const whatsLink = r.whatsapp
+    ? `https://wa.me/${waNumero(r.whatsapp)}?text=${encodeURIComponent(mensagem)}`
+    : `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+
   async function copiar() {
-    if (!codigo) return;
+    if (!link) return;
     try {
-      await navigator.clipboard.writeText(codigo);
+      await navigator.clipboard.writeText(mensagem);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch {
@@ -414,14 +423,22 @@ function AcessoRevendedora({
       {codigo && !r.temAcesso && (
         <div className="rounded-lg bg-brand-500/10 border border-brand-500/30 p-3 space-y-1.5">
           <div className="text-[11px] text-muted">Código de acesso (válido por 7 dias)</div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-xl font-bold tracking-[0.25em] text-brand-600">{codigo}</span>
-            <button onClick={copiar} className="btn-ghost py-1.5 px-3 text-xs whitespace-nowrap">
-              {copiado ? <Check size={14} /> : "Copiar"}
+          <span className="block font-mono text-xl font-bold tracking-[0.25em] text-brand-600">{codigo}</span>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <a
+              href={whatsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary py-2 text-sm flex items-center justify-center gap-1.5"
+            >
+              <MessageCircle size={15} /> WhatsApp
+            </a>
+            <button onClick={copiar} className="btn-ghost py-2 text-sm flex items-center justify-center gap-1.5 whitespace-nowrap">
+              {copiado ? <Check size={15} /> : <Link2 size={15} />} {copiado ? "Copiado" : "Copiar link"}
             </button>
           </div>
           <p className="text-[11px] text-muted">
-            Envie para ela junto do link <b>/acesso</b>. Some assim que ela ativar — só aparece agora.
+            O link já leva o e-mail e o código: ela só toca e cria a senha. Só aparece agora — some quando ela ativar.
           </p>
         </div>
       )}

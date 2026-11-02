@@ -1,7 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { lerConviteDoHash } from "@/lib/acessoRevendedora";
+import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { Gem, Loader2 } from "lucide-react";
 
 export default function AcessoPage() {
@@ -12,16 +15,25 @@ export default function AcessoPage() {
   const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [doLink, setDoLink] = useState(false);
 
-  async function entrarERedirecionar(supabase: ReturnType<typeof createClient>) {
-    const { data: me } = await supabase.rpc("revendedora_me");
-    if (!me) {
-      setErro("Esse acesso não é de revendedora. Verifique com a loja.");
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
+  // link enviado pela loja (/acesso#email=…&codigo=…): preenche e limpa a barra de endereço
+  useEffect(() => {
+    if (!window.location.hash) return;
+    const convite = lerConviteDoHash(window.location.hash);
+    if (convite.email) setEmail(convite.email);
+    if (convite.codigo) setCodigo(convite.codigo);
+    if (convite.email || convite.codigo) {
+      setModo("ativar");
+      setDoLink(Boolean(convite.email && convite.codigo));
     }
-    router.replace("/revenda");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  async function entrarERedirecionar() {
+    // revendedora vai para /revenda; vendedora/entregador/dono que entrou por aqui
+    // também é levado para a própria área, em vez de barrado
+    router.replace(await destinoPosLogin());
   }
 
   async function submit(e: React.FormEvent) {
@@ -52,7 +64,7 @@ export default function AcessoPage() {
         setLoading(false);
         return;
       }
-      await entrarERedirecionar(supabase);
+      await entrarERedirecionar();
     } catch {
       setErro("Erro inesperado. Tente novamente.");
       setLoading(false);
@@ -63,9 +75,9 @@ export default function AcessoPage() {
     <div className="min-h-screen grid place-items-center px-5 bg-[var(--bg)]">
       <div className="w-full max-w-sm reveal">
         <div className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-2">
-          <Gem className="text-brand-600" /> Área da Revendedora
+          <Gem className="text-brand-600" /> Área da Vendedora
         </div>
-        <p className="text-center text-sm text-muted mb-6">Acesse o catálogo e registre suas vendas.</p>
+        <p className="text-center text-sm text-muted mb-6">Revendedoras e equipe da loja: acesse o catálogo e registre suas vendas.</p>
 
         <div className="card space-y-4">
           <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
@@ -85,7 +97,9 @@ export default function AcessoPage() {
 
           <p className="text-xs text-muted">
             {modo === "ativar"
-              ? "Use o e-mail que a loja cadastrou, o código de acesso que ela te enviou e crie a sua senha agora."
+              ? doLink
+                ? "Seu e-mail e código já foram preenchidos pelo link da loja. Só falta criar a sua senha."
+                : "Use o e-mail que a loja cadastrou, o código de acesso que ela te enviou e crie a sua senha agora."
               : "Entre com o e-mail e a senha que você criou."}
           </p>
 
@@ -128,6 +142,12 @@ export default function AcessoPage() {
             </button>
           </form>
         </div>
+        <p className="text-center text-sm text-muted mt-4">
+          É dono(a) da loja?{" "}
+          <Link href="/login?modo=entrar" className="font-semibold text-brand-500 hover:underline">
+            Entrar aqui
+          </Link>
+        </p>
       </div>
     </div>
   );

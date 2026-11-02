@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { registrarMetrica } from "@/lib/metricas/cliente";
-import { Gem, Loader2 } from "lucide-react";
+import { Gem, Loader2, KeyRound } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -174,6 +174,11 @@ export default function LoginPage() {
                 autoComplete={modo === "criar" ? "new-password" : "current-password"}
               />
             </div>
+            {modo === "entrar" && (
+              <p className="text-xs text-muted">
+                Donos, vendedores, entregadores e revendedoras entram aqui — cada um cai direto na sua área.
+              </p>
+            )}
             {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
             {aviso && <p role="status" className="text-sm text-green-600">{aviso}</p>}
             <button disabled={loading} className="btn-primary w-full disabled:opacity-60">
@@ -187,6 +192,12 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
+        <Link
+          href="/acesso"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand-500/40 bg-brand-500/10 px-4 py-3.5 text-base font-semibold text-brand-600 transition hover:border-brand-500 hover:bg-brand-500/15 active:scale-[.98]"
+        >
+          <KeyRound size={18} /> É vendedora? Acesse aqui
+        </Link>
         <p className="text-center text-xs text-muted mt-4">
           Ao criar a conta você concorda com os{" "}
           <Link href="/termos" className="underline hover:text-strong">Termos de Uso</Link> e a{" "}
