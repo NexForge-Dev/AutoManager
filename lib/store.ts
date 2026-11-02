@@ -391,6 +391,9 @@ function erroAmigavel(msg: string | undefined): string {
   if (/vinculo_somente_pela_ativacao/.test(m)) return "O acesso da revendedora é liberado pelo botão Liberar acesso.";
   if (/entrega_campo_bloqueado/.test(m)) return "Só o dono da loja altera os dados da entrega.";
   if (/papel_protegido|usuario_campo_protegido|org_campo_protegido/.test(m)) return "Só o suporte pode alterar isso.";
+  if (/motoboy_invalido/.test(m)) return "Esse motoboy não faz parte da sua loja.";
+  if (/chat_limite/.test(m)) return "Muitas mensagens em pouco tempo. Aguarde um minuto e tente de novo.";
+  if (/org_slug_formato/.test(m)) return "Use só letras minúsculas, números e hífens no link (até 60 caracteres).";
   if (/permission denied|row-level security/i.test(m)) return "Você não tem permissão para fazer isso.";
   if (/failed to fetch|network/i.test(m)) return "Sem conexão. Tente de novo.";
   return m || "Não foi possível salvar. Tente de novo.";
@@ -663,7 +666,7 @@ export const useStore = create<State>()((set, get) => {
           ok: false,
           erro: /duplicate|unique/i.test(error.message)
             ? "Esse link já está em uso. Tente outro."
-            : error.message,
+            : erroAmigavel(error.message),
         };
       set((s) => ({ config: { ...s.config, slug } }));
       return { ok: true };
