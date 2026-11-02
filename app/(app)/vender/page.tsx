@@ -6,7 +6,7 @@ import { brl } from "@/lib/analytics";
 import type { Canal, FormaPagamento } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
-import { Minus, Plus, Check, ShoppingBag, Loader2 } from "lucide-react";
+import { Minus, Plus, Check, ShoppingBag, Loader2, ChevronUp, ChevronDown } from "lucide-react";
 
 const FORMAS: { id: FormaPagamento; label: string }[] = [
   { id: "dinheiro", label: "💵 Dinheiro" },
@@ -50,6 +50,9 @@ function Vender() {
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [registrando, setRegistrando] = useState(false);
   const [busca, setBusca] = useState("");
+  // celular: a barra de checkout fica recolhida (resumo + Registrar) e expande
+  // para canal/pagamento/desconto; no desktop as opções ficam sempre visíveis
+  const [opcoesAbertas, setOpcoesAbertas] = useState(false);
 
   const disponiveis = produtos.filter(
     (p) => p.ativo && p.nome.toLowerCase().includes(busca.toLowerCase())
@@ -196,43 +199,68 @@ function Vender() {
       </div>
 
       {/* espaço para a barra fixa não cobrir os últimos produtos */}
-      {itens.length > 0 && <div aria-hidden className="h-[55vh]" />}
+      {itens.length > 0 && (
+        <div aria-hidden className={`${opcoesAbertas ? "h-[60vh]" : "h-32"} md:h-[55vh]`} />
+      )}
 
       {/* barra fixa de checkout */}
       {itens.length > 0 && (
         <div className="fixed bottom-20 md:bottom-6 inset-x-0 md:left-60 px-4 z-30">
           <div className="card shadow-lg space-y-3 max-w-3xl mx-auto max-h-[70vh] overflow-auto">
+            <button
+              type="button"
+              onClick={() => setOpcoesAbertas((v) => !v)}
+              aria-expanded={opcoesAbertas}
+              aria-controls="vender-opcoes"
+              className="md:hidden w-full flex items-center justify-between gap-2 text-sm min-h-[44px] -my-1"
+            >
+              <span className="text-muted truncate">
+                {CANAIS.find((c) => c.id === canal)?.label} ·{" "}
+                {fiado ? "Fiado" : FORMAS.find((f) => f.id === forma)?.label}
+                {desconto > 0 && ` · desconto ${brl(desconto)}`}
+              </span>
+              <span className="shrink-0 flex items-center gap-1 font-semibold text-brand-500">
+                {opcoesAbertas ? "Ocultar" : "Opções"}
+                {opcoesAbertas ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </span>
+            </button>
+
+            <div id="vender-opcoes" className={`${opcoesAbertas ? "" : "hidden"} md:block space-y-3`}>
             {/* canal */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap" role="group" aria-label="Canal da venda">
               {CANAIS.map((c) => (
-                <span
+                <button
+                  type="button"
                   key={c.id}
                   onClick={() => setCanal(c.id)}
-                  className={`chip ${
+                  aria-pressed={canal === c.id}
+                  className={`chip min-h-[36px] ${
                     canal === c.id
                       ? "bg-brand-600 text-white border-brand-600"
                       : "border-default"
                   }`}
                 >
                   {c.label}
-                </span>
+                </button>
               ))}
             </div>
 
             {/* forma de pagamento */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap" role="group" aria-label="Forma de pagamento">
               {FORMAS.map((f) => (
-                <span
+                <button
+                  type="button"
                   key={f.id}
                   onClick={() => setForma(f.id)}
-                  className={`chip ${
+                  aria-pressed={forma === f.id}
+                  className={`chip min-h-[36px] ${
                     forma === f.id
                       ? "bg-brand-600 text-white border-brand-600"
                       : "border-default"
                   }`}
                 >
                   {f.label}
-                </span>
+                </button>
               ))}
             </div>
 
@@ -261,7 +289,7 @@ function Vender() {
                 onChange={(e) => setRevId(e.target.value)}
               >
                 <option value="">Venda da loja (sem revendedora)</option>
-                {revendedoras.map((r) => (
+                {revendedoras.filter((r) => r.ativa || r.id === revId).map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.nome} ({r.comissaoPercent}%)
                   </option>
@@ -284,12 +312,14 @@ function Vender() {
               <button
                 type="button"
                 onClick={() => setFiado((v) => !v)}
+                aria-pressed={fiado}
                 className={`chip mt-5 ${
                   fiado ? "bg-amber-500 text-white border-amber-500" : "border-default"
                 }`}
               >
                 {fiado ? "🕒 Fiado (a receber)" : "Marcar fiado"}
               </button>
+            </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -317,8 +347,8 @@ function Vender() {
       )}
 
       {sucesso && (
-        <div className="modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm">
-          <div className="modal-panel surface shadow-pop rounded-3xl p-8 text-center space-y-2">
+        <div className="modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm px-5">
+          <div role="status" aria-live="polite" className="modal-panel surface shadow-pop rounded-3xl p-8 text-center space-y-2">
             <div className="text-5xl ob-anim-pop">🎉</div>
             <div className="text-xl font-bold">Venda registrada!</div>
             <div className="text-brand-600 font-semibold text-lg">{sucesso}</div>
@@ -342,18 +372,18 @@ function Stepper({
 }) {
   if (qtd === 0) {
     return (
-      <button onClick={onAdd} disabled={max <= 0} className="btn-ghost py-2 px-3 disabled:opacity-40">
+      <button onClick={onAdd} disabled={max <= 0} aria-label="Adicionar" className="btn-ghost py-2 px-3 min-h-[44px] min-w-[44px] disabled:opacity-40">
         <Plus size={18} />
       </button>
     );
   }
   return (
     <div className="flex items-center gap-3">
-      <button onClick={onSub} className="btn-ghost py-2 px-2">
+      <button onClick={onSub} aria-label="Remover um" className="btn-ghost py-2 px-2 min-h-[44px] min-w-[44px]">
         <Minus size={16} />
       </button>
       <span className="font-bold w-5 text-center">{qtd}</span>
-      <button onClick={onAdd} disabled={qtd >= max} className="btn-primary py-2 px-2 disabled:opacity-40">
+      <button onClick={onAdd} disabled={qtd >= max} aria-label="Adicionar mais um" className="btn-primary py-2 px-2 min-h-[44px] min-w-[44px] disabled:opacity-40">
         <Plus size={16} />
       </button>
     </div>
