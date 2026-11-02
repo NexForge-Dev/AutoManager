@@ -191,7 +191,8 @@ function Conversas() {
         return semTmp.some((x) => x.id === data.id) ? semTmp : [...semTmp, data as Msg];
       });
       registrarMetrica({ tipo: "recurso", recurso: "chat_vitrine_respondido" });
-      await sb.current.from("conversa").update({ ultima_em: new Date().toISOString() }).eq("id", sel);
+      // ultima_em é atualizada pelo trigger trg_bump_conversa a cada mensagem
+      // (0019); o cliente não grava mais essa coluna (0041, achado #19).
     } finally {
       setEnviando(false);
     }

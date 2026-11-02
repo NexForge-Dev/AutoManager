@@ -381,8 +381,30 @@ function erroAmigavel(msg: string | undefined): string {
   if (/venda_invalida/.test(m)) return "Venda não encontrada.";
   if (/produto_invalido|variacao_invalida/.test(m)) return "Produto não encontrado (foi excluído?).";
   if (/qtd_invalida/.test(m)) return "Quantidade inválida.";
+  // regras do banco (migrations 0041/0042)
+  if (/plano_sem_vendedores/.test(m))
+    return "Seu acesso de vendedor está pausado pelo plano atual da loja. Fale com o dono.";
+  if (/canal_invalido|_len"/.test(m)) return "Texto muito longo. Encurte e tente de novo.";
+  if (/preco_nao_negativo|valor_positivo|taxa_nao_negativa/.test(m)) return "Informe um valor maior ou igual a zero.";
+  if (/comissao_faixa|comissao_padrao_faixa/.test(m)) return "A comissão precisa ficar entre 0% e 100%.";
+  if (/use_cancelar_venda/.test(m)) return "Para cancelar uma venda, use o botão Cancelar venda.";
+  if (/vinculo_somente_pela_ativacao/.test(m)) return "O acesso da revendedora é liberado pelo botão Liberar acesso.";
+  if (/entrega_campo_bloqueado/.test(m)) return "Só o dono da loja altera os dados da entrega.";
+  if (/papel_protegido|usuario_campo_protegido|org_campo_protegido/.test(m)) return "Só o suporte pode alterar isso.";
+  if (/permission denied|row-level security/i.test(m)) return "Você não tem permissão para fazer isso.";
   if (/failed to fetch|network/i.test(m)) return "Sem conexão. Tente de novo.";
   return m || "Não foi possível salvar. Tente de novo.";
+}
+
+// Plano da loja para qualquer papel. A tabela `assinatura` é só do dono
+// (migration 0041: tem ids do provedor de pagamento); a RPC minha_assinatura
+// (0042) devolve só os campos de plano. Sem a RPC (banco ainda sem a 0042),
+// cai na leitura direta da tabela, como antes.
+async function lerAssinatura(supabase: ReturnType<typeof createClient>): Promise<{ data: any }> {
+  const { data, error } = await supabase.rpc("minha_assinatura");
+  if (!error) return { data: data ?? null };
+  const { data: tabela } = await supabase.from("assinatura").select("*").limit(1).maybeSingle();
+  return { data: tabela ?? null };
 }
 
 // Janela inicial de vendas carregada na hydrate (cobre painel + analytics de 6 meses).
@@ -493,7 +515,7 @@ export const useStore = create<State>()((set, get) => {
           .order("recebido_em", { ascending: false }),
         // contas a pagar (tabela pode não existir se 0033 não rodou)
         supabase.from("conta_pagar").select("*").order("vencimento", { ascending: true }),
-        supabase.from("assinatura").select("*").limit(1).maybeSingle(),
+        lerAssinatura(supabase),
       ]);
 
       const assinatura: Assinatura | null = assin
@@ -720,7 +742,7 @@ export const useStore = create<State>()((set, get) => {
         set((s) => ({ entregas: s.entregas.filter((x) => x.id !== id) }));
         const erro = /entregas_nao_permitidas/.test(error.message)
           ? "Entregas estão disponíveis só no plano Expansão. Faça upgrade para registrar entregas."
-          : error.message;
+          : erroAmigavel(error.message);
         return { ok: false, erro };
       }
       registrarMetrica({ tipo: "recurso", recurso: "entrega_criada" });
@@ -966,7 +988,7 @@ export const useStore = create<State>()((set, get) => {
       if (error) {
         const ids = new Set(novos.map((p) => p.id));
         set((s) => ({ produtos: s.produtos.filter((p) => !ids.has(p.id)) }));
-        return { ok: false, inseridos: 0, erro: error.message };
+        return { ok: false, inseridos: 0, erro: erroAmigavel(error.message) };
       }
       registrarMetrica({ tipo: "recurso", recurso: "produto_cadastrado", quantidade: novos.length });
 
@@ -1614,7 +1636,7 @@ export const useStore = create<State>()((set, get) => {
       });
       if (error) {
         set((s) => ({ contasPagar: s.contasPagar.filter((x) => x.id !== id) }));
-        return { ok: false, erro: error.message };
+        return { ok: false, erro: erroAmigavel(error.message) };
       }
       registrarMetrica({ tipo: "recurso", recurso: "conta_a_pagar" });
       return { ok: true };
@@ -1752,7 +1774,7 @@ export const useStore = create<State>()((set, get) => {
         status: "pendente",
         recebido_em: new Date(recebidoEm).toISOString(),
       });
-      if (error) return { ok: false, erro: error.message };
+      if (error) return { ok: false, erro: erroAmigavel(error.message) };
       set((st) => ({
         entradasPendentes: [
           {
@@ -1788,7 +1810,7 @@ export const useStore = create<State>()((set, get) => {
         assunto: assunto.trim(),
         mensagem: mensagem.trim(),
       });
-      if (error) return { ok: false, erro: error.message };
+      if (error) return { ok: false, erro: erroAmigavel(error.message) };
       return { ok: true };
     },
 
