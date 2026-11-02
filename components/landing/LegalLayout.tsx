@@ -8,10 +8,12 @@ export const ULTIMA_ATUALIZACAO = "28/10/2026";
 export default function LegalLayout({
   titulo,
   resumo,
+  atualizadoEm = ULTIMA_ATUALIZACAO,
   children,
 }: {
   titulo: string;
   resumo?: string;
+  atualizadoEm?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -29,7 +31,7 @@ export default function LegalLayout({
 
       <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{titulo}</h1>
-        <p className="mt-2 text-sm text-muted">Última atualização: {ULTIMA_ATUALIZACAO}</p>
+        <p className="mt-2 text-sm text-muted">Última atualização: {atualizadoEm}</p>
         {resumo && (
           <p className="mt-6 rounded-2xl border border-brand-500/20 bg-brand-500/5 p-4 text-sm leading-relaxed">
             {resumo}

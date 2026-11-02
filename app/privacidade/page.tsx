@@ -15,6 +15,7 @@ export default function PrivacidadePage() {
   return (
     <LegalLayout
       titulo="Política de Privacidade"
+      atualizadoEm="02/11/2026"
       resumo="Em resumo: usamos seus dados só para fazer o AutoManager funcionar e para cobrar a assinatura. Não vendemos dados. Os dados dos clientes da sua loja pertencem à sua loja — nós apenas os guardamos e processamos em seu nome. Você pode pedir acesso, correção ou exclusão a qualquer momento."
     >
       <Secao n={1} titulo="A quem se aplica">
@@ -126,9 +127,8 @@ export default function PrivacidadePage() {
         <ul>
           <li>
             <strong>Supabase</strong> — banco de dados, autenticação, armazenamento de imagens e
-            mensagens em tempo real. É onde os dados ficam guardados. A infraestrutura pode estar
-            localizada fora do Brasil; nesse caso a transferência internacional ocorre com base em
-            cláusulas contratuais e garantias de segurança do provedor (art. 33 da LGPD).
+            mensagens em tempo real. É onde os dados ficam guardados, em servidores da AWS nos{" "}
+            <strong>Estados Unidos</strong> (região us-east-1, Virgínia).
           </li>
           <li>
             <strong>Stripe</strong> — processamento das assinaturas e pagamentos. O Stripe trata os
@@ -136,13 +136,28 @@ export default function PrivacidadePage() {
             processá-los fora do Brasil (art. 33 da LGPD).
           </li>
           <li>
-            <strong>Provedor de hospedagem do site</strong> — entrega das páginas e registros técnicos
-            de acesso.
+            <strong>Vercel</strong> — hospedagem do site e das APIs: entrega das páginas e registros
+            técnicos de acesso (IP, navegador, data e hora). Pode processar as requisições em servidores
+            fora do Brasil.
+          </li>
+          <li>
+            <strong>Painel interno NexForge</strong> — ferramenta de gestão da própria empresa que
+            recebe estatísticas de uso do produto (por exemplo, &quot;uma loja concluiu o
+            onboarding&quot; ou &quot;mudou de plano&quot;). Recebe só um identificador pseudônimo da
+            loja e códigos fixos de evento — nunca nomes, e-mails, telefones, produtos, clientes ou
+            valores de vendas.
           </li>
           <li>
             <strong>Autoridades</strong>, quando houver obrigação legal ou ordem judicial.
           </li>
         </ul>
+        <p>
+          <strong>Transferência internacional:</strong> como o banco de dados (Supabase) e a
+          hospedagem (Vercel) ficam nos Estados Unidos, os dados pessoais tratados pelo AutoManager são
+          transferidos para fora do Brasil. Essa transferência ocorre para cumprir o contrato com você
+          e se apoia nas cláusulas contratuais e nas garantias de segurança desses provedores
+          (art. 33, II e IX, da LGPD).
+        </p>
         <p>
           Dentro de uma loja, <strong>revendedoras, vendedores e motoboys</strong> acessam dados da
           loja conforme o papel de cada um (por exemplo, a revendedora vê as próprias vendas e
