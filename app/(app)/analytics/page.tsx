@@ -62,7 +62,7 @@ function Analytics() {
           <div className={`grid gap-2 stagger ${caps.allowAdvancedAnalytics ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
             {/* ticket médio e itens/venda: só vendas com produtos (sem "Recebimento avulso") */}
             <Kpi label="Ticket médio" valor={<CountUp value={a.ticketMedio} format={brl} />} />
-            <Kpi label="Itens/venda" valor={<CountUp value={a.itensPorVenda} format={(n) => n.toFixed(1)} />} />
+            <Kpi label="Itens/venda" valor={<CountUp value={a.itensPorVenda} format={(n) => n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} />} />
             {caps.allowAdvancedAnalytics &&
               (a.tendenciaMes === null ? (
                 // mês anterior sem vendas: não há base para comparar (nada de "+0%" verde)

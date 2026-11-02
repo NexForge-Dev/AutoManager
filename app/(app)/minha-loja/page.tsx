@@ -75,7 +75,7 @@ function limparSlug(s: string): string {
 
 function MinhaLoja() {
   const { config, orgId, produtos, setConfig, definirSlug } = useStore();
-  const { alerta } = useDialog();
+  const { alerta, confirm } = useDialog();
   const fileRef = useRef<HTMLInputElement>(null);
   const capaRef = useRef<HTMLInputElement>(null);
 
@@ -155,6 +155,20 @@ function MinhaLoja() {
     }
     if (limpo !== slug) setSlug(limpo); // mostra como ficou (sem acento, espaços ou "--")
     if (limpo === config.slug) return;
+    // trocar o link de uma loja já publicada quebra o link antigo (WhatsApp, Instagram...):
+    // confirma antes, mostrando como o endereço ficou depois da limpeza
+    if (config.slug) {
+      const ok = await confirm({
+        titulo: "Trocar o link da loja?",
+        mensagem: `O novo endereço será /loja/${limpo}. O link antigo (/loja/${config.slug}) deixa de funcionar para quem já recebeu.`,
+        confirmar: "Trocar link",
+        perigo: true,
+      });
+      if (!ok) {
+        setSlug(config.slug);
+        return;
+      }
+    }
     setSalvandoSlug(true);
     const r = await definirSlug(limpo);
     setSalvandoSlug(false);

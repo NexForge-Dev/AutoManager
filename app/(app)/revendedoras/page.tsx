@@ -63,8 +63,8 @@ function Revendedoras() {
     setEditId(r.id);
     setNome(r.nome);
     setWhats(r.whatsapp ?? "");
-    setComissao(String(r.comissaoPercent).replace(".", ","));
-    setMeta(r.metaMensal ? String(r.metaMensal).replace(".", ",") : "");
+    setComissao(r.comissaoPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 }));
+    setMeta(r.metaMensal ? r.metaMensal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "");
     setAberto(true);
   }
 
@@ -136,7 +136,7 @@ function Revendedoras() {
     const v = await prompt({
       titulo: "Meta do mês",
       mensagem: "Defina a meta de vendas mensal (R$):",
-      valorInicial: atual ? String(atual).replace(".", ",") : "",
+      valorInicial: atual ? atual.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
       tipo: "text",
       inputMode: "decimal",
       confirmar: "Salvar",
@@ -258,7 +258,7 @@ function Revendedoras() {
                     )}
                   </div>
                   <div className="text-xs text-muted">
-                    {r.comissaoPercent}% · vendeu {brl(vendMes)} no mês
+                    {r.comissaoPercent.toLocaleString("pt-BR")}% · vendeu {brl(vendMes)} no mês
                   </div>
                 </div>
                 <div className="flex items-center shrink-0 -mr-2">

@@ -157,7 +157,8 @@ export function parseProdutosCSV(texto: string): ResultadoImport {
   for (let i = 1; i < linhasBrutas.length; i++) {
     const campos = dividir(linhasBrutas[i], sep);
     const get = (k: keyof typeof COLUNAS) => (idx[k] !== undefined ? campos[idx[k]!] ?? "" : "");
-    const nome = get("nome").trim();
+    // quebra de linha/tab dentro da célula vira espaço (o nome aparece numa linha só)
+    const nome = get("nome").replace(/\s+/g, " ").trim();
     if (!nome) continue; // pula linha sem nome (linha vazia/separadora)
     total++;
     const nLinha = i + 1;

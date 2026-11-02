@@ -229,6 +229,9 @@ function Vender({
   const [desconto, setDesconto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; txt: string } | null>(null);
+  // celular: o carrinho fica recolhido numa barra (senão cobria o catálogo e
+  // "roubava" os toques nos produtos); expande para revisar e registrar
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false);
 
   // a confirmação de venda some sozinha depois de alguns segundos
   useEffect(() => {
@@ -325,7 +328,21 @@ function Vender({
 
       {/* carrinho fixo */}
       {carrinho.length > 0 && (
-        <div className="card space-y-3 sticky bottom-4 shadow-xl">
+        <div className="card space-y-3 sticky bottom-4 shadow-xl max-h-[75dvh] overflow-auto">
+          <button
+            type="button"
+            onClick={() => setCarrinhoAberto((v) => !v)}
+            aria-expanded={carrinhoAberto}
+            aria-controls="rev-carrinho"
+            className="md:hidden w-full flex items-center justify-between gap-2 min-h-[44px] -my-1 text-sm"
+          >
+            <span className="flex items-center gap-2 font-semibold">
+              <ShoppingBag size={16} className="text-brand-500" />
+              {carrinho.reduce((a, i) => a + i.qtd, 0)} item(ns) · {brl(total)}
+            </span>
+            <span className="font-semibold text-brand-500">{carrinhoAberto ? "Ocultar" : "Ver venda"}</span>
+          </button>
+          <div id="rev-carrinho" className={`${carrinhoAberto ? "" : "hidden"} md:block space-y-3`}>
           <div className="flex items-center justify-between font-semibold">
             <span className="flex items-center gap-2"><ShoppingBag size={16} className="text-brand-500" /> Venda</span>
             <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="-mr-2 grid h-11 w-11 place-items-center text-muted"><X size={18} /></button>
@@ -407,6 +424,7 @@ function Vender({
             </div>
           </div>
 
+          </div>
           {msg && (
             <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-green-600" : "text-red-600"}`}>
               {msg.txt}

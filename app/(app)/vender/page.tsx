@@ -309,7 +309,7 @@ function Vender() {
                 <option value="">Venda da loja (sem revendedora)</option>
                 {revendedoras.filter((r) => r.ativa || r.id === revId).map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.nome} ({r.comissaoPercent}%)
+                    {r.nome} ({r.comissaoPercent.toLocaleString("pt-BR")}%)
                   </option>
                 ))}
               </select>

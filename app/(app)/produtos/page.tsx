@@ -223,15 +223,10 @@ function Produtos() {
                 </div>
                 <div className="text-xs text-muted truncate">
                   {p.categoria} · {brl(p.precoVenda)}
-                  {podeEditar && (
-                    <>
-                      {" "}· margem{" "}
-                      {p.custo > 0 && p.precoVenda > 0
-                        ? (((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)
-                        : "-"}
-                      %
-                    </>
+                  {podeEditar && p.custo > 0 && p.precoVenda > 0 && (
+                    <> · margem {(((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)}%</>
                   )}
+                  {podeEditar && !(p.custo > 0) && <> · sem custo</>}
                   {temGrade && (
                     <span className="ml-1 inline-flex items-center gap-0.5 text-brand-500">
                       <Layers size={11} /> {p.variacoes.length}
