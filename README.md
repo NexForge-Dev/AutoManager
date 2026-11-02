@@ -46,7 +46,7 @@ npm run build && npm start
 
 | Layer | Stack |
 |---|---|
-| Frontend | Next.js 14 (App Router) + Tailwind + lucide + recharts |
+| Frontend | Next.js 15 (App Router, React 18) + Tailwind + lucide + recharts |
 | Auth/session | `@supabase/ssr` (cookies) + `middleware.ts` (refresh + route protection) |
 | Data | Supabase Postgres - `lib/store.ts` (Zustand write-through) reads/writes via `supabase-js` |
 | Business logic | `lib/store.ts` (inventory/commission) + `lib/analytics.ts` (restock/metrics) |

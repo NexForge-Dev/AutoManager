@@ -1,8 +1,9 @@
 # Checklist de lançamento (GO-LIVE) — AutoManager
 
-Banco: Supabase **na nuvem** (projeto `paqsixfvmbkowedvukgz`). Todas as migrations até a
-`0036_estoque_vendas.sql` já estão aplicadas (conferido em 29/10/2026). Não rode migrations novas
-sem backup.
+Banco: Supabase **na nuvem** (projeto `paqsixfvmbkowedvukgz`, região us-east-1). Todas as migrations
+até a `0036_estoque_vendas.sql` já estão aplicadas (conferido em 02/11/2026); faltam
+`0037_stripe` → `0040_rpc_sem_anon`. Não rode migrations novas sem backup — o passo a passo exato
+está em [`docs/DEPLOY-TODAY.md`](docs/DEPLOY-TODAY.md).
 
 ## 1. Contas e chaves que você precisa criar/pegar
 
@@ -48,7 +49,7 @@ Revise também o texto jurídico das três páginas (de preferência com um advo
    Supabase `select org_id, plano from assinatura where provider = 'mercadopago' and status <> 'canceled';`
    — para cada loja, cancele a assinatura no painel do MP e peça para assinar de novo em `/planos`
    (o checkout recusa quem ainda tem assinatura MP ativa, para não cobrar em dobro).
-7. Aplique a migration `0037_stripe.sql` e faça novo deploy.
+7. Aplique as migrations `0037_stripe.sql` a `0040_rpc_sem_anon.sql` (ver `docs/DEPLOY-TODAY.md`) e faça novo deploy.
 
 ## 4. Supabase Auth (e-mails)
 
@@ -91,7 +92,9 @@ Antes de cada deploy, rode localmente: `npm ci && npm run lint && npx tsc --noEm
 - [ ] Criar conta com um e-mail real → chega o e-mail de confirmação → confirmar → Entrar → onboarding.
 - [ ] "Esqueci minha senha" → chega o e-mail → link abre `/redefinir-senha`.
 - [ ] Configurações › Plano › assinar o plano mais barato com um cartão real → volta para o app e o
-      plano aparece ativo. Confira no MP (Suas integrações › Webhooks › histórico) que a notificação
-      voltou **200**. Depois cancele a assinatura no MP se foi só teste.
+      plano aparece ativo. Confira no Stripe (Developers › Webhooks › seu endpoint › Event deliveries)
+      que os eventos voltaram **200**. Se foi só teste, cancele pelo portal (Configurações › Plano ›
+      Gerenciar assinatura) e reembolse em Stripe › Payments.
+- [ ] `https://SEU-DOMINIO/api/health` responde `{"ok":true,"database":true}` (use no monitor de uptime).
 - [ ] Logs do host sem `[AutoManager] Configuração de produção ausente`.
 - [ ] Vitrine pública `/loja/<slug-da-sua-loja>` abre no celular.

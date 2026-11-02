@@ -43,7 +43,7 @@ contra o banco real**.
 |---|---|---|
 | **Planos & assinatura** (Ambulante/Solo/Equipe/Expansão) + trial + enforcement | ✅ Pronto | Tabela `assinatura`, limites em `lib/plans.ts`, triggers no banco |
 | **Pagamento (Stripe)** — checkout, troca de plano, portal e webhook | ✅ Integrado | `/planos` → Checkout; `api/stripe/*`; webhook valida `stripe-signature` |
-| **Caixa de recebimentos** (`/recebimentos`) — confirma "foi venda?" → vira venda | ✅ Pronto | Tabela `entrada_pendente`, webhook MP grava, dono confirma (atômico/idempotente) |
+| **Caixa de recebimentos** (`/recebimentos`) — confirma "foi venda?" → vira venda | ✅ Pronto | Tabela `entrada_pendente`, dono confirma (atômico/idempotente); nenhum provedor conectado hoje |
 | **Financeiro / contas a pagar** (`/financeiro`) — o que sai + a receber + saldo projetado | ✅ Pronto | Tabela `conta_pagar`; fecha o fluxo de caixa (a receber − a pagar) |
 | **Painel da plataforma** (super-admin): MRR/ARR, lojas, moderar contas, trocar plano | ✅ Pronto | `/admin` (resumo/lojas/chamados/**auditoria**) + `api/admin/*` |
 | **Trilha de auditoria do super-admin** (append-only) | ✅ Pronto | Tabela `admin_log`; ações sensíveis registradas (§12) |
@@ -92,7 +92,7 @@ contra o banco real**.
 
 | Camada | Tecnologia |
 |---|---|
-| Frontend | **Next.js 14** (App Router) + React 18 + TypeScript |
+| Frontend | **Next.js 15** (App Router) + React 18 + TypeScript |
 | Estilo | Tailwind CSS + `lucide-react` (ícones) |
 | Gráficos | `recharts` (relatórios) + SVG próprio (analytics) |
 | Estado | **Zustand** (`lib/store.ts`) - write-through: lê/grava direto no Supabase |
@@ -155,7 +155,7 @@ Navegação e rotas se adaptam ao papel e às **capacidades do plano**
 | `/vender` | Venda rápida: carrinho, canal, revendedora, desconto, fiado, **pagamento + parcelas**. |
 | `/revendedoras` | Comissão/meta por revendedora + **gestão de acesso** (e-mail, liberar 1ª senha). |
 | `/entregas` | Entregas (dono gerencia; motoboy vê/atualiza as suas **e pega do pool** as sem dono — claim/devolver, `0034`). Aba sempre visível: fora do Expansão mostra pitch de upgrade. |
-| `/recebimentos` | **Caixa de recebimentos** (só dono): entradas de conta conectada (MP) para confirmar "foi venda?" → vira venda. Badge de pendentes no menu. |
+| `/recebimentos` | **Caixa de recebimentos** (só dono): entradas de conta conectada (nenhuma integrada hoje; modo de teste) para confirmar "foi venda?" → vira venda. Badge de pendentes no menu. |
 | `/financeiro` | **Contas a pagar** (só dono): fornecedores, aluguel, energia etc., com categorias e filtro (pendentes/pagas/todas) + resumo **a receber − a pagar = saldo projetado**. |
 | `/reposicao` | Sugestões de compra (média de venda dos últimos 30 dias; ciente de grade/variações). |
 | `/conversas` | Caixa de entrada do chat da vitrine (tempo real). |
@@ -187,7 +187,7 @@ Navegação e rotas se adaptam ao papel e às **capacidades do plano**
 | `POST /api/stripe/portal` | Abre o Customer Portal do Stripe (cartão, faturas, cancelar). |
 | `POST /api/stripe/webhook` | Eventos do Stripe (checkout, subscription.*, invoice.*). Valida `stripe-signature`, é idempotente (`stripe_evento`) e relê a assinatura na API (ver §13). |
 | `GET /api/admin/overview` | Super-admin: agregados da plataforma (MRR/ARR, lojas, planos). Service role após checar o e-mail. |
-| `POST /api/admin/plano` | Super-admin: troca manual de plano de uma loja (cortesia/suporte; sem cobrança no MP). |
+| `POST /api/admin/plano` | Super-admin: troca manual de plano de uma loja (cortesia/suporte; sem cobrança no Stripe). |
 | `POST /api/admin/usuario` | Super-admin: moderar conta da loja — `desativar`/`banir`/`reativar` (ban no `auth.users`) ou `deletar` (apaga org + contas). Nunca age sobre o próprio super-admin. |
 
 ---
@@ -312,6 +312,10 @@ enforcement de plano: `plano_efetivo()`, `limite_revendedoras()`, `permite_reven
 | `0034_entrega_pool` | **Pool de entregas** (fluxo "pegar / devolver"): o motoboy também vê as entregas **sem dono** da loja e pode **reivindicá-las** (claim) ou devolvê-las; a trava de escrita garante que ele só deixa a entrega consigo mesmo ou solta (nunca atribui a outro). Realtime ligado. |
 | `0035_seguranca_cobranca` | **Segurança/cobrança:** vínculo de membro só via `app_metadata` (fecha cadastro direto em loja alheia), super-admin por `app_metadata.role`, trial de 1 mês com `trial_usado`, trial vencido → Ambulante, limite de papéis também no UPDATE, códigos de acesso de revendedora movidos p/ `revendedora_convite` (sem acesso do cliente). |
 | `0036_estoque_vendas` | **Estoque/vendas:** `cancelar_venda` (devolve estoque, anula comissão), `entrada_estoque`/`ajustar_estoque` atômicos no banco, trava de linha (`FOR UPDATE`) nas vendas contra venda além do estoque, `CHECK (estoque_atual >= 0)`. |
+| `0037_stripe` | **Stripe:** tabela `stripe_evento` (idempotência do webhook, só service_role) e índices por cliente/assinatura do Stripe em `assinatura`. |
+| `0038_rate_limit` | **Rate limit no banco:** tabela `rate_limite` + RPC `rate_limit_registrar` (só service_role), usada por `/api/revendedora/ativar` (10/15 min por IP, 5/15 min por e-mail; chaves com SHA-256). |
+| `0039_codigo_acesso_sem_vies` | Código de convite da revendedora com `gen_random_bytes` + rejeição: os 31 caracteres equiprováveis (antes o `9` nunca saía). |
+| `0040_rpc_sem_anon` | Revoga `EXECUTE` de `anon`/`PUBLIC` nas RPCs SECURITY DEFINER só de usuário logado; `anon` mantém só `loja_publica` e `recuperar_conversa`. `mudar_plano` fica só para service_role. |
 
 > **Numeração:** as migrations do chat foram renumeradas (`0017`–`0019`) para não colidir
 > com o fluxo paralelo de aparência/chamados (`0014`/`0016`). Por isso há um **gap no `0015`** —
@@ -413,7 +417,7 @@ o SaaS — não é o "admin" de uma loja (esse é o `owner`). Tudo nas rotas `/a
   contagem de lojas por status (ativas/trial/canceladas) e o **mix de planos** (ativas e MRR por
   plano). A rota tolera o banco sem a coluna `org.acesso` (conta tudo como `ativo`).
 - **Lojas:** lista todas as lojas (dono, plano, status, membros). Por loja o super-admin pode
-  **trocar o plano** (`POST /api/admin/plano` — cortesia/suporte, sem cobrança no MP) e **moderar
+  **trocar o plano** (`POST /api/admin/plano` — cortesia/suporte, sem cobrança no Stripe) e **moderar
   a conta** (`POST /api/admin/usuario`): `desativar`/`banir` (bane todos os logins da loja no
   `auth.users` e marca `org.acesso`), `reativar` (remove o ban) ou `deletar` (apaga a org em
   cascata + as contas de auth — **irreversível**). Trava de segurança: nunca age sobre a própria
