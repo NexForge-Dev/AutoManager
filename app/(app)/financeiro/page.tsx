@@ -8,6 +8,7 @@ import type { ContaPagar } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import Modal from "@/components/Modal";
+import { Aviso, EstadoVazio, PageHeader, Painel, Progresso, Segmentado, Selo, Stat } from "@/components/ui";
 import {
   Wallet,
   Plus,
@@ -19,6 +20,7 @@ import {
   TrendingDown,
   RotateCcw,
   Repeat,
+  Scale,
 } from "lucide-react";
 
 export default function FinanceiroPage() {
@@ -40,6 +42,12 @@ const CATEGORIAS = [
   "Marketing",
   "Outros",
 ];
+
+const FILTROS = [
+  ["pendentes", "Pendentes"],
+  ["pagas", "Pagas"],
+  ["todas", "Todas"],
+] as const;
 
 function fmtData(ymd: string): string {
   const [y, m, d] = ymd.split("-");
@@ -107,158 +115,173 @@ function Financeiro() {
     }
   }
 
+  const maiorCategoria = resumo.porCategoria.reduce((m, c) => Math.max(m, c.valor), 0);
+
   return (
-    <div className="space-y-3">
-      <header className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <Wallet className="text-brand-600" />
-          <h1 className="text-2xl font-bold">Financeiro</h1>
-        </div>
-        <button onClick={() => setAberto(true)} className="btn-primary py-2 px-3 text-sm">
-          <Plus size={18} /> Conta
-        </button>
-      </header>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Financeiro"
+        descricao="Contas a pagar e projeção do seu caixa (a receber − a pagar)."
+        acoes={
+          <button onClick={() => setAberto(true)} className="btn-primary btn-sm">
+            <Plus size={17} aria-hidden /> Conta
+          </button>
+        }
+      />
 
-      <p className="text-sm text-muted">Contas a pagar e projeção do seu caixa (a receber − a pagar).</p>
-
-      {/* cards de fluxo */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="card">
-          <div className="flex items-center gap-1.5 text-xs text-muted">
-            <TrendingUp size={14} className="text-green-500" /> A receber
-          </div>
-          <div className="text-xl font-bold mt-1 text-green-500">{brl(aReceber)}</div>
-          <div className="text-[11px] text-muted">vendas fiado em aberto</div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-1.5 text-xs text-muted">
-            <TrendingDown size={14} className="text-red-500" /> A pagar
-          </div>
-          <div className="text-xl font-bold mt-1 text-red-500">{brl(resumo.aPagar)}</div>
-          <div className="text-[11px] text-muted">{resumo.qtdPendentes} conta(s) pendente(s)</div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="text-xs text-muted">Saldo projetado</div>
-        <div className={`text-2xl font-bold ${saldoProjetado >= 0 ? "text-green-500" : "text-red-500"}`}>
-          {brl(saldoProjetado)}
-        </div>
-        <div className="text-[11px] text-muted mt-0.5">Se tudo a receber entrar e tudo a pagar sair.</div>
+      {/* fluxo: o que entra, o que sai e o que sobra */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <Stat
+          rotulo="A receber"
+          icone={TrendingUp}
+          tom="ok"
+          valor={brl(aReceber)}
+          apoio="vendas fiado em aberto"
+        />
+        <Stat
+          rotulo="A pagar"
+          icone={TrendingDown}
+          tom="bad"
+          valor={brl(resumo.aPagar)}
+          apoio={`${resumo.qtdPendentes} conta(s) pendente(s)`}
+        />
+        <Stat
+          className="col-span-2 lg:col-span-1"
+          rotulo="Saldo projetado"
+          icone={Scale}
+          tom={saldoProjetado >= 0 ? "ok" : "bad"}
+          valorTom={saldoProjetado >= 0 ? "ok" : "bad"}
+          valor={brl(saldoProjetado)}
+          apoio="Se tudo a receber entrar e tudo a pagar sair."
+        />
       </div>
 
       {resumo.vencidasQtd > 0 && (
-        <div className="card flex items-center justify-between bg-red-500/5 border-red-500/30">
-          <span className="text-sm flex items-center gap-1.5 text-red-600">
-            <AlertTriangle size={15} /> {resumo.vencidasQtd} conta(s) vencida(s)
-          </span>
-          <span className="font-bold text-red-600">{brl(resumo.vencidasValor)}</span>
-        </div>
+        <Aviso
+          tom="bad"
+          icone={AlertTriangle}
+          titulo={`${resumo.vencidasQtd} conta(s) vencida(s)`}
+          acao={<span className="font-bold tnum text-bad">{brl(resumo.vencidasValor)}</span>}
+        />
       )}
 
-      {/* por categoria */}
-      {resumo.porCategoria.length > 0 && (
-        <div className="card space-y-2">
-          <div className="font-semibold text-sm">A pagar por categoria</div>
-          {resumo.porCategoria.map((c) => (
-            <div key={c.categoria} className="flex items-center justify-between text-sm">
-              <span className="text-muted">{c.categoria}</span>
-              <span className="font-semibold">{brl(c.valor)}</span>
+      <div className="grid gap-4 md:gap-5 lg:grid-cols-3 items-start">
+        {/* lista */}
+        <div className="lg:col-span-2 min-w-0 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="section-title">Contas</h2>
+            <Segmentado rotulo="Filtrar contas" opcoes={FILTROS} valor={filtro} onChange={setFiltro} />
+          </div>
+
+          {lista.length === 0 ? (
+            <div className="card p-0">
+              {contasPagar.length === 0 ? (
+                <EstadoVazio
+                  icone={Wallet}
+                  titulo="Nenhuma conta cadastrada"
+                  acao={
+                    <button onClick={() => setAberto(true)} className="btn-primary">
+                      <Plus size={17} aria-hidden /> Adicionar conta
+                    </button>
+                  }
+                >
+                  Registre fornecedores, aluguel e energia para ver o que sai do caixa.
+                </EstadoVazio>
+              ) : (
+                <EstadoVazio compacto titulo="Nenhuma conta neste filtro." />
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="card-list">
+              {lista.map((c) => {
+                const vencida = c.status === "pendente" && c.vencimento < hoje;
+                const ocupada = processando === c.id;
+                return (
+                  <div key={c.id} className="px-4 py-3 sm:flex sm:items-center sm:gap-4">
+                    <div className="flex items-start justify-between gap-3 min-w-0 flex-1">
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate">{c.descricao}</div>
+                        <div className="text-xs text-muted flex items-center gap-x-2 gap-y-1 mt-1 flex-wrap">
+                          {vencida ? (
+                            <Selo tom="bad" icone={CalendarClock}>
+                              Venceu {fmtData(c.vencimento)}
+                            </Selo>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 tnum">
+                              <CalendarClock size={12} aria-hidden /> {fmtData(c.vencimento)}
+                            </span>
+                          )}
+                          {c.categoria && <span>{c.categoria}</span>}
+                          {c.fornecedor && <span>· {c.fornecedor}</span>}
+                          {c.recorrente && (
+                            <Selo tom="brand" icone={Repeat}>
+                              fixa
+                            </Selo>
+                          )}
+                          {c.status === "paga" && <Selo tom="ok">paga</Selo>}
+                        </div>
+                      </div>
+                      <div
+                        className={`font-bold tnum shrink-0 ${c.status === "paga" ? "text-muted line-through" : ""}`}
+                      >
+                        {brl(c.valor)}
+                      </div>
+                    </div>
 
-      {/* filtro */}
-      <div className="flex gap-2">
-        {(["pendentes", "pagas", "todas"] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            aria-pressed={filtro === f}
-            onClick={() => setFiltro(f)}
-            className={`chip ${filtro === f ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
-          >
-            {f === "pendentes" ? "Pendentes" : f === "pagas" ? "Pagas" : "Todas"}
-          </button>
-        ))}
-      </div>
-
-      {/* lista */}
-      {lista.length === 0 ? (
-        <div className="card text-center text-muted py-8">
-          {contasPagar.length === 0
-            ? "Nenhuma conta cadastrada. Toque em + Conta para começar."
-            : "Nenhuma conta neste filtro."}
-        </div>
-      ) : (
-        <div className="space-y-2 stagger">
-          {lista.map((c) => {
-            const vencida = c.status === "pendente" && c.vencimento < hoje;
-            const ocupada = processando === c.id;
-            return (
-              <div key={c.id} className="card space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate">
-                      {c.descricao}
-                      {c.recorrente && (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-brand-500">
-                          <Repeat size={11} /> fixa
-                        </span>
+                    <div className="flex gap-2 mt-2.5 sm:mt-0 shrink-0">
+                      {c.status === "pendente" ? (
+                        <button
+                          type="button"
+                          onClick={() => marcarPaga(c, true)}
+                          disabled={ocupada}
+                          className="btn-ghost btn-sm flex-1"
+                        >
+                          <Check size={15} aria-hidden /> {ocupada ? "Salvando…" : "Marcar paga"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => marcarPaga(c, false)}
+                          disabled={ocupada}
+                          className="btn-ghost btn-sm flex-1"
+                        >
+                          <RotateCcw size={15} aria-hidden /> {ocupada ? "Salvando…" : "Reabrir"}
+                        </button>
                       )}
-                    </div>
-                    <div className="text-xs text-muted flex items-center gap-2 mt-0.5 flex-wrap">
-                      {c.categoria && <span>{c.categoria}</span>}
-                      {c.fornecedor && <span>· {c.fornecedor}</span>}
-                      <span className={`inline-flex items-center gap-1 ${vencida ? "text-red-500 font-semibold" : ""}`}>
-                        <CalendarClock size={11} /> {fmtData(c.vencimento)}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => remover(c)}
+                        disabled={ocupada}
+                        className="icon-btn h-9 w-9 hover:!text-bad"
+                        aria-label={`Excluir conta ${c.descricao}`}
+                      >
+                        <Trash2 size={16} aria-hidden />
+                      </button>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className={`font-bold ${c.status === "paga" ? "text-muted line-through" : ""}`}>
-                      {brl(c.valor)}
-                    </div>
-                    {c.status === "paga" && <div className="text-[11px] text-green-500">paga</div>}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  {c.status === "pendente" ? (
-                    <button
-                      type="button"
-                      onClick={() => marcarPaga(c, true)}
-                      disabled={ocupada}
-                      className="btn-primary flex-1 py-1.5 text-sm disabled:opacity-60"
-                    >
-                      <Check size={15} /> {ocupada ? "Salvando…" : "Marcar paga"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => marcarPaga(c, false)}
-                      disabled={ocupada}
-                      className="btn-ghost flex-1 py-1.5 text-sm disabled:opacity-60"
-                    >
-                      <RotateCcw size={15} /> {ocupada ? "Salvando…" : "Reabrir"}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => remover(c)}
-                    disabled={ocupada}
-                    className="btn-ghost py-1.5 px-3 text-sm text-red-500 disabled:opacity-60"
-                    aria-label={`Excluir conta ${c.descricao}`}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* por categoria */}
+        {resumo.porCategoria.length > 0 && (
+          <Painel titulo="A pagar por categoria">
+            <div className="space-y-3">
+              {resumo.porCategoria.map((c) => (
+                <div key={c.categoria}>
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-muted truncate">{c.categoria}</span>
+                    <span className="font-semibold tnum shrink-0">{brl(c.valor)}</span>
+                  </div>
+                  <Progresso className="mt-1" pct={maiorCategoria ? (c.valor / maiorCategoria) * 100 : 0} />
+                </div>
+              ))}
+            </div>
+          </Painel>
+        )}
+      </div>
 
       {aberto && <ContaForm onClose={() => setAberto(false)} />}
     </div>
@@ -342,18 +365,18 @@ function ContaForm({ onClose }: { onClose: () => void }) {
             <input id="conta-fornecedor" className="input" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm min-h-[32px]">
           <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} />
-          <Repeat size={14} className="text-brand-500" /> Marcar como despesa fixa
+          <Repeat size={14} className="text-muted" aria-hidden /> Marcar como despesa fixa
         </label>
-        <p className="text-[11px] text-muted -mt-2">
+        <p className="hint !-mt-2">
           Só identifica a conta como fixa (aluguel, internet…). O próximo mês não é lançado automaticamente.
         </p>
         <div>
           <label className="label" htmlFor="conta-obs">Observação (opcional)</label>
           <textarea id="conta-obs" className="input" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
         </div>
-        <button onClick={salvar} disabled={salvando} className="btn-primary w-full disabled:opacity-60">
+        <button onClick={salvar} disabled={salvando} className="btn-primary w-full">
           {salvando ? "Salvando…" : "Salvar conta"}
         </button>
     </Modal>

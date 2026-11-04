@@ -9,6 +9,7 @@ import { slugSugerido } from "@/lib/slug";
 import { FONTES, carregarFonte } from "@/lib/fontes";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
+import { Aviso, EstadoVazio, LinkAcao, PageHeader, Painel, Segmentado } from "@/components/ui";
 import type { Produto } from "@/lib/types";
 import {
   Globe,
@@ -21,8 +22,6 @@ import {
   ExternalLink,
   Check,
   Gem,
-  Eye,
-  EyeOff,
   AlertTriangle,
   Smartphone,
   MessageCircle,
@@ -36,6 +35,7 @@ import {
   ImagePlus,
   Trash2,
   Brush,
+  Pipette,
 } from "lucide-react";
 
 export default function MinhaLojaPage() {
@@ -45,6 +45,12 @@ export default function MinhaLojaPage() {
     </Guard>
   );
 }
+
+// no celular e no tablet a edição e a prévia não cabem lado a lado
+const VISTAS = [
+  ["editar", "Editar"],
+  ["previa", "Ver prévia"],
+] as const;
 
 const CORES: { hex: string; nome: string }[] = [
   { hex: "#db2777", nome: "Rosa" },
@@ -107,6 +113,8 @@ function MinhaLoja() {
   const [alternando, setAlternando] = useState(false);
   const [salvandoSlug, setSalvandoSlug] = useState(false);
   const [enviandoLogo, setEnviandoLogo] = useState(false);
+
+  const [vista, setVista] = useState<"editar" | "previa">("editar");
 
   const [fontStack, setFontStack] = useState("");
   useEffect(() => {
@@ -311,402 +319,501 @@ function MinhaLoja() {
   const salvar = (campo: string, valor: string) => persistir({ [campo]: valor || null });
 
   return (
-    <div className="space-y-4 pb-10">
+    <div className="space-y-4 md:space-y-5">
       {salvoVisivel && (
         <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 reveal pointer-events-none">
-          <div className="surface shadow-pop border border-default rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2">
-            <Check size={15} className="text-green-500" /> Salvo
+          <div role="status" className="surface shadow-pop border border-default rounded-full px-4 py-2 text-sm font-semibold flex items-center gap-2">
+            <Check size={15} className="text-ok" aria-hidden /> Salvo
           </div>
         </div>
       )}
-      <header className="pt-1 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Minha Loja</h1>
-          <p className="text-sm text-muted">Monte sua loja online: link, identidade, contato e vitrine.</p>
-        </div>
-        <button
-          type="button"
-          onClick={toggleAtiva}
-          disabled={alternando}
-          aria-pressed={config.lojaAtiva}
-          title={config.lojaAtiva ? "Tirar a loja do ar" : "Colocar a loja no ar"}
-          className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition disabled:opacity-60 ${
-            config.lojaAtiva ? "bg-brand-600 text-white" : "surface-alt text-muted"
-          }`}
-        >
-          {alternando ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : config.lojaAtiva ? (
-            <Eye size={16} />
-          ) : (
-            <EyeOff size={16} />
-          )}
-          {config.lojaAtiva ? "No ar" : "Fora do ar"}
-        </button>
-      </header>
 
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 lg:gap-10 items-start">
+      <PageHeader
+        titulo="Minha Loja"
+        descricao="Monte sua loja online: link, identidade, contato e vitrine."
+        acoes={
+          <button
+            type="button"
+            onClick={toggleAtiva}
+            disabled={alternando}
+            aria-pressed={config.lojaAtiva}
+            title={config.lojaAtiva ? "Tirar a loja do ar" : "Colocar a loja no ar"}
+            className="btn-ghost btn-sm"
+          >
+            {alternando ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden />
+            ) : (
+              <span
+                aria-hidden
+                className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+                  config.lojaAtiva ? "bg-ok" : "bg-[var(--border)]"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                    config.lojaAtiva ? "left-[14px]" : "left-0.5"
+                  }`}
+                />
+              </span>
+            )}
+            {config.lojaAtiva ? "No ar" : "Fora do ar"}
+          </button>
+        }
+      />
+
+      {!config.lojaAtiva && (
+        <Aviso
+          tom="warn"
+          icone={Globe}
+          titulo="Sua loja está fora do ar"
+          acao={
+            <button type="button" onClick={toggleAtiva} disabled={alternando} className="btn-primary btn-sm">
+              Colocar no ar
+            </button>
+          }
+        >
+          Ative para gerar o link e deixá-la visível.
+        </Aviso>
+      )}
+
+      {/* abaixo de lg não cabem as duas colunas: edição e prévia viram duas vistas */}
+      <Segmentado
+        className="flex lg:hidden [&>button]:flex-1"
+        rotulo="Alternar entre edição e prévia"
+        opcoes={VISTAS}
+        valor={vista}
+        onChange={setVista}
+      />
+
+      <div className="grid gap-4 md:gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 items-start">
         {/* ---------------- edição ---------------- */}
-        <div className="space-y-4">
+        <div className={`min-w-0 space-y-4 md:space-y-5 ${vista === "previa" ? "hidden lg:block" : ""}`}>
           {/* Link */}
-          <section className="card space-y-3">
-            <div className="flex items-center gap-2 font-semibold">
-              <Globe size={18} className="text-brand-500" /> Link da loja
-            </div>
-            {!config.lojaAtiva && (
-              <p className="text-sm text-muted">
-                Sua loja está <b>fora do ar</b>. Ative em “No ar” para gerar o link e deixá-la visível.
-              </p>
-            )}
-            <div>
-              <label className="label" htmlFor="loja-slug">Endereço da loja</label>
-              <div className="flex gap-2">
-                <span className="input flex items-center text-sm text-muted truncate max-w-[45%] min-w-0">{origin}/loja/</span>
-                <input
-                  id="loja-slug"
-                  className="input flex-1 min-w-0"
-                  value={slug}
-                  placeholder="minha-loja"
-                  maxLength={80}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  onChange={(e) => setSlug(e.target.value)}
-                  onBlur={salvarSlug}
-                />
-              </div>
-              <p className="text-xs text-muted mt-1">
-                {salvandoSlug ? "Salvando…" : "Letras minúsculas, números e hífen, até 60 caracteres."}
-              </p>
-            </div>
-            {url && (
-              <div className="flex gap-2">
-                <button type="button" onClick={copiar} className="btn-ghost flex-1 py-2 text-sm">
-                  {copiado ? <Check size={15} /> : <Copy size={15} />} {copiado ? "Copiado!" : "Copiar link"}
-                </button>
-                <a href={url} target="_blank" rel="noreferrer" className="btn-ghost flex-1 py-2 text-sm">
-                  <ExternalLink size={15} /> Abrir loja
-                </a>
-              </div>
-            )}
-            {url && copiaManual && (
+          <Painel titulo="Link da loja" icone={Globe}>
+            <div className="space-y-3">
               <div>
-                <p className="text-xs text-muted mb-1">Não deu para copiar automaticamente. Copie o link abaixo:</p>
-                <input
-                  className="input text-sm"
-                  readOnly
-                  value={url}
-                  aria-label="Link da loja"
-                  onFocus={(e) => e.currentTarget.select()}
-                />
+                <label className="label" htmlFor="loja-slug">Endereço da loja</label>
+                <div className="flex min-w-0">
+                  <span className="input surface-alt flex w-auto max-w-[58%] shrink items-center rounded-r-none border-r-0 text-sm md:text-sm text-muted">
+                    <span className="truncate">{origin.replace(/^https?:\/\//, "")}/loja/</span>
+                  </span>
+                  <input
+                    id="loja-slug"
+                    className="input flex-1 min-w-0 rounded-l-none"
+                    value={slug}
+                    placeholder="minha-loja"
+                    maxLength={80}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onChange={(e) => setSlug(e.target.value)}
+                    onBlur={salvarSlug}
+                  />
+                </div>
+                <p className="hint">
+                  {salvandoSlug ? "Salvando…" : "Letras minúsculas, números e hífen, até 60 caracteres."}
+                </p>
               </div>
-            )}
-            {erro && (
-              <p className="text-sm text-red-500" role="alert">
-                {erro}
-              </p>
-            )}
-          </section>
+              {url && (
+                <div className="flex gap-2">
+                  <button type="button" onClick={copiar} className="btn-ghost btn-sm flex-1 sm:flex-none">
+                    {copiado ? <Check size={15} className="text-ok" aria-hidden /> : <Copy size={15} aria-hidden />}{" "}
+                    {copiado ? "Copiado!" : "Copiar link"}
+                  </button>
+                  <a href={url} target="_blank" rel="noreferrer" className="btn-ghost btn-sm flex-1 sm:flex-none">
+                    <ExternalLink size={15} aria-hidden /> Abrir loja
+                  </a>
+                </div>
+              )}
+              {url && copiaManual && (
+                <div>
+                  <p className="hint mt-0 mb-1">Não deu para copiar automaticamente. Copie o link abaixo:</p>
+                  <input
+                    className="input text-sm md:text-sm"
+                    readOnly
+                    value={url}
+                    aria-label="Link da loja"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </div>
+              )}
+              {erro && (
+                <p className="text-sm text-bad" role="alert">
+                  {erro}
+                </p>
+              )}
+            </div>
+          </Painel>
 
           {/* Identidade */}
-          <section className="card space-y-4">
-            <div className="flex items-center gap-2 font-semibold">
-              <Palette size={18} className="text-brand-500" /> Identidade
-            </div>
-            <div>
-              <label className="label">Nome da loja</label>
-              <input className="input" value={nome} onChange={(e) => setNome(e.target.value)} onBlur={() => persistir({ nomeLoja: nome || "Minha Loja" })} />
-            </div>
-            <div>
-              <label className="label">Chamada curta (subtítulo)</label>
-              <textarea
-                className="input"
-                rows={2}
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                onBlur={() => persistir({ lojaDescricao: descricao || null })}
-                placeholder="Ex.: Semijoias folheadas com garantia. Entrega para toda a cidade."
-              />
-            </div>
-
-            {/* capa / banner */}
-            <div>
-              <label className="label">Imagem de capa (banner)</label>
-              <div className="rounded-xl overflow-hidden border border-default surface-alt aspect-[16/6] relative grid place-items-center">
-                {capaUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={capaUrl} alt="Imagem de capa da loja" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="text-muted flex flex-col items-center gap-1 text-xs">
-                    <ImagePlus size={22} />
-                    Aparece no topo da sua vitrine
-                  </div>
-                )}
+          <Painel titulo="Identidade" descricao="Como a loja aparece para a sua cliente." icone={Palette}>
+            <div className="space-y-4">
+              <div>
+                <label className="label" htmlFor="loja-nome">Nome da loja</label>
+                <input
+                  id="loja-nome"
+                  className="input"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  onBlur={() => persistir({ nomeLoja: nome || "Minha Loja" })}
+                />
               </div>
-              <input ref={capaRef} type="file" accept="image/*" hidden onChange={onCapa} />
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => capaRef.current?.click()} disabled={enviandoCapa} className="btn-ghost py-2 px-3 text-sm disabled:opacity-60">
-                  {enviandoCapa ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                  {capaUrl ? "Trocar capa" : "Enviar capa"}
-                </button>
-                {capaUrl && (
-                  <button type="button" onClick={removerCapa} disabled={enviandoCapa} className="btn-ghost py-2 px-3 text-sm text-red-500 disabled:opacity-60">
-                    <Trash2 size={16} /> Remover
-                  </button>
-                )}
+              <div>
+                <label className="label" htmlFor="loja-descricao">Chamada curta (subtítulo)</label>
+                <textarea
+                  id="loja-descricao"
+                  className="input"
+                  rows={2}
+                  value={descricao}
+                  onChange={(e) => setDescricao(e.target.value)}
+                  onBlur={() => persistir({ lojaDescricao: descricao || null })}
+                  placeholder="Ex.: Semijoias folheadas com garantia. Entrega para toda a cidade."
+                />
               </div>
-              <p className="text-xs text-muted mt-1">Foto larga (paisagem). Fica atrás do nome no topo da loja.</p>
-            </div>
 
-            {/* logo */}
-            <div>
-              <label className="label">Logo</label>
-              <div className="flex items-center gap-3">
-                <div className="h-16 w-16 rounded-xl surface-alt grid place-items-center overflow-hidden border border-default">
-                  {logoUrl ? (
+              {/* capa / banner */}
+              <div>
+                <span className="label">Imagem de capa (banner)</span>
+                <div
+                  className="overflow-hidden border border-default surface-alt h-28 sm:h-36 w-full grid place-items-center"
+                  style={{ borderRadius: "var(--r-input)" }}
+                >
+                  {capaUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={logoUrl} alt="Logo da loja" className="h-full w-full object-cover" />
+                    <img src={capaUrl} alt="Imagem de capa da loja" className="h-full w-full object-cover" />
                   ) : (
-                    <ImageIcon size={22} className="text-muted" />
+                    <div className="text-muted flex flex-col items-center gap-1 text-xs">
+                      <ImagePlus size={20} aria-hidden />
+                      Aparece no topo da sua vitrine
+                    </div>
                   )}
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" hidden onChange={onLogo} />
-                <button type="button" onClick={() => fileRef.current?.click()} disabled={enviandoLogo} className="btn-ghost py-2 px-3 text-sm disabled:opacity-60">
-                  {enviandoLogo ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                  {logoUrl ? "Trocar logo" : "Enviar logo"}
-                </button>
-              </div>
-            </div>
-
-            {/* cor */}
-            <div>
-              <label className="label">Cor da loja</label>
-              <div className="flex flex-wrap items-center gap-2">
-                {CORES.map((c) => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => escolherCor(c.hex)}
-                    className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95 ${cor === c.hex ? "border-white ring-2 ring-brand-500" : "border-transparent"}`}
-                    style={{ background: c.hex }}
-                    aria-label={`Cor ${c.nome}`}
-                    aria-pressed={cor === c.hex}
-                    title={c.nome}
-                  />
-                ))}
-                <label className="h-8 w-8 rounded-full border border-default grid place-items-center cursor-pointer overflow-hidden">
-                  <input type="color" aria-label="Escolher outra cor" className="h-10 w-10 cursor-pointer" value={cor || "#db2777"} onChange={(e) => escolherCor(e.target.value)} />
-                </label>
-                <button type="button" onClick={() => escolherCor(null)} className="text-xs text-muted ml-1 underline">
-                  padrão
-                </button>
-              </div>
-            </div>
-
-            {/* fonte */}
-            <div>
-              <label className="label flex items-center gap-1">
-                <Type size={14} /> Fonte das letras
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {FONTES.map((f) => (
-                  <button
-                    key={f.key}
-                    onClick={() => escolherFonte(f.key)}
-                    style={{ fontFamily: carregarFonte(f.key) || undefined }}
-                    className={`rounded-xl border px-3 py-2 text-sm text-left transition ${
-                      fonte === f.key ? "border-brand-500 bg-brand-500/5" : "border-default hover:surface-alt"
-                    }`}
-                  >
-                    <div className="font-semibold truncate">Aa</div>
-                    <div className="text-[11px] text-muted truncate">{f.label}</div>
+                <input ref={capaRef} type="file" accept="image/*" hidden onChange={onCapa} />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button type="button" onClick={() => capaRef.current?.click()} disabled={enviandoCapa} className="btn-ghost btn-sm">
+                    {enviandoCapa ? <Loader2 className="animate-spin" size={16} aria-hidden /> : <Upload size={16} aria-hidden />}
+                    {capaUrl ? "Trocar capa" : "Enviar capa"}
                   </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Aparência do painel */}
-          <section className="card space-y-4">
-            <div className="flex items-center gap-2 font-semibold">
-              <Brush size={18} className="text-brand-500" /> Aparência do painel
-            </div>
-            <p className="text-xs text-muted -mt-2">
-              Personalize as cores de fundo, a fonte e o arredondamento do painel (admin). Tudo aplica
-              na hora, em todo o app.
-            </p>
-
-            {/* tema base (paleta de fundo) */}
-            <div>
-              <label className="label">Tema do painel</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {TEMAS_BASE.map((t) => {
-                  const ativo = (temaBase ?? "escuro") === t.key;
-                  return (
-                    <button
-                      key={t.key}
-                      onClick={() => escolherTema(t.key)}
-                      className={`rounded-xl border p-2 text-left transition-all active:scale-[.97] hover:-translate-y-0.5 ${
-                        ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default hover:border-brand-500/50"
-                      }`}
-                      style={{ background: t.bg }}
-                    >
-                      <div className="flex gap-1">
-                        <span className="h-4 w-4 rounded-full" style={{ background: t.surface, border: `1px solid ${t.border}` }} />
-                        <span className="h-4 w-4 rounded-full" style={{ background: t.surfaceAlt }} />
-                        <span className="h-4 w-4 rounded-full bg-brand-500" />
-                      </div>
-                      <span className="mt-2 block text-xs font-medium" style={{ color: t.text }}>
-                        {t.label}
-                      </span>
+                  {capaUrl && (
+                    <button type="button" onClick={removerCapa} disabled={enviandoCapa} className="btn-danger btn-sm">
+                      <Trash2 size={16} aria-hidden /> Remover
                     </button>
-                  );
-                })}
+                  )}
+                </div>
+                <p className="hint">Foto larga (paisagem). Fica atrás do nome no topo da loja.</p>
               </div>
-              <p className="text-xs text-muted mt-1">Muda as cores de fundo do painel (admin) e da vitrine.</p>
-            </div>
 
-            {/* fonte do app */}
-            <div>
-              <label className="label">Fonte do app</label>
-              <select
-                className="input"
-                value={appFonte ?? "padrao"}
-                onChange={(e) => escolherFonteApp(e.target.value === "padrao" ? null : e.target.value)}
-                style={{ fontFamily: FONTES.find((f) => f.key === (appFonte ?? "padrao"))?.stack || undefined }}
-              >
-                {FONTES.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted mt-1">Aplica a fonte em todo o painel. (A vitrine tem fonte própria, acima.)</p>
-            </div>
+              {/* logo */}
+              <div>
+                <span className="label">Logo</span>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="h-14 w-14 shrink-0 surface-alt grid place-items-center overflow-hidden border border-default"
+                    style={{ borderRadius: "var(--r-input)" }}
+                  >
+                    {logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={logoUrl} alt="Logo da loja" className="h-full w-full object-cover" />
+                    ) : (
+                      <ImageIcon size={20} className="text-muted" aria-hidden />
+                    )}
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" hidden onChange={onLogo} />
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={enviandoLogo} className="btn-ghost btn-sm">
+                    {enviandoLogo ? <Loader2 className="animate-spin" size={16} aria-hidden /> : <Upload size={16} aria-hidden />}
+                    {logoUrl ? "Trocar logo" : "Enviar logo"}
+                  </button>
+                </div>
+              </div>
 
-            {/* arredondamento dos cantos */}
-            <div>
-              <label className="label">Arredondamento dos cantos</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {RAIOS.map((r) => {
-                  const ativo = (appRaio ?? "padrao") === r.key;
-                  return (
-                    <button
-                      key={r.key}
-                      onClick={() => escolherRaio(r.key === "padrao" ? null : r.key)}
-                      className={`border p-2 transition-all active:scale-[.97] flex flex-col items-center gap-2 ${
-                        ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default hover:border-brand-500/50 hover:bg-[var(--hover)]"
+              {/* cor */}
+              <div>
+                <span className="label" id="loja-cor">Cor da loja</span>
+                <div className="flex flex-wrap items-center gap-0.5 -ml-1" role="group" aria-labelledby="loja-cor">
+                  {CORES.map((c) => {
+                    const ativa = cor === c.hex;
+                    return (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => escolherCor(c.hex)}
+                        className="grid place-items-center h-10 w-10 rounded-full"
+                        aria-label={`Cor ${c.nome}`}
+                        aria-pressed={ativa}
+                        title={c.nome}
+                      >
+                        <span
+                          className={`grid place-items-center h-7 w-7 rounded-full transition-transform active:scale-95 ${
+                            ativa
+                              ? "ring-2 ring-brand-500 ring-offset-2 ring-offset-[color:var(--surface)]"
+                              : "ring-1 ring-inset ring-[color:var(--border)]"
+                          }`}
+                          style={{ background: c.hex }}
+                        >
+                          {ativa && <Check size={14} className="text-white" aria-hidden />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <label className="relative grid place-items-center h-10 w-10 rounded-full cursor-pointer" title="Escolher outra cor">
+                    <span
+                      className={`grid place-items-center h-7 w-7 rounded-full ${
+                        cor && !CORES.some((c) => c.hex === cor)
+                          ? "text-white ring-2 ring-brand-500 ring-offset-2 ring-offset-[color:var(--surface)]"
+                          : "text-muted border border-dashed border-[color:var(--text-muted)]"
                       }`}
-                      style={{ borderRadius: r.card }}
+                      style={cor && !CORES.some((c) => c.hex === cor) ? { background: cor } : undefined}
                     >
-                      <span className="h-8 w-12 surface-alt border border-default" style={{ borderRadius: r.btn }} />
-                      <span className="text-xs font-medium">{r.label}</span>
-                    </button>
-                  );
-                })}
+                      <Pipette size={13} aria-hidden />
+                    </span>
+                    <input
+                      type="color"
+                      aria-label="Escolher outra cor"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      value={cor || "#db2777"}
+                      onChange={(e) => escolherCor(e.target.value)}
+                    />
+                  </label>
+                  <button type="button" onClick={() => escolherCor(null)} className="text-sm text-muted hover:text-strong ml-1 px-1 min-h-[40px] underline underline-offset-2">
+                    padrão
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-muted mt-1">Deixa os cards e botões do painel mais retos ou mais arredondados.</p>
+
+              {/* fonte */}
+              <div>
+                <span className="label flex items-center gap-1.5" id="loja-fonte">
+                  <Type size={14} className="text-muted" aria-hidden /> Fonte das letras
+                </span>
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-2" role="group" aria-labelledby="loja-fonte">
+                  {FONTES.map((f) => {
+                    const ativa = fonte === f.key;
+                    return (
+                      <button
+                        key={f.key}
+                        type="button"
+                        aria-pressed={ativa}
+                        onClick={() => escolherFonte(f.key)}
+                        title={f.label}
+                        style={{ fontFamily: carregarFonte(f.key) || undefined, borderRadius: "var(--r-btn)" }}
+                        className={`flex items-center gap-2.5 min-h-[44px] border px-3 text-sm text-left transition-colors ${
+                          ativa ? "border-brand-500 bg-brand-500/10" : "border-default hover:border-[color:var(--text-muted)]"
+                        }`}
+                      >
+                        <span className="font-semibold shrink-0">Aa</span>
+                        <span className="text-xs text-muted truncate min-w-0 flex-1">{f.label}</span>
+                        {ativa && <Check size={14} className="text-accent shrink-0" aria-hidden />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </section>
+          </Painel>
 
           {/* Sobre */}
-          <section className="card space-y-3">
-            <div className="flex items-center gap-2 font-semibold">
-              <Info size={18} className="text-brand-500" /> Sobre a loja
-            </div>
+          <Painel titulo="Sobre a loja" icone={Info}>
             <textarea
               className="input"
               rows={4}
+              aria-label="Sobre a loja"
               value={sobre}
               onChange={(e) => setSobre(e.target.value)}
               onBlur={() => persistir({ lojaSobre: sobre || null })}
               placeholder="Conte a história da sua loja, diferenciais, garantia, prazos de entrega, formas de pagamento…"
             />
-          </section>
+          </Painel>
 
           {/* Contato */}
-          <section className="card space-y-3">
-            <div className="flex items-center gap-2 font-semibold">
-              <Phone size={18} className="text-brand-500" /> Contato
+          <Painel titulo="Contato" icone={Phone}>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div>
+                <label className="label flex items-center gap-1.5" htmlFor="loja-whatsapp">
+                  <MessageCircle size={13} className="text-muted" aria-hidden /> WhatsApp
+                </label>
+                <input id="loja-whatsapp" className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} onBlur={() => salvar("lojaWhatsapp", whatsapp)} placeholder="Ex.: 11 99999-9999" />
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5" htmlFor="loja-telefone">
+                  <Phone size={13} className="text-muted" aria-hidden /> Telefone
+                </label>
+                <input id="loja-telefone" className="input" value={telefone} onChange={(e) => setTelefone(e.target.value)} onBlur={() => salvar("lojaTelefone", telefone)} placeholder="Ex.: (11) 3333-3333" />
+              </div>
+              <div className="sm:col-span-2 xl:col-span-1">
+                <label className="label flex items-center gap-1.5" htmlFor="loja-email">
+                  <Mail size={13} className="text-muted" aria-hidden /> E-mail
+                </label>
+                <input id="loja-email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => salvar("lojaEmail", email)} placeholder="contato@sualoja.com" />
+              </div>
             </div>
-            <div>
-              <label className="label flex items-center gap-1"><MessageCircle size={13} /> WhatsApp</label>
-              <input className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} onBlur={() => salvar("lojaWhatsapp", whatsapp)} placeholder="Ex.: 11 99999-9999" />
-            </div>
-            <div>
-              <label className="label flex items-center gap-1"><Phone size={13} /> Telefone</label>
-              <input className="input" value={telefone} onChange={(e) => setTelefone(e.target.value)} onBlur={() => salvar("lojaTelefone", telefone)} placeholder="Ex.: (11) 3333-3333" />
-            </div>
-            <div>
-              <label className="label flex items-center gap-1"><Mail size={13} /> E-mail</label>
-              <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => salvar("lojaEmail", email)} placeholder="contato@sualoja.com" />
-            </div>
-          </section>
+          </Painel>
 
           {/* Redes sociais */}
-          <section className="card space-y-3">
-            <div className="flex items-center gap-2 font-semibold">
-              <AtSign size={18} className="text-brand-500" /> Redes sociais
+          <Painel titulo="Redes sociais" icone={AtSign}>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div>
+                <label className="label flex items-center gap-1.5" htmlFor="loja-instagram">
+                  <Instagram size={13} className="text-muted" aria-hidden /> Instagram
+                </label>
+                <input id="loja-instagram" className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} onBlur={() => salvar("lojaInstagram", instagram)} placeholder="@sualoja" />
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5" htmlFor="loja-facebook">
+                  <Facebook size={13} className="text-muted" aria-hidden /> Facebook
+                </label>
+                <input id="loja-facebook" className="input" value={facebook} onChange={(e) => setFacebook(e.target.value)} onBlur={() => salvar("lojaFacebook", facebook)} placeholder="sualoja ou link completo" />
+              </div>
+              <div className="sm:col-span-2 xl:col-span-1">
+                <label className="label flex items-center gap-1.5" htmlFor="loja-tiktok">
+                  <Music2 size={13} className="text-muted" aria-hidden /> TikTok
+                </label>
+                <input id="loja-tiktok" className="input" value={tiktok} onChange={(e) => setTiktok(e.target.value)} onBlur={() => salvar("lojaTiktok", tiktok)} placeholder="@sualoja" />
+              </div>
             </div>
-            <div>
-              <label className="label flex items-center gap-1"><Instagram size={13} /> Instagram</label>
-              <input className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} onBlur={() => salvar("lojaInstagram", instagram)} placeholder="@sualoja" />
-            </div>
-            <div>
-              <label className="label flex items-center gap-1"><Facebook size={13} /> Facebook</label>
-              <input className="input" value={facebook} onChange={(e) => setFacebook(e.target.value)} onBlur={() => salvar("lojaFacebook", facebook)} placeholder="sualoja ou link completo" />
-            </div>
-            <div>
-              <label className="label flex items-center gap-1"><Music2 size={13} /> TikTok</label>
-              <input className="input" value={tiktok} onChange={(e) => setTiktok(e.target.value)} onBlur={() => salvar("lojaTiktok", tiktok)} placeholder="@sualoja" />
-            </div>
-          </section>
+          </Painel>
 
           {/* Resumo da vitrine */}
-          <section className="card space-y-2">
-            <div className="flex items-center gap-2 font-semibold">
-              <Gem size={18} className="text-brand-500" /> Produtos na vitrine
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="surface-alt rounded-xl py-2">
-                <div className="text-xl font-bold">{visiveis.length}</div>
-                <div className="text-[11px] text-muted">aparecem</div>
+          <Painel titulo="Produtos na vitrine" icone={Gem}>
+            {produtos.length === 0 ? (
+              <EstadoVazio compacto titulo="Nenhum produto cadastrado" acao={<LinkAcao href="/produtos">Ir para Produtos</LinkAcao>}>
+                Cadastre produtos para preencher sua vitrine.
+              </EstadoVazio>
+            ) : (
+              <div className="space-y-3">
+                <dl className="grid grid-cols-3 text-center">
+                  <div className="min-w-0 px-1 flex flex-col-reverse">
+                    <dt className="text-xs text-muted mt-0.5">aparecem</dt>
+                    <dd className="figure">{visiveis.length}</dd>
+                  </div>
+                  <div className="min-w-0 px-1 border-x border-default flex flex-col-reverse">
+                    <dt className="text-xs text-muted mt-0.5">ocultos (inativos)</dt>
+                    <dd className="figure">{ocultos}</dd>
+                  </div>
+                  <div className="min-w-0 px-1 flex flex-col-reverse">
+                    <dt className="text-xs text-muted mt-0.5">sem estoque</dt>
+                    <dd className={`figure ${semEstoque > 0 ? "text-warn" : ""}`}>{semEstoque}</dd>
+                  </div>
+                </dl>
+                {semEstoque > 0 && (
+                  <Aviso tom="warn" icone={AlertTriangle}>
+                    {semEstoque} produto(s) sem estoque aparecem como “Esgotado”. Para ocultá-los, abra o produto em
+                    Produtos e desmarque “Produto ativo”.
+                  </Aviso>
+                )}
               </div>
-              <div className="surface-alt rounded-xl py-2">
-                <div className="text-xl font-bold">{ocultos}</div>
-                <div className="text-[11px] text-muted">ocultos (inativos)</div>
-              </div>
-              <div className="surface-alt rounded-xl py-2">
-                <div className="text-xl font-bold">{semEstoque}</div>
-                <div className="text-[11px] text-muted">sem estoque</div>
-              </div>
-            </div>
-            {semEstoque > 0 && (
-              <p className="text-xs text-amber-600 flex items-start gap-1">
-                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-                {semEstoque} produto(s) sem estoque aparecem como “Esgotado”. Para ocultá-los, abra o produto em
-                Produtos e desmarque “Produto ativo”.
-              </p>
             )}
-          </section>
+          </Painel>
+
+          {/* Aparência do painel */}
+          <Painel
+            titulo="Aparência do painel"
+            descricao="Personalize as cores de fundo, a fonte e o arredondamento do painel (admin). Tudo aplica na hora, em todo o app."
+            icone={Brush}
+          >
+            <div className="space-y-4">
+              {/* tema base (paleta de fundo) */}
+              <div>
+                <span className="label" id="loja-tema">Tema do painel</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2" role="group" aria-labelledby="loja-tema">
+                  {TEMAS_BASE.map((t) => {
+                    const ativo = (temaBase ?? "escuro") === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        aria-pressed={ativo}
+                        onClick={() => escolherTema(t.key)}
+                        className={`border p-2.5 text-left transition-shadow ${
+                          ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default hover:border-[color:var(--text-muted)]"
+                        }`}
+                        style={{ background: t.bg, borderRadius: "var(--r-btn)" }}
+                      >
+                        <span className="flex items-center gap-1">
+                          <span className="h-4 w-4 rounded-full" style={{ background: t.surface, border: `1px solid ${t.border}` }} />
+                          <span className="h-4 w-4 rounded-full" style={{ background: t.surfaceAlt }} />
+                          <span className="h-4 w-4 rounded-full bg-brand-500" />
+                          {ativo && <Check size={14} className="ml-auto" style={{ color: t.text }} aria-hidden />}
+                        </span>
+                        <span className="mt-2 block text-xs font-medium" style={{ color: t.text }}>
+                          {t.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="hint">Muda as cores de fundo do painel (admin) e da vitrine.</p>
+              </div>
+
+              {/* fonte do app */}
+              <div>
+                <label className="label" htmlFor="loja-fonte-app">Fonte do app</label>
+                <select
+                  id="loja-fonte-app"
+                  className="input"
+                  value={appFonte ?? "padrao"}
+                  onChange={(e) => escolherFonteApp(e.target.value === "padrao" ? null : e.target.value)}
+                  style={{ fontFamily: FONTES.find((f) => f.key === (appFonte ?? "padrao"))?.stack || undefined }}
+                >
+                  {FONTES.map((f) => (
+                    <option key={f.key} value={f.key}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="hint">Aplica a fonte em todo o painel. (A vitrine tem fonte própria, acima.)</p>
+              </div>
+
+              {/* arredondamento dos cantos */}
+              <div>
+                <span className="label" id="loja-raio">Arredondamento dos cantos</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-labelledby="loja-raio">
+                  {RAIOS.map((r) => {
+                    const ativo = (appRaio ?? "padrao") === r.key;
+                    return (
+                      <button
+                        key={r.key}
+                        type="button"
+                        aria-pressed={ativo}
+                        onClick={() => escolherRaio(r.key === "padrao" ? null : r.key)}
+                        className={`border p-2.5 flex flex-col items-center gap-2 transition-shadow ${
+                          ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default hover:border-[color:var(--text-muted)]"
+                        }`}
+                        style={{ borderRadius: r.card }}
+                      >
+                        <span className="h-7 w-12 surface-alt border border-default" style={{ borderRadius: r.btn }} />
+                        <span className="text-xs font-medium text-center">{r.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="hint">Deixa os cards e botões do painel mais retos ou mais arredondados.</p>
+              </div>
+            </div>
+          </Painel>
         </div>
 
         {/* ---------------- preview ---------------- */}
-        <div className="lg:sticky lg:top-8">
-          <div className="flex items-center gap-2 text-sm text-muted mb-3">
-            <Smartphone size={15} /> Pré-visualização - é assim que sua cliente vê
+        <aside className={`min-w-0 lg:sticky lg:top-7 ${vista === "editar" ? "hidden lg:block" : ""}`}>
+          <div className="mx-auto w-full max-w-[320px]">
+            <div className="flex items-start gap-2 mb-2.5">
+              <Smartphone size={16} className="text-muted shrink-0 mt-0.5" aria-hidden />
+              <div className="min-w-0">
+                <h2 className="section-title">Pré-visualização</h2>
+                <p className="text-xs text-muted">É assim que sua cliente vê</p>
+              </div>
+            </div>
+            <PreviewLoja
+              nome={nome || "Minha Loja"}
+              descricao={descricao}
+              sobre={sobre}
+              logoUrl={logoUrl}
+              capaUrl={capaUrl}
+              produtos={visiveis}
+              fontStack={fontStack}
+              contato={{ whatsapp, telefone, email, instagram, facebook, tiktok }}
+            />
           </div>
-          <PreviewLoja
-            nome={nome || "Minha Loja"}
-            descricao={descricao}
-            sobre={sobre}
-            logoUrl={logoUrl}
-            capaUrl={capaUrl}
-            produtos={visiveis}
-            fontStack={fontStack}
-            contato={{ whatsapp, telefone, email, instagram, facebook, tiktok }}
-          />
-        </div>
+        </aside>
       </div>
     </div>
   );
@@ -743,86 +850,96 @@ function PreviewLoja({
   const atual = abas.some((a) => a.key === aba) ? aba : "inicio";
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-[2.2rem] border-4 border-default surface overflow-hidden shadow-2xl">
-      <div className="h-7 surface-alt flex items-center justify-center">
-        <div className="h-1.5 w-20 rounded-full bg-default/60" />
-      </div>
+    // moldura de celular: altura presa à janela para caber inteira na coluna fixa
+    <div className="rounded-[2.25rem] border border-default surface-alt p-1.5 shadow-card">
+      <div className="rounded-[1.875rem] overflow-hidden">
+        <div className="h-6 surface flex items-center justify-center" aria-hidden>
+          <div className="h-1 w-14 rounded-full bg-[var(--border)]" />
+        </div>
 
-      <div className="max-h-[74vh] min-h-[520px] overflow-auto bg-[var(--bg)]" style={fontStack ? { fontFamily: fontStack } : undefined}>
-        <header className="surface border-b border-default">
-          {capaUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={capaUrl} alt="" className="h-24 w-full object-cover" />
-          )}
-          <div className={`px-4 flex items-center gap-3 ${capaUrl ? "-mt-6 pb-3" : "py-4"}`}>
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={nome} className="h-12 w-12 rounded-2xl object-cover border-2 border-[var(--surface)]" />
-            ) : (
-              <div className="h-12 w-12 rounded-2xl bg-brand-600 grid place-items-center text-white border-2 border-[var(--surface)]">
-                <Gem size={22} />
+        <div
+          className="h-[calc(100dvh-13rem)] max-h-[640px] min-h-[440px] overflow-y-auto bg-[var(--bg)] [scrollbar-width:thin]"
+          style={fontStack ? { fontFamily: fontStack } : undefined}
+        >
+          <div className="flex min-h-full flex-col">
+            <header className="surface border-b border-default">
+              {capaUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={capaUrl} alt="" className="h-24 w-full object-cover" />
+              )}
+              <div className={`px-4 flex items-center gap-3 ${capaUrl ? "-mt-6 pb-3" : "py-4"}`}>
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt={nome} className="h-12 w-12 rounded-2xl object-cover border-2 border-[var(--surface)]" />
+                ) : (
+                  <div className="h-12 w-12 shrink-0 rounded-2xl bg-brand-600 grid place-items-center text-white border-2 border-[var(--surface)]">
+                    <Gem size={22} aria-hidden />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold truncate">{nome}</h3>
+                </div>
               </div>
-            )}
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold truncate">{nome}</h2>
-            </div>
-          </div>
-          {/* navegação por abas */}
-          <div className="flex gap-1 px-3 pb-2">
-            {abas.map((a) => (
-              <button
-                key={a.key}
-                onClick={() => setAba(a.key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                  atual === a.key ? "bg-brand-600 text-white" : "surface-alt text-muted"
-                }`}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        {atual === "inicio" && (
-          <main className="px-3 py-3">
-            {descricao && <p className="text-xs text-muted mb-3 px-1">{descricao}</p>}
-            {produtos.length === 0 ? (
-              <div className="card text-center text-muted text-sm">Cadastre produtos para preencher sua vitrine.</div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2.5">
-                {produtos.map((p) => (
-                  <PreviewCard key={p.id} p={p} />
+              {/* navegação por abas */}
+              <div className="flex gap-1 px-3 pb-2">
+                {abas.map((a) => (
+                  <button
+                    key={a.key}
+                    type="button"
+                    aria-pressed={atual === a.key}
+                    onClick={() => setAba(a.key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      atual === a.key ? "bg-brand-600 text-white" : "surface-alt text-muted"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
                 ))}
               </div>
+            </header>
+
+            {atual === "inicio" && (
+              <div className="px-3 py-3">
+                {descricao && <p className="text-xs text-muted mb-3 px-1">{descricao}</p>}
+                {produtos.length === 0 ? (
+                  <div className="card text-center text-muted text-sm">Cadastre produtos para preencher sua vitrine.</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {produtos.map((p) => (
+                      <PreviewCard key={p.id} p={p} />
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-          </main>
-        )}
 
-        {atual === "sobre" && sobre && (
-          <section className="px-4 py-4">
-            <div className="text-sm font-semibold mb-1">Sobre a loja</div>
-            <p className="text-xs text-muted whitespace-pre-line">{sobre}</p>
-          </section>
-        )}
+            {atual === "sobre" && sobre && (
+              <section className="px-4 py-4">
+                <div className="text-sm font-semibold mb-1">Sobre a loja</div>
+                <p className="text-xs text-muted whitespace-pre-line">{sobre}</p>
+              </section>
+            )}
 
-        {atual === "contato" && temContato && (
-          <section className="px-4 py-4 space-y-2">
-            <div className="text-sm font-semibold">Fale com a gente</div>
-            <div className="flex flex-wrap gap-2">
-              {contato.whatsapp && <Pill icon={<MessageCircle size={13} />} txt="WhatsApp" />}
-              {contato.telefone && <Pill icon={<Phone size={13} />} txt={contato.telefone} />}
-              {contato.email && <Pill icon={<Mail size={13} />} txt="E-mail" />}
-              {contato.instagram && <Pill icon={<Instagram size={13} />} txt="Instagram" />}
-              {contato.facebook && <Pill icon={<Facebook size={13} />} txt="Facebook" />}
-              {contato.tiktok && <Pill icon={<Music2 size={13} />} txt="TikTok" />}
+            {atual === "contato" && temContato && (
+              <section className="px-4 py-4 space-y-2">
+                <div className="text-sm font-semibold">Fale com a gente</div>
+                <div className="flex flex-wrap gap-2">
+                  {contato.whatsapp && <Pill icon={<MessageCircle size={13} aria-hidden />} txt="WhatsApp" />}
+                  {contato.telefone && <Pill icon={<Phone size={13} aria-hidden />} txt={contato.telefone} />}
+                  {contato.email && <Pill icon={<Mail size={13} aria-hidden />} txt="E-mail" />}
+                  {contato.instagram && <Pill icon={<Instagram size={13} aria-hidden />} txt="Instagram" />}
+                  {contato.facebook && <Pill icon={<Facebook size={13} aria-hidden />} txt="Facebook" />}
+                  {contato.tiktok && <Pill icon={<Music2 size={13} aria-hidden />} txt="TikTok" />}
+                </div>
+              </section>
+            )}
+
+            <div className="sticky bottom-2 mt-auto flex justify-end px-3 pb-2 pointer-events-none">
+              <span className="bg-brand-600 text-white rounded-full shadow-card flex items-center gap-1.5 px-3 py-2 text-xs font-semibold">
+                <MessageCircle size={14} aria-hidden /> Falar com a loja
+              </span>
             </div>
-          </section>
-        )}
-
-        <div className="sticky bottom-2 flex justify-end px-3 pb-2">
-          <span className="bg-brand-600 text-white rounded-full shadow-lg flex items-center gap-1.5 px-3 py-2 text-xs font-semibold">
-            <MessageCircle size={14} /> Falar com a loja
-          </span>
+          </div>
         </div>
       </div>
     </div>
@@ -848,10 +965,10 @@ function PreviewCard({ p }: { p: Produto }) {
           <img src={p.imagens[0]} alt={p.nome} className="h-full w-full object-cover" />
         ) : (
           <div className="h-full w-full grid place-items-center text-muted">
-            <Gem size={24} />
+            <Gem size={24} aria-hidden />
           </div>
         )}
-        <span className={`absolute top-1.5 left-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${esgotado ? "bg-red-500 text-white" : "bg-black/55 text-white"}`}>
+        <span className={`absolute top-1.5 left-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${esgotado ? "bg-red-600 text-white" : "bg-black/55 text-white"}`}>
           {esgotado ? "Esgotado" : `${p.estoqueAtual} em estoque`}
         </span>
       </div>
@@ -859,8 +976,8 @@ function PreviewCard({ p }: { p: Produto }) {
         <div className="text-xs font-semibold leading-tight line-clamp-2">{p.nome}</div>
         {p.marca && <div className="text-[10px] text-muted">{p.marca}</div>}
         <div className="mt-auto pt-1.5">
-          {temDesconto && <div className="text-[10px] text-muted line-through">{brl(p.precoComparativo!)}</div>}
-          <div className="font-bold text-brand-500 text-sm">{brl(p.precoVenda)}</div>
+          {temDesconto && <div className="text-[10px] text-muted line-through tnum">{brl(p.precoComparativo!)}</div>}
+          <div className="font-bold text-accent text-sm tnum">{brl(p.precoVenda)}</div>
           {p.variacoes.length > 0 && <div className="text-[10px] text-muted">{p.variacoes.length} opções</div>}
         </div>
       </div>

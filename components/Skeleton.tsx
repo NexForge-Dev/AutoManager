@@ -37,7 +37,7 @@ export function SkeletonList({ count = 4, lines = 1 }: { count?: number; lines?:
 // Grade de "cartões de métrica" (placeholder de dashboards).
 export function SkeletonMetrics({ count = 4 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="card space-y-2">
           <Skeleton className="h-3 w-1/2" />

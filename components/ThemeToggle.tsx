@@ -36,21 +36,18 @@ export default function ThemeToggle() {
   ];
 
   return (
-    <div className="flex surface-alt rounded-xl p-1 gap-1">
+    <div className="segmented flex [&>button]:min-h-[40px]" role="group" aria-label="Tema do aplicativo">
       {opcoes.map((o) => {
         const Icon = o.icon;
-        const ativo = claro === o.claro;
         return (
           <button
             key={o.label}
             type="button"
-            aria-pressed={ativo}
+            aria-pressed={claro === o.claro}
             onClick={() => escolher(o.claro)}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition active:scale-95 ${
-              ativo ? "surface shadow text-strong" : "text-muted hover:text-strong hover:bg-[var(--hover)]"
-            }`}
+            className="flex flex-1 items-center justify-center gap-2"
           >
-            <Icon size={16} /> {o.label}
+            <Icon size={16} aria-hidden /> {o.label}
           </button>
         );
       })}

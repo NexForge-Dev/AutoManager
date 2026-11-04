@@ -106,7 +106,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     return (
       <GuardMontado.Provider value={true}>
         <DialogProvider>
-          <main className="max-w-3xl mx-auto px-4 pt-4 pb-12 md:px-8 md:pt-8">{children}</main>
+          <main className="max-w-6xl mx-auto px-4 pt-4 pb-12 md:px-8 md:pt-7">{children}</main>
         </DialogProvider>
       </GuardMontado.Provider>
     );
@@ -129,19 +129,19 @@ export default function Guard({ children }: { children: React.ReactNode }) {
 function AppLoadingSkeleton() {
   return (
     <div className="min-h-screen md:flex">
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default p-4 gap-2">
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default p-3 gap-2">
         <div className="flex items-center gap-2 px-2 py-3">
           <Skeleton className="h-7 w-7 rounded-lg" />
           <Skeleton className="h-4 w-28" />
         </div>
         <div className="mt-2 space-y-1.5">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full rounded-xl" />
+            <Skeleton key={i} className="h-9 w-full rounded-lg" />
           ))}
         </div>
       </aside>
       <div className="flex-1 md:pl-60">
-        <main className="max-w-3xl mx-auto px-4 pt-4 pb-28 md:px-8 md:pt-8 md:pb-12 space-y-4">
+        <main className="max-w-6xl mx-auto px-4 pt-4 pb-28 md:px-8 md:pt-7 md:pb-12 space-y-4">
           <div className="space-y-2">
             <Skeleton className="h-7 w-44" />
             <Skeleton className="h-4 w-64" />

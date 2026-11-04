@@ -165,7 +165,7 @@ export interface RaioPreset {
 export const RAIOS: RaioPreset[] = [
   { key: "reto", label: "Retos", card: "0.375rem", btn: "0.25rem", input: "0.25rem" },
   { key: "suave", label: "Suaves", card: "0.625rem", btn: "0.5rem", input: "0.5rem" },
-  { key: "padrao", label: "Padrão", card: "1rem", btn: "0.75rem", input: "0.75rem" },
+  { key: "padrao", label: "Padrão", card: "0.875rem", btn: "0.625rem", input: "0.625rem" },
   { key: "redondo", label: "Bem arredondados", card: "1.5rem", btn: "1.25rem", input: "1.25rem" },
 ];
 

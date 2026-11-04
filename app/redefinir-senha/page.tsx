@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { registrarSessao } from "@/lib/metricas/cliente";
-import { CheckCircle2, Gem, KeyRound, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import EntradaShell from "@/components/landing/EntradaShell";
+import { Aviso } from "@/components/ui";
 
 type Estado = "verificando" | "pronto" | "invalido" | "salvo";
 
@@ -171,80 +173,77 @@ export default function RedefinirSenhaPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-5 bg-[var(--bg)]">
-      <div className="w-full max-w-sm reveal">
-        <Link href="/" className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-6">
-          <Gem className="text-brand-600" /> AutoManager
-        </Link>
-        <div className="card space-y-4">
-          <div className="flex items-center gap-2">
-            <KeyRound className="text-brand-600" size={20} />
-            <h1 className="text-lg font-bold">Criar nova senha</h1>
-          </div>
+    <EntradaShell>
+      <h1 className="page-title text-center">Criar nova senha</h1>
+      <div className="card mt-5 space-y-4 p-5">
+        {estado === "verificando" && (
+          <p className="flex items-center gap-2 text-sm text-muted" role="status">
+            <Loader2 className="animate-spin" size={16} aria-hidden /> Validando o link…
+          </p>
+        )}
 
-          {estado === "verificando" && (
-            <p className="flex items-center gap-2 text-sm text-muted" role="status">
-              <Loader2 className="animate-spin" size={16} /> Validando o link…
-            </p>
-          )}
-
-          {estado === "invalido" && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted" role="alert">
+        {estado === "invalido" && (
+          <div className="space-y-3">
+            <div role="alert">
+              <Aviso tom="bad" icone={AlertCircle}>
                 {motivo ?? "Este link de redefinição é inválido ou já expirou."} Peça um novo link na tela de login
                 (&quot;Esqueci minha senha&quot;).
-              </p>
-              <Link href="/login?modo=entrar" className="btn-primary w-full">
-                Voltar ao login
-              </Link>
+              </Aviso>
+            </div>
+            <Link href="/login?modo=entrar" className="btn-primary w-full">
+              Voltar ao login
+            </Link>
+          </div>
+        )}
+
+        {estado === "salvo" && (
+          <div role="status">
+            <Aviso tom="ok" icone={CheckCircle2}>Senha alterada! Entrando no painel…</Aviso>
+          </div>
+        )}
+
+        {estado === "pronto" && (
+          <form onSubmit={salvar} className="space-y-3">
+            <div>
+              <label htmlFor="nova-senha" className="label">Nova senha</label>
+              <input
+                id="nova-senha"
+                type="password"
+                className="input"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                autoFocus
+              />
+              <p className="hint">Mínimo de 8 caracteres.</p>
+            </div>
+            <div>
+              <label htmlFor="confirma-senha" className="label">Confirme a nova senha</label>
+              <input
+                id="confirma-senha"
+                type="password"
+                className="input"
+                value={confirma}
+                onChange={(e) => setConfirma(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </div>
+            {erro && (
+            <div role="alert">
+              <Aviso tom="bad" icone={AlertCircle}>{erro}</Aviso>
             </div>
           )}
-
-          {estado === "salvo" && (
-            <p className="flex items-center gap-2 text-sm text-green-600" role="status">
-              <CheckCircle2 size={18} /> Senha alterada! Entrando no painel…
-            </p>
-          )}
-
-          {estado === "pronto" && (
-            <form onSubmit={salvar} className="space-y-3">
-              <div>
-                <label htmlFor="nova-senha" className="label">Nova senha</label>
-                <input
-                  id="nova-senha"
-                  type="password"
-                  className="input"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  autoFocus
-                />
-                <p className="mt-1 text-xs text-muted">Mínimo de 8 caracteres.</p>
-              </div>
-              <div>
-                <label htmlFor="confirma-senha" className="label">Confirme a nova senha</label>
-                <input
-                  id="confirma-senha"
-                  type="password"
-                  className="input"
-                  value={confirma}
-                  onChange={(e) => setConfirma(e.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                />
-              </div>
-              {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
-              <button disabled={salvando} className="btn-primary w-full disabled:opacity-60">
-                {salvando ? <Loader2 className="animate-spin" size={18} /> : "Salvar nova senha"}
-              </button>
-            </form>
-          )}
-        </div>
+            <button disabled={salvando} className="btn-primary w-full">
+              {salvando ? <Loader2 className="animate-spin" size={18} aria-hidden /> : "Salvar nova senha"}
+            </button>
+          </form>
+        )}
       </div>
-    </div>
+    </EntradaShell>
   );
 }
 

@@ -8,11 +8,12 @@ import Guard from "@/components/Guard";
 import { registrarMetrica } from "@/lib/metricas/cliente";
 import CountUp from "@/components/CountUp";
 import { useDialog } from "@/components/Dialog";
+import { EstadoVazio, PageHeader, Painel, Progresso, Segmentado, Selo, Stat } from "@/components/ui";
 import type { Venda } from "@/lib/types";
 import { fimDeYmd, fimDoDia, inicioDeYmd, inicioDoAno, inicioDoDia, inicioDoMes, ymdSP } from "@/lib/fuso";
 const VendasArea = dynamic(() => import("@/components/charts/VendasArea"), {
   ssr: false,
-  loading: () => <div style={{ height: 150 }} className="skeleton rounded-xl" />,
+  loading: () => <div style={{ height: 190 }} className="skeleton rounded-xl" />,
 });
 import {
   FileSpreadsheet,
@@ -25,6 +26,8 @@ import {
   Receipt,
   XCircle,
   Check,
+  BarChart3,
+  Percent,
 } from "lucide-react";
 
 export default function RelatoriosPage() {
@@ -36,6 +39,14 @@ export default function RelatoriosPage() {
 }
 
 type Preset = "hoje" | "7dias" | "mes" | "ano" | "custom";
+
+const PRESETS = [
+  ["hoje", "Hoje"],
+  ["7dias", "7 dias"],
+  ["mes", "Mês"],
+  ["ano", "Ano"],
+  ["custom", "Personalizado"],
+] as const;
 
 
 function Relatorios() {
@@ -196,295 +207,279 @@ function Relatorios() {
     );
   }
 
-  return (
-    <div className="space-y-4">
-      <header className="pt-1">
-        <h1 className="text-2xl font-bold">Relatórios Financeiros</h1>
-        <p className="text-sm text-muted">
-          Faturamento, lucro e fluxo de caixa. Vendido (competência) × recebido (caixa).
-        </p>
-      </header>
+  const maiorForma = r.porForma.reduce((m, f) => Math.max(m, f.valor), 0);
 
-      {/* filtros + export */}
-      <div className="card space-y-3 print-hidden">
-        <div className="flex gap-2 flex-wrap">
-          {([
-            ["hoje", "Hoje"],
-            ["7dias", "7 dias"],
-            ["mes", "Mês"],
-            ["ano", "Ano"],
-            ["custom", "Personalizado"],
-          ] as [Preset, string][]).map(([id, lbl]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={preset === id}
-              onClick={() => setPreset(id)}
-              className={`chip ${
-                preset === id ? "bg-brand-600 text-white border-brand-600" : "border-default"
-              }`}
-            >
-              {lbl}
+  return (
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Relatórios financeiros"
+        descricao="Faturamento, lucro e fluxo de caixa. Vendido (competência) × recebido (caixa)."
+        acoes={
+          <>
+            <button type="button" onClick={exportarExcel} disabled={periodoInvalido} className="btn-ghost btn-sm">
+              <FileSpreadsheet size={16} aria-hidden /> Excel
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              disabled={periodoInvalido}
+              onClick={() => {
+                registrarMetrica({ tipo: "recurso", recurso: "relatorio_exportado" });
+                window.print();
+              }}
+              className="btn-ghost btn-sm"
+            >
+              <Printer size={16} aria-hidden /> PDF
+            </button>
+          </>
+        }
+      />
+
+      {/* período */}
+      <div className="space-y-3 print-hidden">
+        <Segmentado rotulo="Período do relatório" opcoes={PRESETS} valor={preset} onChange={setPreset} className="max-w-full" />
         {preset === "custom" && (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            <div>
               <label className="label" htmlFor="rel-de">De</label>
               <input id="rel-de" type="date" className="input" value={de} onChange={(e) => setDe(e.target.value)} />
             </div>
-            <div className="flex-1">
+            <div>
               <label className="label" htmlFor="rel-ate">Até</label>
               <input id="rel-ate" type="date" className="input" value={ate} onChange={(e) => setAte(e.target.value)} />
             </div>
           </div>
         )}
         {periodoInvalido && (
-          <p className="text-sm text-red-500" role="alert">
+          <p className="text-sm text-bad" role="alert">
             A data inicial (De) precisa ser antes da final (Até). Ajuste o período para ver o relatório.
           </p>
         )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={exportarExcel}
-            disabled={periodoInvalido}
-            className="btn-ghost flex-1 py-2 text-sm disabled:opacity-50"
-          >
-            <FileSpreadsheet size={16} /> Excel
-          </button>
-          <button type="button" disabled={periodoInvalido} onClick={() => {
-            registrarMetrica({ tipo: "recurso", recurso: "relatorio_exportado" });
-            window.print();
-          }} className="btn-ghost flex-1 py-2 text-sm disabled:opacity-50">
-            <Printer size={16} /> PDF
-          </button>
-        </div>
       </div>
 
-      <div className="text-xs text-muted -mt-1">
+      <div className="text-xs text-muted -mt-2">
         Período: {label}
         {/* a loja carrega primeiro só os últimos 180 dias; o resto chega em segundo plano */}
         {deMs < Date.now() - 180 * 24 * 60 * 60 * 1000 &&
           " · vendas com mais de 180 dias podem levar alguns segundos para aparecer"}
       </div>
 
+      {vendas.length === 0 && (
+        <div className="card p-0">
+          <EstadoVazio icone={BarChart3} titulo="Ainda não há o que mostrar">
+            Registre vendas para ver seus relatórios aqui.
+          </EstadoVazio>
+        </div>
+      )}
+
       {vendas.length > 0 && vendasPeriodo.length === 0 && !periodoInvalido && (
-        <div className="card text-center text-muted py-6 text-sm">Nenhuma venda neste período.</div>
-      )}
-
-      {/* cards principais */}
-      <div className="grid grid-cols-2 gap-3 stagger">
-        <Metric titulo="Faturamento bruto" valor={<CountUp value={r.faturamento} format={brl} />} sub="vendas (competência)" />
-        <Metric titulo="Recebido (caixa)" valor={<CountUp value={r.recebido} format={brl} />} sub={`${r.qtdPagas} pagas`} forte />
-        <Metric titulo="A receber" valor={<CountUp value={r.aReceber} format={brl} />} sub={`${r.qtdPendentes} pendentes`} />
-        <Metric titulo="Descontos" valor={<CountUp value={r.descontos} format={brl} />} sub={`em ${r.qtdComDesconto} venda(s)`} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3">
-        <div className="card">
-          <div className="text-xs text-muted">Lucro projetado</div>
-          <CountUp value={r.lucroProjetado} format={brl} className="text-2xl font-bold text-green-500 block" />
-          <div className="text-xs text-muted mt-1">
-            Se todas as vendas do período forem pagas · margem {r.margem.toFixed(1)}%
-            {r.qtdCanceladas > 0 && ` · ${r.qtdCanceladas} cancelada(s) fora da conta`}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Metric titulo="Lucro realizado" valor={brl(r.lucroRealizado)} sub="proporcional ao caixa" />
-          <Metric titulo="Custo das vendas" valor={brl(r.custoVendas)} sub="custo congelado na venda" />
-        </div>
-      </div>
-
-      {/* fluxo de caixa */}
-      <div className="card">
-        <div className="flex items-center gap-2 font-semibold">
-          <Wallet size={18} className="text-brand-500" /> Fluxo de Caixa — entradas no período
-        </div>
-        <CountUp value={r.fluxoTotal} format={brl} className="text-2xl font-bold mt-1 block" />
-        <div className="grid grid-cols-3 gap-2 my-3">
-          <Mini label="Média" valor={brl(r.fluxoMedia)} />
-          <Mini label="Pico" valor={brl(r.fluxoPico.valor)} sub={r.fluxoPico.dia} />
-          {/* sem base de comparação (ex.: "Hoje"): neutro, nada de "+0%" verde */}
-          <Mini
-            label="Tendência"
-            valor={r.tendencia === null ? "—" : `${r.tendencia >= 0 ? "+" : ""}${r.tendencia.toFixed(0)}%`}
-            up={r.tendencia === null ? undefined : r.tendencia >= 0}
-          />
-        </div>
-        <VendasArea data={r.fluxo} yKey="valor" gradientId="fx" interval="preserveStartEnd" height={150} />
-      </div>
-
-      {/* por forma de pagamento */}
-      {r.porForma.length > 0 && (
-        <div className="card space-y-2">
-          <div className="font-semibold mb-1">Recebido por forma de pagamento</div>
-          {r.porForma.map((f) => (
-            <div key={f.forma} className="flex items-center justify-between">
-              <span className="text-muted">{f.label}</span>
-              <span className="font-semibold">{brl(f.valor)}</span>
-            </div>
-          ))}
+        <div className="card p-0">
+          <EstadoVazio compacto icone={Clock} titulo="Nenhuma venda neste período." />
         </div>
       )}
 
-      {/* parcelamento (crédito) */}
-      {parcelado.qtd > 0 && (
-        <div className="card flex items-center justify-between">
-          <div>
-            <div className="font-semibold">Vendas parceladas</div>
-            <div className="text-xs text-muted">
-              {parcelado.qtd} venda(s) · até {parcelado.maxParcelas}x
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="font-bold">{brl(parcelado.total)}</div>
-            <div className="text-[11px] text-muted">no crédito</div>
-          </div>
-        </div>
-      )}
+      {/* receita */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+        <Stat rotulo="Faturamento bruto" icone={Receipt} tom="brand" valor={<CountUp value={r.faturamento} format={brl} />} apoio="vendas (competência)" />
+        <Stat rotulo="Recebido (caixa)" icone={Wallet} tom="ok" valor={<CountUp value={r.recebido} format={brl} />} apoio={`${r.qtdPagas} pagas`} />
+        <Stat rotulo="A receber" icone={Clock} tom="warn" valor={<CountUp value={r.aReceber} format={brl} />} apoio={`${r.qtdPendentes} pendentes`} />
+        <Stat rotulo="Descontos" icone={Percent} valor={<CountUp value={r.descontos} format={brl} />} apoio={`em ${r.qtdComDesconto} venda(s)`} />
+      </div>
 
-      {/* ranking mais/menos */}
-      {config.usaRevendedoras && ranking.length > 0 && (
-        <div className="card">
-          <div className="flex items-center gap-2 font-semibold mb-3">
-            <Trophy size={18} className="text-amber-500" /> Quem vende mais - e menos
+      {/* lucro */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <Stat
+          className="col-span-2 lg:col-span-1"
+          rotulo="Lucro projetado"
+          icone={TrendingUp}
+          tom="ok"
+          valorTom="ok"
+          valor={<CountUp value={r.lucroProjetado} format={brl} />}
+          apoio={
+            <>
+              Se todas as vendas do período forem pagas · margem {r.margem.toFixed(1)}%
+              {r.qtdCanceladas > 0 && ` · ${r.qtdCanceladas} cancelada(s) fora da conta`}
+            </>
+          }
+        />
+        <Stat rotulo="Lucro realizado" valor={brl(r.lucroRealizado)} apoio="proporcional ao caixa" />
+        <Stat rotulo="Custo das vendas" valor={brl(r.custoVendas)} apoio="custo congelado na venda" />
+      </div>
+
+      <div className="grid gap-4 md:gap-5 lg:grid-cols-3 items-start">
+        {/* fluxo de caixa */}
+        <Painel
+          className="lg:col-span-2"
+          titulo="Fluxo de caixa"
+          descricao="Entradas no período"
+          icone={Wallet}
+          acao={<CountUp value={r.fluxoTotal} format={brl} className="text-lg font-bold tnum" />}
+        >
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <Mini label="Média" valor={brl(r.fluxoMedia)} />
+            <Mini label="Pico" valor={brl(r.fluxoPico.valor)} sub={r.fluxoPico.dia} />
+            {/* sem base de comparação (ex.: "Hoje"): neutro, nada de "+0%" verde */}
+            <Mini
+              label="Tendência"
+              valor={r.tendencia === null ? "—" : `${r.tendencia >= 0 ? "+" : ""}${r.tendencia.toFixed(0)}%`}
+              up={r.tendencia === null ? undefined : r.tendencia >= 0}
+            />
           </div>
-          <div className="space-y-1.5">
-            {ranking.map((r2, i) => {
-              const ultimo = i === ranking.length - 1 && ranking.length > 1;
-              return (
-                <div key={r2.id} className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-muted w-5 shrink-0">{i + 1}º</span>
-                    <span className="font-medium truncate">{r2.nome}</span>
-                    {i === 0 && r2.total > 0 && (
-                      <TrendingUp size={14} className="text-green-500 shrink-0" />
-                    )}
-                    {ultimo && <TrendingDown size={14} className="text-red-500 shrink-0" />}
-                  </span>
-                  <span className="text-sm shrink-0">
-                    {brl(r2.total)} <span className="text-muted">· {r2.qtd}</span>
-                  </span>
+          <VendasArea data={r.fluxo} yKey="valor" gradientId="fx" interval="preserveStartEnd" height={190} />
+        </Painel>
+
+        <div className="space-y-4 md:space-y-5 min-w-0">
+          {/* por forma de pagamento */}
+          {r.porForma.length > 0 && (
+            <Painel titulo="Recebido por forma de pagamento">
+              <div className="space-y-3">
+                {r.porForma.map((f) => (
+                  <div key={f.forma}>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted truncate">{f.label}</span>
+                      <span className="font-semibold tnum shrink-0">{brl(f.valor)}</span>
+                    </div>
+                    <Progresso className="mt-1" pct={maiorForma ? (f.valor / maiorForma) * 100 : 0} />
+                  </div>
+                ))}
+              </div>
+            </Painel>
+          )}
+
+          {/* parcelamento (crédito) */}
+          {parcelado.qtd > 0 && (
+            <div className="card flex items-center justify-between gap-3">
+              <div>
+                <div className="section-title">Vendas parceladas</div>
+                <div className="text-xs text-muted">
+                  {parcelado.qtd} venda(s) · até {parcelado.maxParcelas}x
                 </div>
-              );
-            })}
-          </div>
+              </div>
+              <div className="text-right">
+                <div className="font-bold tnum">{brl(parcelado.total)}</div>
+                <div className="text-xs text-muted">no crédito</div>
+              </div>
+            </div>
+          )}
+
+          {/* ranking mais/menos */}
+          {config.usaRevendedoras && ranking.length > 0 && (
+            <Painel titulo="Quem vende mais - e menos" icone={Trophy}>
+              <div className="space-y-2">
+                {ranking.map((r2, i) => {
+                  const ultimo = i === ranking.length - 1 && ranking.length > 1;
+                  return (
+                    <div key={r2.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-muted tnum w-5 shrink-0">{i + 1}º</span>
+                        <span className="font-medium truncate">{r2.nome}</span>
+                        {i === 0 && r2.total > 0 && (
+                          <TrendingUp size={14} className="text-ok shrink-0" aria-label="Quem mais vendeu" />
+                        )}
+                        {ultimo && <TrendingDown size={14} className="text-bad shrink-0" aria-label="Quem menos vendeu" />}
+                      </span>
+                      <span className="tnum shrink-0">
+                        {brl(r2.total)} <span className="text-muted">· {r2.qtd}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Painel>
+          )}
         </div>
-      )}
+      </div>
 
       {/* vendas do período (cancelar / receber fiado) */}
       {vendasPeriodo.length > 0 && (
-        <div className="card print-hidden">
-          <div className="flex items-center gap-2 font-semibold mb-3">
-            <Receipt size={18} className="text-brand-500" /> Vendas do período
-            <span className="text-xs text-muted font-normal">({vendasPeriodo.length})</span>
-          </div>
-          <div className="divide-y divide-[var(--border)]">
-            {vendasPeriodo.slice(0, mostrarVendas).map((v) => {
-              const { data, hora } = dataHora(v.data);
-              const cancelada = v.statusPagamento === "cancelada";
-              const quem = v.revendedoraId
-                ? revendedoras.find((x) => x.id === v.revendedoraId)?.nome ?? "-"
-                : "Loja";
-              return (
-                <div key={v.id} className="py-2 flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className={`text-sm font-medium truncate ${cancelada ? "line-through text-muted" : ""}`}>
-                      {v.itens.length > 0
-                        ? v.itens.map((i) => `${i.qtd}x ${i.nome}${i.variacaoNome ? ` (${i.variacaoNome})` : ""}`).join(", ")
-                        : "Recebimento avulso"}
-                    </div>
-                    <div className="text-[11px] text-muted truncate">
-                      {data} {hora} · {quem}
-                      {cancelada ? (
-                        <span className="text-red-500 font-semibold"> · cancelada</span>
-                      ) : v.statusPagamento === "pendente" ? (
-                        <span className="text-amber-500 font-semibold"> · a receber</span>
-                      ) : null}
-                    </div>
+        <Painel
+          className="print-hidden"
+          titulo={
+            <>
+              Vendas do período <span className="text-muted font-normal tnum">({vendasPeriodo.length})</span>
+            </>
+          }
+          icone={Receipt}
+          lista
+        >
+          {vendasPeriodo.slice(0, mostrarVendas).map((v) => {
+            const { data, hora } = dataHora(v.data);
+            const cancelada = v.statusPagamento === "cancelada";
+            const quem = v.revendedoraId
+              ? revendedoras.find((x) => x.id === v.revendedoraId)?.nome ?? "-"
+              : "Loja";
+            return (
+              <div key={v.id} className="row py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm font-medium truncate ${cancelada ? "line-through text-muted" : ""}`}>
+                    {v.itens.length > 0
+                      ? v.itens.map((i) => `${i.qtd}x ${i.nome}${i.variacaoNome ? ` (${i.variacaoNome})` : ""}`).join(", ")
+                      : "Recebimento avulso"}
                   </div>
-                  <div className={`text-sm font-bold shrink-0 ${cancelada ? "line-through text-muted" : ""}`}>
-                    {brl(v.total)}
+                  <div className="text-xs text-muted flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <span className="tnum">
+                      {data} {hora}
+                    </span>
+                    <span>· {quem}</span>
+                    {cancelada ? (
+                      <Selo tom="bad">cancelada</Selo>
+                    ) : v.statusPagamento === "pendente" ? (
+                      <Selo tom="warn">a receber</Selo>
+                    ) : null}
                   </div>
-                  {ehDono && !cancelada && (
-                    <div className="flex gap-1 shrink-0">
-                      {v.statusPagamento === "pendente" && (
-                        <button
-                          onClick={() => receber(v)}
-                          disabled={processando === v.id}
-                          className="grid place-items-center h-8 w-8 rounded-lg text-green-600 hover:bg-[var(--hover)] disabled:opacity-50"
-                          title="Marcar como recebida"
-                          aria-label="Marcar como recebida"
-                        >
-                          <Check size={16} />
-                        </button>
-                      )}
+                </div>
+                <div className={`text-sm font-bold tnum shrink-0 ${cancelada ? "line-through text-muted" : ""}`}>
+                  {brl(v.total)}
+                </div>
+                {ehDono && (
+                  <div className="flex shrink-0 justify-end w-[5.25rem] -mr-1.5">
+                    {!cancelada && v.statusPagamento === "pendente" && (
+                      <button
+                        onClick={() => receber(v)}
+                        disabled={processando === v.id}
+                        className="icon-btn text-ok hover:!text-ok"
+                        title="Marcar como recebida"
+                        aria-label="Marcar como recebida"
+                      >
+                        <Check size={17} aria-hidden />
+                      </button>
+                    )}
+                    {!cancelada && (
                       <button
                         onClick={() => cancelar(v)}
                         disabled={processando === v.id}
-                        className="grid place-items-center h-8 w-8 rounded-lg text-red-500 hover:bg-[var(--hover)] disabled:opacity-50"
+                        className="icon-btn hover:!text-bad"
                         title="Cancelar venda"
                         aria-label="Cancelar venda"
                       >
-                        <XCircle size={16} />
+                        <XCircle size={17} aria-hidden />
                       </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {vendasPeriodo.length > mostrarVendas && (
-            <button
-              onClick={() => setMostrarVendas((n) => n + 20)}
-              className="btn-ghost w-full py-2 text-sm mt-2"
-            >
-              Mostrar mais ({vendasPeriodo.length - mostrarVendas})
-            </button>
+            <div className="p-3">
+              <button onClick={() => setMostrarVendas((n) => n + 20)} className="btn-ghost btn-sm w-full">
+                Mostrar mais ({vendasPeriodo.length - mostrarVendas})
+              </button>
+            </div>
           )}
-        </div>
+        </Painel>
       )}
-
-      {vendas.length === 0 && (
-        <div className="card text-center text-muted py-8">
-          <Clock className="mx-auto mb-2 opacity-50" />
-          Registre vendas para ver seus relatórios aqui.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Metric({
-  titulo,
-  valor,
-  sub,
-  forte,
-}: {
-  titulo: string;
-  valor: React.ReactNode;
-  sub?: string;
-  forte?: boolean;
-}) {
-  return (
-    <div className="card">
-      <div className="text-xs text-muted">{titulo}</div>
-      <div className={`text-xl font-bold mt-1 ${forte ? "text-brand-500" : ""}`}>{valor}</div>
-      {sub && <div className="text-[11px] text-muted mt-0.5">{sub}</div>}
     </div>
   );
 }
 
 function Mini({ label, valor, sub, up }: { label: string; valor: string; sub?: string; up?: boolean }) {
   return (
-    <div className="surface-alt rounded-xl px-3 py-2">
-      <div className="text-[11px] text-muted">{label}</div>
-      <div className={`font-bold text-sm ${up === undefined ? "" : up ? "text-green-500" : "text-red-500"}`}>
+    <div className="surface-alt rounded-lg px-3 py-2 min-w-0">
+      <div className="text-xs text-muted">{label}</div>
+      <div className={`font-bold text-sm tnum truncate ${up === undefined ? "" : up ? "text-ok" : "text-bad"}`}>
         {valor}
       </div>
-      {sub && <div className="text-[10px] text-muted">{sub}</div>}
+      {sub && <div className="text-[11px] text-muted truncate">{sub}</div>}
     </div>
   );
 }

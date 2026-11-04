@@ -11,6 +11,7 @@ import { useDialog } from "@/components/Dialog";
 import Modal from "@/components/Modal";
 import { usePlano } from "@/lib/usePlano";
 import { planoQueLibera, brlPreco } from "@/lib/plans";
+import { Aviso, EstadoVazio, PageHeader, Painel, Segmentado, Selo, Stat, type Tom } from "@/components/ui";
 import {
   Truck,
   Plus,
@@ -29,6 +30,7 @@ import {
   PackageCheck,
   Undo2,
   Inbox,
+  CircleDashed,
 } from "lucide-react";
 
 export default function EntregasPage() {
@@ -44,11 +46,12 @@ const STATUS_LABEL: Record<StatusEntrega, string> = {
   a_caminho: "A caminho",
   entregue: "Entregue",
 };
-const STATUS_COR: Record<StatusEntrega, string> = {
-  pendente: "text-amber-500",
-  a_caminho: "text-blue-500",
-  entregue: "text-green-500",
+const STATUS_TOM: Record<StatusEntrega, Tom> = {
+  pendente: "warn",
+  a_caminho: "info",
+  entregue: "ok",
 };
+const STATUS_ICONE = { pendente: CircleDashed, a_caminho: Bike, entregue: Check } as const;
 
 function Entregas() {
   const {
@@ -131,54 +134,96 @@ function Entregas() {
   const ativas = entregas.filter((e) => e.status !== "entregue");
   const concluidas = entregas.filter((e) => e.status === "entregue");
 
+  const qtdPendentes = entregas.filter((e) => e.status === "pendente").length;
+  const qtdACaminho = entregas.filter((e) => e.status === "a_caminho").length;
+
   return (
-    <div className="space-y-3">
-      <header className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <Truck className="text-brand-600" />
-          <h1 className="text-2xl font-bold">Entregas</h1>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Entregas"
+        descricao="Distribua as entregas entre os motoboys e acompanhe cada pedido."
+        acoes={
+          <button onClick={() => setAberto(true)} className="btn-primary btn-sm">
+            <Plus size={17} aria-hidden /> Entrega
+          </button>
+        }
+      />
+
+      {entregas.length === 0 ? (
+        <div className="card p-0">
+          <EstadoVazio
+            icone={Truck}
+            titulo="Nenhuma entrega ainda."
+            acao={
+              <button onClick={() => setAberto(true)} className="btn-primary">
+                <Plus size={17} aria-hidden /> Nova entrega
+              </button>
+            }
+          >
+            Crie uma entrega com o cliente e o endereço para acompanhar até a porta do cliente.
+          </EstadoVazio>
         </div>
-        <button onClick={() => setAberto(true)} className="btn-primary py-2 px-3 text-sm">
-          <Plus size={18} /> Entrega
-        </button>
-      </header>
-
-      {entregas.length === 0 && <div className="card text-center text-muted">Nenhuma entrega ainda.</div>}
-
-      {ativas.length > 0 && (
-        <div className="space-y-2 stagger">
-          <h2 className="text-sm font-semibold text-muted">Em aberto ({ativas.length})</h2>
-          {ativas.map((e) => (
-            <EntregaCard
-              key={e.id}
-              e={e}
-              dono={dono}
-              motoboys={motoboys}
-              nomeMotoboy={membros.find((m) => m.id === e.motoboyId)?.nome}
-              onAtribuir={atribuir}
-              onStatus={mudarStatus}
-              ocupada={ocupada === e.id}
+      ) : (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <Stat rotulo="Pendentes" icone={CircleDashed} tom="warn" valor={qtdPendentes} apoio="aguardando saída" />
+            <Stat rotulo="A caminho" icone={Bike} tom="info" valor={qtdACaminho} apoio="na rua agora" />
+            <Stat
+              className="col-span-2 lg:col-span-1"
+              rotulo="Entregues"
+              icone={Check}
+              tom="ok"
+              valor={concluidas.length}
+              apoio="confirmadas e fechadas"
             />
-          ))}
-        </div>
-      )}
+          </div>
 
-      {concluidas.length > 0 && (
-        <div className="space-y-2 stagger">
-          <h2 className="text-sm font-semibold text-muted">Entregues ({concluidas.length})</h2>
-          {concluidas.map((e) => (
-            <EntregaCard
-              key={e.id}
-              e={e}
-              dono={dono}
-              motoboys={motoboys}
-              nomeMotoboy={membros.find((m) => m.id === e.motoboyId)?.nome}
-              onAtribuir={atribuir}
-              onStatus={mudarStatus}
-              ocupada={ocupada === e.id}
-            />
-          ))}
-        </div>
+          <div className="grid gap-4 md:gap-5 lg:grid-cols-3 items-start">
+            <div className="lg:col-span-2 min-w-0 space-y-2">
+              <h2 className="section-title">Em aberto ({ativas.length})</h2>
+              {ativas.length > 0 ? (
+                <div className="card-list stagger">
+                  {ativas.map((e) => (
+                    <EntregaCard
+                      key={e.id}
+                      e={e}
+                      dono={dono}
+                      motoboys={motoboys}
+                      nomeMotoboy={membros.find((m) => m.id === e.motoboyId)?.nome}
+                      onAtribuir={atribuir}
+                      onStatus={mudarStatus}
+                      ocupada={ocupada === e.id}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="card p-0">
+                  <EstadoVazio compacto titulo="Nenhuma entrega em aberto." />
+                </div>
+              )}
+            </div>
+
+            {concluidas.length > 0 && (
+              <div className="min-w-0 space-y-2">
+                <h2 className="section-title">Entregues ({concluidas.length})</h2>
+                <div className="card-list stagger">
+                  {concluidas.map((e) => (
+                    <EntregaCard
+                      key={e.id}
+                      e={e}
+                      dono={dono}
+                      motoboys={motoboys}
+                      nomeMotoboy={membros.find((m) => m.id === e.motoboyId)?.nome}
+                      onAtribuir={atribuir}
+                      onStatus={mudarStatus}
+                      ocupada={ocupada === e.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {aberto && (
@@ -224,56 +269,53 @@ function PitchEntregas() {
     },
   ];
 
-  const fluxo = [
-    { cor: "text-amber-500", label: "Pendente", desc: "Pedido criado, aguardando saída" },
-    { cor: "text-blue-500", label: "A caminho", desc: "Motoboy saiu para entregar" },
-    { cor: "text-green-500", label: "Entregue", desc: "Confirmado e fechado" },
+  const fluxo: { tom: Tom; label: string; desc: string }[] = [
+    { tom: "warn", label: "Pendente", desc: "Pedido criado, aguardando saída" },
+    { tom: "info", label: "A caminho", desc: "Motoboy saiu para entregar" },
+    { tom: "ok", label: "Entregue", desc: "Confirmado e fechado" },
   ];
 
   return (
-    <div className="space-y-5">
-      <header className="flex items-center gap-2 pt-1">
-        <Truck className="text-brand-600" />
-        <h1 className="text-2xl font-bold">Entregas</h1>
-      </header>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader titulo="Entregas" />
 
       {/* HERO */}
-      <section className="card relative overflow-hidden text-center py-10 px-6 space-y-4">
-        <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-brand-500/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-brand-500/10 blur-2xl" />
-        <div className="relative space-y-4">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 text-brand-500 text-xs font-bold px-3 py-1">
-            <Sparkles size={13} /> Disponível no plano {plano?.nome ?? "Expansão"}
-          </span>
-          <h2 className="text-2xl md:text-3xl font-extrabold leading-tight max-w-xl mx-auto">
+      <section className="card px-5 py-7 md:px-8 md:py-9">
+        <div className="max-w-2xl space-y-4">
+          <Selo tom="brand" icone={Sparkles}>
+            Disponível no plano {plano?.nome ?? "Expansão"}
+          </Selo>
+          <h2 className="text-2xl md:text-3xl font-bold leading-tight tracking-tight">
             Pare de gerenciar entrega no grito.
             <br />
-            <span className="text-brand-500">Tenha uma operação de verdade.</span>
+            <span className="text-accent">Tenha uma operação de verdade.</span>
           </h2>
-          <p className="text-sm md:text-base text-muted max-w-lg mx-auto">
+          <p className="text-sm md:text-base text-muted">
             Print no grupo, áudio de 3 minutos, “qual era mesmo o endereço?”. Cada entrega bagunçada é
             cliente irritado e dinheiro escapando. Coloque seus motoboys, suas rotas e suas taxas dentro
             da plataforma — e durma tranquilo sabendo onde está cada pedido.
           </p>
-          <Link href="/planos" className="btn-primary inline-flex w-auto px-7 mx-auto">
-            <Zap size={16} />
-            {preco ? `Liberar entregas por ${preco}/mês` : "Ver planos"}
-          </Link>
-          <p className="text-xs text-muted flex items-center justify-center gap-1.5">
-            <BadgeCheck size={13} className="text-brand-500" /> Ativa na hora · cancele quando quiser
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Link href="/planos" className="btn-primary max-w-full">
+              <Zap size={16} aria-hidden />
+              {preco ? `Liberar entregas por ${preco}/mês` : "Ver planos"}
+            </Link>
+            <p className="text-xs text-muted flex items-center gap-1.5">
+              <BadgeCheck size={13} className="text-accent shrink-0" aria-hidden /> Ativa na hora · cancele quando quiser
+            </p>
+          </div>
         </div>
       </section>
 
       {/* RECURSOS */}
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {recursos.map((r) => {
           const Icon = r.icon;
           return (
             <div key={r.titulo} className="card space-y-2">
-              <div className="h-10 w-10 rounded-xl bg-brand-500/10 grid place-items-center">
-                <Icon size={20} className="text-brand-500" />
-              </div>
+              <span className="grid place-items-center h-9 w-9 rounded-lg tone-brand" aria-hidden>
+                <Icon size={18} />
+              </span>
               <div className="font-semibold">{r.titulo}</div>
               <p className="text-sm text-muted">{r.desc}</p>
             </div>
@@ -281,54 +323,51 @@ function PitchEntregas() {
         })}
       </section>
 
-      {/* FLUXO */}
-      <section className="card space-y-3">
-        <div className="flex items-center gap-2 font-semibold">
-          <Route size={18} className="text-brand-500" /> Do pedido à porta do cliente
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-4 md:gap-5 lg:grid-cols-3 items-start">
+        {/* FLUXO */}
+        <Painel titulo="Do pedido à porta do cliente" icone={Route} lista>
           {fluxo.map((f, i) => (
-            <div key={f.label} className="surface-alt rounded-xl p-3 flex items-start gap-2">
-              <span className="text-xs font-bold text-muted shrink-0">{i + 1}</span>
-              <div>
-                <div className={`text-sm font-semibold ${f.cor}`}>{f.label}</div>
-                <div className="text-xs text-muted">{f.desc}</div>
+            <div key={f.label} className="flex items-start gap-3 px-4 py-3">
+              <span className="text-xs font-bold text-muted tnum shrink-0 mt-0.5">{i + 1}</span>
+              <div className="min-w-0">
+                <Selo tom={f.tom}>{f.label}</Selo>
+                <div className="text-sm text-muted mt-1">{f.desc}</div>
               </div>
             </div>
           ))}
-        </div>
-      </section>
+        </Painel>
 
-      {/* PROVA DE VALOR + CTA FINAL */}
-      <section className="card space-y-4">
-        <div className="space-y-1">
-          <div className="text-lg font-bold">Quanto custa NÃO ter isso?</div>
-          <p className="text-sm text-muted">
-            Uma única entrega trocada de endereço já paga o plano. Some o tempo que você perde no
-            WhatsApp coordenando motoboy e o cliente que não compra de novo porque “demorou e ninguém
-            soube dizer onde estava”. {preco ? `Por ${preco}/mês` : "Por menos do que um delivery atrasado"}, você
-            transforma a parte mais caótica da sua loja na mais organizada.
-          </p>
-        </div>
-        {plano && (
-          <div className="rounded-2xl border border-brand-500/30 bg-brand-500/5 p-4">
-            <div className="flex items-center justify-between">
-              <span className="font-bold">Plano {plano.nome}</span>
-              <span className="text-brand-500 font-bold">{brlPreco(plano.precoCentavos)}/mês</span>
-            </div>
-            <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-              {plano.beneficios.map((b) => (
-                <li key={b} className="text-xs text-muted flex items-center gap-1.5">
-                  <ArrowRight size={12} className="text-brand-500 shrink-0" /> {b}
-                </li>
-              ))}
-            </ul>
+        {/* PROVA DE VALOR + CTA FINAL */}
+        <section className="card lg:col-span-2 min-w-0 space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold">Quanto custa NÃO ter isso?</h2>
+            <p className="text-sm text-muted">
+              Uma única entrega trocada de endereço já paga o plano. Some o tempo que você perde no
+              WhatsApp coordenando motoboy e o cliente que não compra de novo porque “demorou e ninguém
+              soube dizer onde estava”. {preco ? `Por ${preco}/mês` : "Por menos do que um delivery atrasado"}, você
+              transforma a parte mais caótica da sua loja na mais organizada.
+            </p>
           </div>
-        )}
-        <Link href="/planos" className="btn-primary w-full">
-          <Sparkles size={16} /> Quero gerenciar minhas entregas
-        </Link>
-      </section>
+          {plano && (
+            <div className="border border-default surface-alt p-4" style={{ borderRadius: "var(--r-input)" }}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-bold">Plano {plano.nome}</span>
+                <span className="text-accent font-bold tnum whitespace-nowrap">{brlPreco(plano.precoCentavos)}/mês</span>
+              </div>
+              <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                {plano.beneficios.map((b) => (
+                  <li key={b} className="text-xs text-muted flex items-center gap-1.5">
+                    <ArrowRight size={12} className="text-accent shrink-0" aria-hidden /> {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <Link href="/planos" className="btn-primary w-full">
+            <Sparkles size={16} aria-hidden /> Quero gerenciar minhas entregas
+          </Link>
+        </section>
+      </div>
     </div>
   );
 }
@@ -365,47 +404,42 @@ function MotoboyEntregas({
     if (!r.ok) alerta({ titulo: "Não deu para pegar", mensagem: r.erro || "Tente outra entrega." });
   }
 
-  function tab(id: "disponiveis" | "minhas", label: string) {
-    return (
-      <button
-        onClick={() => setAba(id)}
-        className={`chip ${aba === id ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
-      >
-        {label}
-      </button>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      <header className="flex items-center gap-2 pt-1">
-        <Truck className="text-brand-600" />
-        <h1 className="text-2xl font-bold">Minhas entregas</h1>
-      </header>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader titulo="Minhas entregas" />
 
-      <div className="flex gap-2">
-        {tab("disponiveis", `Disponíveis (${disponiveis.length})`)}
-        {tab("minhas", `Minhas (${minhasAtivas.length})`)}
-      </div>
+      <Segmentado
+        rotulo="Lista de entregas"
+        valor={aba}
+        onChange={setAba}
+        opcoes={
+          [
+            ["disponiveis", `Disponíveis (${disponiveis.length})`],
+            ["minhas", `Minhas (${minhasAtivas.length})`],
+          ] as const
+        }
+      />
 
       {aba === "disponiveis" ? (
         disponiveis.length === 0 ? (
-          <div className="card text-center text-muted py-8 flex flex-col items-center gap-2">
-            <Inbox size={28} /> Nenhuma entrega no balcão agora.
+          <div className="card p-0">
+            <EstadoVazio icone={Inbox} titulo="Nenhuma entrega no balcão agora." />
           </div>
         ) : (
           <>
-            <p className="text-xs text-muted">Toque em “Pegar” para assumir a entrega. Ela sai do balcão e vai para “Minhas”.</p>
-            <div className="space-y-2 stagger">
+            <p className="text-sm text-muted">Toque em “Pegar” para assumir a entrega. Ela sai do balcão e vai para “Minhas”.</p>
+            <div className="card-list stagger">
               {disponiveis.map((e) => (
-                <div key={e.id} className="card space-y-2">
-                  <EntregaInfo e={e} />
+                <div key={e.id} className="px-4 py-3.5 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <EntregaInfo e={e} />
+                  </div>
                   <button
                     disabled={ocupado === e.id}
                     onClick={() => pegar(e.id)}
-                    className="btn-primary w-full py-2 text-sm disabled:opacity-60"
+                    className="btn-primary w-full sm:w-auto shrink-0"
                   >
-                    <PackageCheck size={16} /> {ocupado === e.id ? "Pegando…" : "Pegar entrega"}
+                    <PackageCheck size={16} aria-hidden /> {ocupado === e.id ? "Pegando…" : "Pegar entrega"}
                   </button>
                 </div>
               ))}
@@ -415,24 +449,30 @@ function MotoboyEntregas({
       ) : (
         <>
           {minhasAtivas.length === 0 && minhasFeitas.length === 0 && (
-            <div className="card text-center text-muted py-8">
-              Você ainda não pegou nenhuma entrega. Veja o balcão em “Disponíveis”.
+            <div className="card p-0">
+              <EstadoVazio icone={Bike} titulo="Você ainda não pegou nenhuma entrega.">
+                Veja o balcão em “Disponíveis”.
+              </EstadoVazio>
             </div>
           )}
           {minhasAtivas.length > 0 && (
-            <div className="space-y-2 stagger">
-              <h2 className="text-sm font-semibold text-muted">Em aberto ({minhasAtivas.length})</h2>
-              {minhasAtivas.map((e) => (
-                <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} ocupada={ocupada === e.id} />
-              ))}
+            <div className="space-y-2">
+              <h2 className="section-title">Em aberto ({minhasAtivas.length})</h2>
+              <div className="card-list stagger">
+                {minhasAtivas.map((e) => (
+                  <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} ocupada={ocupada === e.id} />
+                ))}
+              </div>
             </div>
           )}
           {minhasFeitas.length > 0 && (
-            <div className="space-y-2 stagger">
-              <h2 className="text-sm font-semibold text-muted">Entregues ({minhasFeitas.length})</h2>
-              {minhasFeitas.map((e) => (
-                <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} ocupada={ocupada === e.id} />
-              ))}
+            <div className="space-y-2">
+              <h2 className="section-title">Entregues ({minhasFeitas.length})</h2>
+              <div className="card-list stagger">
+                {minhasFeitas.map((e) => (
+                  <MinhaEntregaCard key={e.id} e={e} onStatus={onStatus} onDevolver={onDevolver} ocupada={ocupada === e.id} />
+                ))}
+              </div>
             </div>
           )}
         </>
@@ -444,24 +484,30 @@ function MotoboyEntregas({
 // bloco de dados da entrega (cliente, endereço, telefone, taxa, status) reutilizado
 function EntregaInfo({ e }: { e: Entrega }) {
   return (
-    <div className="flex items-start justify-between gap-2">
+    <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="font-semibold truncate">{e.clienteNome || "Cliente"}</div>
         {e.endereco && (
-          <div className="text-xs text-muted flex items-center gap-1">
-            <MapPin size={12} /> {e.endereco}
+          <div className="text-sm text-muted flex items-start gap-1.5 mt-0.5">
+            <MapPin size={14} className="shrink-0 mt-0.5" aria-hidden />
+            <span className="min-w-0 break-words">{e.endereco}</span>
           </div>
         )}
         {e.telefone && (
-          <a href={`tel:${e.telefone}`} className="text-xs text-brand-500 flex items-center gap-1">
-            <Phone size={12} /> {e.telefone}
+          <a
+            href={`tel:${e.telefone}`}
+            className="text-sm text-accent inline-flex items-center gap-1.5 min-h-[32px] tnum hover:underline"
+          >
+            <Phone size={14} aria-hidden /> {e.telefone}
           </a>
         )}
         {e.observacao && <div className="text-xs text-muted mt-0.5">{e.observacao}</div>}
       </div>
-      <div className="text-right shrink-0">
-        {e.taxa > 0 && <div className="text-sm font-semibold">{brl(e.taxa)}</div>}
-        <div className={`text-xs font-medium ${STATUS_COR[e.status]}`}>{STATUS_LABEL[e.status]}</div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <Selo tom={STATUS_TOM[e.status]} icone={STATUS_ICONE[e.status]}>
+          {STATUS_LABEL[e.status]}
+        </Selo>
+        {e.taxa > 0 && <div className="text-sm font-semibold tnum">{brl(e.taxa)}</div>}
       </div>
     </div>
   );
@@ -479,23 +525,27 @@ function MinhaEntregaCard({
   ocupada: boolean;
 }) {
   return (
-    <div className="card space-y-2">
+    <div className="px-4 py-3.5 space-y-3">
       <EntregaInfo e={e} />
       {e.status !== "entregue" && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {e.status === "pendente" && (
-            <button disabled={ocupada} onClick={() => onStatus(e.id, "a_caminho")} className="btn-ghost flex-1 py-2 text-sm disabled:opacity-60">
-              <Bike size={16} /> Saí para entrega
+            <button disabled={ocupada} onClick={() => onStatus(e.id, "a_caminho")} className="btn-ghost btn-sm !min-h-[44px] flex-auto whitespace-nowrap">
+              <Bike size={16} aria-hidden /> Saí para entrega
             </button>
           )}
-          <button disabled={ocupada} onClick={() => onStatus(e.id, "entregue")} className="btn-primary flex-1 py-2 text-sm disabled:opacity-60">
-            <Check size={16} /> Entregue
+          <button disabled={ocupada} onClick={() => onStatus(e.id, "entregue")} className="btn-primary btn-sm !min-h-[44px] flex-auto whitespace-nowrap">
+            <Check size={16} aria-hidden /> Entregue
           </button>
         </div>
       )}
       {e.status === "pendente" && (
-        <button disabled={ocupada} onClick={() => onDevolver(e.id)} className="w-full min-h-[44px] py-1.5 text-xs text-muted flex items-center justify-center gap-1 disabled:opacity-60">
-          <Undo2 size={14} /> Devolver ao balcão
+        <button
+          disabled={ocupada}
+          onClick={() => onDevolver(e.id)}
+          className="w-full min-h-[40px] text-sm text-muted hover:text-strong flex items-center justify-center gap-1.5 disabled:opacity-60"
+        >
+          <Undo2 size={14} aria-hidden /> Devolver ao balcão
         </button>
       )}
     </div>
@@ -520,72 +570,54 @@ function EntregaCard({
   ocupada: boolean;
 }) {
   return (
-    <div className="card space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-semibold truncate">{e.clienteNome || "Cliente"}</div>
-          {e.endereco && (
-            <div className="text-xs text-muted flex items-center gap-1">
-              <MapPin size={12} /> {e.endereco}
-            </div>
-          )}
-          {e.telefone && (
-            <a href={`tel:${e.telefone}`} className="text-xs text-brand-500 flex items-center gap-1">
-              <Phone size={12} /> {e.telefone}
-            </a>
-          )}
-          {e.observacao && <div className="text-xs text-muted mt-0.5">{e.observacao}</div>}
-        </div>
-        <div className="text-right shrink-0">
-          {e.taxa > 0 && <div className="text-sm font-semibold">{brl(e.taxa)}</div>}
-          <div className={`text-xs font-medium ${STATUS_COR[e.status]}`}>
-            {STATUS_LABEL[e.status]}
-          </div>
-        </div>
-      </div>
+    <div className="px-4 py-3.5 space-y-3">
+      <EntregaInfo e={e} />
 
-      {dono && (
-        <select
-          className="input py-1.5 text-sm"
-          aria-label="Motoboy da entrega"
-          disabled={ocupada}
-          value={e.motoboyId ?? ""}
-          onChange={(ev) => onAtribuir(e.id, ev.target.value || null)}
-        >
-          <option value="">Sem motoboy</option>
-          {motoboys.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.nome || "Motoboy"}
-            </option>
-          ))}
-        </select>
-      )}
       {!dono && nomeMotoboy && (
         <div className="text-xs text-muted flex items-center gap-1">
-          <Bike size={12} /> {nomeMotoboy}
+          <Bike size={12} aria-hidden /> {nomeMotoboy}
         </div>
       )}
 
-      {e.status !== "entregue" && (
-        <div className="flex gap-2">
-          {e.status === "pendente" && (
+      <div className="flex flex-wrap items-center gap-2">
+        {dono && (
+          <select
+            className="input !min-h-[40px] py-1.5 text-sm flex-1 basis-40 min-w-0"
+            aria-label="Motoboy da entrega"
+            disabled={ocupada}
+            value={e.motoboyId ?? ""}
+            onChange={(ev) => onAtribuir(e.id, ev.target.value || null)}
+          >
+            <option value="">Sem motoboy</option>
+            {motoboys.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nome || "Motoboy"}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {e.status !== "entregue" && (
+          <div className="flex flex-wrap gap-2 flex-1 basis-56 sm:flex-none sm:basis-auto">
+            {e.status === "pendente" && (
+              <button
+                disabled={ocupada}
+                onClick={() => onStatus(e.id, "a_caminho")}
+                className="btn-ghost btn-sm !min-h-[40px] flex-auto whitespace-nowrap sm:flex-none"
+              >
+                <Bike size={15} aria-hidden /> Saí para entrega
+              </button>
+            )}
             <button
               disabled={ocupada}
-              onClick={() => onStatus(e.id, "a_caminho")}
-              className="btn-ghost flex-1 py-2 text-sm disabled:opacity-60"
+              onClick={() => onStatus(e.id, "entregue")}
+              className="btn-ghost btn-sm !min-h-[40px] flex-auto whitespace-nowrap sm:flex-none"
             >
-              <Bike size={16} /> Saí para entrega
+              <Check size={15} aria-hidden /> Entregue
             </button>
-          )}
-          <button
-            disabled={ocupada}
-            onClick={() => onStatus(e.id, "entregue")}
-            className="btn-primary flex-1 py-2 text-sm disabled:opacity-60"
-          >
-            <Check size={16} /> Entregue
-          </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -653,7 +685,9 @@ function NovaEntrega({
           <input id="ent-obs" maxLength={300} className="input" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: ponto de referência" />
         </div>
         {erro && (
-          <p className="text-sm text-red-500 bg-red-500/10 rounded-xl px-3 py-2">{erro}</p>
+          <Aviso tom="bad" className="!py-2">
+            <span className="text-bad">{erro}</span>
+          </Aviso>
         )}
         <button
           disabled={salvando}
@@ -680,10 +714,11 @@ function NovaEntrega({
             setSalvando(false);
             if (!r.ok) setErro(r.erro || "Não foi possível criar a entrega.");
           }}
-          className="btn-primary w-full disabled:opacity-60"
+          className="btn-primary w-full"
         >
           {salvando ? "Criando…" : "Criar entrega"}
         </button>
     </Modal>
   );
 }
+

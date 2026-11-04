@@ -19,7 +19,7 @@ function AvisoBloqueio() {
   const { bloqueado, situacao } = usePlano();
   if (!bloqueado) return null;
   return (
-    <p role="alert" className="text-sm text-red-600 max-w-md mx-auto">
+    <p role="alert" className="text-sm text-bad max-w-md mx-auto">
       {AVISO_BLOQUEIO[situacao]}
     </p>
   );
@@ -36,17 +36,17 @@ export function UpgradeBlock({
   planoNecessario?: PlanoDef | null;
 }) {
   return (
-    <div className="card text-center py-12 px-6 space-y-4">
-      <div className="mx-auto h-16 w-16 rounded-2xl bg-brand-500/10 grid place-items-center">
-        <Lock className="text-brand-500" size={28} />
-      </div>
+    <div className="card text-center py-10 px-5 space-y-3">
+      <span className="mx-auto grid place-items-center h-11 w-11 rounded-xl tone-brand" aria-hidden>
+        <Lock size={21} />
+      </span>
       <div>
-        <div className="text-xl font-bold">{titulo}</div>
+        <div className="text-lg font-bold leading-tight">{titulo}</div>
         <p className="text-sm text-muted max-w-md mx-auto mt-1">{descricao}</p>
       </div>
       <AvisoBloqueio />
-      <Link href="/planos" className="btn-primary inline-flex w-auto max-w-full px-6 mx-auto text-center">
-        <Sparkles size={16} />
+      <Link href="/planos" className="btn-primary w-auto max-w-full text-center">
+        <Sparkles size={16} aria-hidden />
         {planoNecessario
           ? `Desbloquear com o ${planoNecessario.nome} · ${brlPreco(planoNecessario.precoCentavos)}/mês`
           : "Ver planos"}
@@ -73,22 +73,22 @@ export function UpgradeModal({
   return (
     <Modal onClose={onClose} titulo={titulo} largura="md:max-w-sm" className="space-y-4">
       <div className="text-center space-y-4">
-        <div className="mx-auto h-16 w-16 rounded-2xl bg-brand-500/10 grid place-items-center">
-          <Sparkles className="text-brand-500" size={28} />
-        </div>
+        <span className="mx-auto grid place-items-center h-11 w-11 rounded-xl tone-brand" aria-hidden>
+          <Sparkles size={21} />
+        </span>
         <p className="text-sm text-muted">{descricao}</p>
         <AvisoBloqueio />
 
         {planoNecessario && (
-          <div className="rounded-2xl border border-brand-500/30 bg-brand-500/5 p-4 text-left">
+          <div className="border border-brand-500/30 bg-brand-500/[.06] p-3.5 text-left" style={{ borderRadius: "var(--r-card)" }}>
             <div className="flex items-center justify-between gap-2">
               <span className="font-bold">Plano {planoNecessario.nome}</span>
-              <span className="text-brand-500 font-bold whitespace-nowrap">{brlPreco(planoNecessario.precoCentavos)}/mês</span>
+              <span className="text-accent font-bold tnum whitespace-nowrap">{brlPreco(planoNecessario.precoCentavos)}/mês</span>
             </div>
             <ul className="mt-2 space-y-1">
               {planoNecessario.beneficios.slice(0, 4).map((b) => (
                 <li key={b} className="text-xs text-muted flex items-center gap-1.5">
-                  <ArrowRight size={12} className="text-brand-500 shrink-0" /> {b}
+                  <ArrowRight size={12} className="text-accent shrink-0" aria-hidden /> {b}
                 </li>
               ))}
             </ul>
@@ -96,9 +96,9 @@ export function UpgradeModal({
         )}
 
         <Link href="/planos" className="btn-primary w-full">
-          <Sparkles size={16} /> Fazer upgrade
+          <Sparkles size={16} aria-hidden /> Fazer upgrade
         </Link>
-        <button type="button" onClick={onClose} className="text-sm text-muted w-full min-h-[44px]">
+        <button type="button" onClick={onClose} className="text-sm text-muted hover:text-strong w-full min-h-[44px]">
           Agora não
         </button>
       </div>

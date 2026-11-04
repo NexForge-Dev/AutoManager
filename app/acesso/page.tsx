@@ -5,7 +5,24 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { lerConviteDoHash } from "@/lib/acessoRevendedora";
 import { destinoPosLogin, MOTIVOS_ACESSO, motivoDaUrl } from "@/lib/destinoPosLogin";
-import { Gem, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardList, Lock, Loader2, Smartphone, Wallet } from "lucide-react";
+import EntradaShell, { type ItemEntrada } from "@/components/landing/EntradaShell";
+import { Aviso, Segmentado } from "@/components/ui";
+
+const LADO: { titulo: string; itens: ItemEntrada[] } = {
+  titulo: "Sua área para vender pelo celular.",
+  itens: [
+    { icone: Smartphone, titulo: "Catálogo da loja", texto: "Veja os produtos disponíveis" },
+    { icone: ClipboardList, titulo: "Suas vendas", texto: "Registre cada venda e acompanhe o histórico" },
+    { icone: Wallet, titulo: "Sua comissão", texto: "Calculada a cada venda registrada" },
+    { icone: Lock, titulo: "Acesso próprio", texto: "Entre com o seu e-mail e a sua senha" },
+  ],
+};
+
+const MODOS = [
+  ["ativar", "Primeiro acesso"],
+  ["entrar", "Entrar"],
+] as const;
 
 export default function AcessoPage() {
   const router = useRouter();
@@ -105,92 +122,87 @@ export default function AcessoPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-5 bg-[var(--bg)]">
-      <div className="w-full max-w-sm reveal">
-        <h1 className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-2">
-          <Gem className="text-brand-600" /> Área da Vendedora
-        </h1>
-        <p className="text-center text-sm text-muted mb-6">Revendedoras e equipe da loja: acesse o catálogo e registre suas vendas.</p>
+    <EntradaShell lado={LADO}>
+      <h1 className="page-title text-center">Área da Vendedora</h1>
+      <p className="mt-1 text-center text-sm text-muted">
+        Revendedoras e equipe da loja: acesse o catálogo e registre suas vendas.
+      </p>
 
-        <div className="card space-y-4">
-          <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
-            <button
-              type="button"
-              aria-pressed={modo === "ativar"}
-              onClick={() => trocarModo("ativar")}
-              className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "ativar" ? "surface shadow" : "text-muted hover:text-strong"}`}
-            >
-              Primeiro acesso
-            </button>
-            <button
-              type="button"
-              aria-pressed={modo === "entrar"}
-              onClick={() => trocarModo("entrar")}
-              className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "entrar" ? "surface shadow" : "text-muted hover:text-strong"}`}
-            >
-              Entrar
-            </button>
-          </div>
+      <div className="card mt-5 space-y-4 p-5">
+        <Segmentado
+          rotulo="Primeiro acesso ou entrar"
+          opcoes={MODOS}
+          valor={modo}
+          onChange={trocarModo}
+          className="flex w-full [&>button]:flex-1"
+        />
 
-          <p className="text-xs text-muted">
-            {modo === "ativar"
-              ? doLink
-                ? "Seu e-mail e código já foram preenchidos pelo link da loja. Só falta criar a sua senha."
-                : "Use o e-mail que a loja cadastrou, o código de acesso que ela te enviou e crie a sua senha agora."
-              : "Entre com o e-mail e a senha que você criou."}
-          </p>
-
-          <form onSubmit={submit} className="space-y-3">
-            <div>
-              <label htmlFor="acesso-email" className="label">E-mail</label>
-              <input id="acesso-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-            </div>
-            {modo === "ativar" && (
-              <div>
-                <label htmlFor="acesso-codigo" className="label">Código de acesso</label>
-                <input
-                  id="acesso-codigo"
-                  className="input tracking-[0.3em] font-mono uppercase"
-                  value={codigo}
-                  onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-                  required
-                  maxLength={6}
-                  placeholder="ABC123"
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted mt-1">A loja te passa esse código junto com o link de acesso.</p>
-              </div>
-            )}
-            <div>
-              <label htmlFor="acesso-senha" className="label">{modo === "ativar" ? "Crie sua senha" : "Senha"}</label>
-              <input
-                id="acesso-senha"
-                type="password"
-                className="input"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                minLength={modo === "ativar" ? 8 : 6}
-                maxLength={72}
-                autoComplete={modo === "ativar" ? "new-password" : "current-password"}
-              />
-            </div>
-            {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
-            {aviso && <p role="status" className="text-sm text-green-600">{aviso}</p>}
-            <button disabled={loading} className="btn-primary w-full disabled:opacity-60">
-              {loading ? <Loader2 className="animate-spin" size={18} /> : modo === "ativar" ? "Ativar e entrar" : "Entrar"}
-            </button>
-          </form>
-        </div>
-        <p className="text-center text-sm text-muted mt-4">
-          É dono(a) da loja?{" "}
-          <Link href="/login?modo=entrar" className="font-semibold text-brand-500 hover:underline">
-            Entrar aqui
-          </Link>
+        <p className="text-sm text-muted">
+          {modo === "ativar"
+            ? doLink
+              ? "Seu e-mail e código já foram preenchidos pelo link da loja. Só falta criar a sua senha."
+              : "Use o e-mail que a loja cadastrou, o código de acesso que ela te enviou e crie a sua senha agora."
+            : "Entre com o e-mail e a senha que você criou."}
         </p>
+
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label htmlFor="acesso-email" className="label">E-mail</label>
+            <input id="acesso-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          </div>
+          {modo === "ativar" && (
+            <div>
+              <label htmlFor="acesso-codigo" className="label">Código de acesso</label>
+              <input
+                id="acesso-codigo"
+                className="input tracking-[0.3em] font-mono uppercase"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                required
+                maxLength={6}
+                placeholder="ABC123"
+                autoCapitalize="characters"
+                autoComplete="off"
+              />
+              <p className="hint">A loja te passa esse código junto com o link de acesso.</p>
+            </div>
+          )}
+          <div>
+            <label htmlFor="acesso-senha" className="label">{modo === "ativar" ? "Crie sua senha" : "Senha"}</label>
+            <input
+              id="acesso-senha"
+              type="password"
+              className="input"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              required
+              minLength={modo === "ativar" ? 8 : 6}
+              maxLength={72}
+              autoComplete={modo === "ativar" ? "new-password" : "current-password"}
+            />
+          </div>
+          {erro && (
+            <div role="alert">
+              <Aviso tom="bad" icone={AlertCircle}>{erro}</Aviso>
+            </div>
+          )}
+          {aviso && (
+            <div role="status">
+              <Aviso tom="ok" icone={CheckCircle2}>{aviso}</Aviso>
+            </div>
+          )}
+          <button disabled={loading} className="btn-primary w-full">
+            {loading ? <Loader2 className="animate-spin" size={18} aria-hidden /> : modo === "ativar" ? "Ativar e entrar" : "Entrar"}
+          </button>
+        </form>
       </div>
-    </div>
+      <p className="mt-4 text-center text-sm text-muted">
+        É dono(a) da loja?{" "}
+        <Link href="/login?modo=entrar" className="font-semibold text-accent hover:underline">
+          Entrar aqui
+        </Link>
+      </p>
+    </EntradaShell>
   );
 }
 

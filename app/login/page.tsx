@@ -6,7 +6,24 @@ import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { registrarMetrica, registrarSessao } from "@/lib/metricas/cliente";
 import { planoValido } from "@/lib/plans";
-import { Gem, Loader2, KeyRound } from "lucide-react";
+import { AlertCircle, CheckCircle2, KeyRound, Loader2, ShieldCheck, Smartphone, Timer, Wallet } from "lucide-react";
+import EntradaShell, { type ItemEntrada } from "@/components/landing/EntradaShell";
+import { Aviso, Segmentado } from "@/components/ui";
+
+const LADO: { titulo: string; itens: ItemEntrada[] } = {
+  titulo: "Saiba quanto sua loja vende e quanto sobra, todo dia.",
+  itens: [
+    { icone: Timer, titulo: "Venda registrada em segundos", texto: "O estoque baixa sozinho" },
+    { icone: Wallet, titulo: "Comissão calculada", texto: "Por venda e por revendedora" },
+    { icone: Smartphone, titulo: "Feito para o celular", texto: "Adicione à tela inicial e abra como um app" },
+    { icone: ShieldCheck, titulo: "Cada loja isolada", texto: "Ninguém de outra loja vê os seus números" },
+  ],
+};
+
+const MODOS = [
+  ["criar", "Criar conta"],
+  ["entrar", "Entrar"],
+] as const;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -128,102 +145,95 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-5 bg-[var(--bg)]">
-      <div className="w-full max-w-sm reveal">
-        <Link href="/" className="flex items-center justify-center gap-2 font-extrabold text-brand-500 text-xl mb-6">
-          <Gem className="text-brand-600" /> AutoManager
-        </Link>
-        <h1 className="sr-only">Entrar no AutoManager</h1>
-        <div className="card space-y-4">
-          <div className="flex rounded-xl surface-alt p-1 text-sm font-semibold">
-            <button
-              type="button"
-              aria-pressed={modo === "criar"}
-              onClick={() => setModo("criar")}
-              className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "criar" ? "surface shadow" : "text-muted hover:text-strong"}`}
-            >
-              Criar conta
-            </button>
-            <button
-              type="button"
-              aria-pressed={modo === "entrar"}
-              onClick={() => setModo("entrar")}
-              className={`flex-1 rounded-lg py-2 transition active:scale-95 ${modo === "entrar" ? "surface shadow" : "text-muted hover:text-strong"}`}
-            >
-              Entrar
-            </button>
-          </div>
+    <EntradaShell lado={LADO}>
+      <h1 className="page-title text-center">{modo === "criar" ? "Crie sua conta grátis" : "Entre na sua conta"}</h1>
+      <p className="mt-1 text-center text-sm text-muted">
+        {modo === "criar" ? "1º mês grátis, sem cartão." : "Que bom ver você de volta."}
+      </p>
+      <div className="card mt-5 space-y-4 p-5">
+        <Segmentado
+          rotulo="Criar conta ou entrar"
+          opcoes={MODOS}
+          valor={modo}
+          onChange={setModo}
+          className="flex w-full [&>button]:flex-1"
+        />
 
-          <form onSubmit={submit} className="space-y-3">
-            <div>
-              <label htmlFor="login-email" className="label">E-mail</label>
-              <input
-                id="login-email"
-                type="email"
-                className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="login-senha" className="label">Senha</label>
-                {modo === "entrar" && (
-                  <button
-                    type="button"
-                    onClick={esqueciSenha}
-                    disabled={enviandoReset}
-                    className="mb-1 text-xs font-medium text-brand-500 hover:underline disabled:opacity-60"
-                  >
-                    {enviandoReset ? "Enviando…" : "Esqueci minha senha"}
-                  </button>
-                )}
-              </div>
-              <input
-                id="login-senha"
-                type="password"
-                className="input"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                minLength={modo === "criar" ? 8 : 6}
-                maxLength={72}
-                autoComplete={modo === "criar" ? "new-password" : "current-password"}
-              />
-            </div>
-            {modo === "entrar" && (
-              <p className="text-xs text-muted">
-                Donos, vendedores, entregadores e revendedoras entram aqui — cada um cai direto na sua área.
-              </p>
-            )}
-            {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
-            {aviso && <p role="status" className="text-sm text-green-600">{aviso}</p>}
-            <button disabled={loading} className="btn-primary w-full disabled:opacity-60">
-              {loading ? (
-                <Loader2 className="animate-spin" size={18} />
-              ) : modo === "criar" ? (
-                "Criar conta grátis"
-              ) : (
-                "Entrar"
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label htmlFor="login-email" className="label">E-mail</label>
+            <input
+              id="login-email"
+              type="email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="login-senha" className="label">Senha</label>
+              {modo === "entrar" && (
+                <button
+                  type="button"
+                  onClick={esqueciSenha}
+                  disabled={enviandoReset}
+                  className="mb-1 min-h-[32px] text-sm font-medium text-accent hover:underline disabled:opacity-60"
+                >
+                  {enviandoReset ? "Enviando…" : "Esqueci minha senha"}
+                </button>
               )}
-            </button>
-          </form>
-        </div>
-        <Link
-          href="/acesso"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand-500/40 bg-brand-500/10 px-4 py-3.5 text-base font-semibold text-brand-600 transition hover:border-brand-500 hover:bg-brand-500/15 active:scale-[.98]"
-        >
-          <KeyRound size={18} /> É vendedora? Acesse aqui
-        </Link>
-        <p className="text-center text-xs text-muted mt-4">
-          Ao criar a conta você concorda com os{" "}
-          <Link href="/termos" className="underline hover:text-strong">Termos de Uso</Link> e a{" "}
-          <Link href="/privacidade" className="underline hover:text-strong">Política de Privacidade</Link>.
-        </p>
+            </div>
+            <input
+              id="login-senha"
+              type="password"
+              className="input"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              required
+              minLength={modo === "criar" ? 8 : 6}
+              maxLength={72}
+              autoComplete={modo === "criar" ? "new-password" : "current-password"}
+            />
+            {modo === "criar" && <p className="hint">Mínimo de 8 caracteres.</p>}
+          </div>
+          {modo === "entrar" && (
+            <p className="text-xs text-muted">
+              Donos, vendedores, entregadores e revendedoras entram aqui: cada um cai direto na sua área.
+            </p>
+          )}
+          {erro && (
+            <div role="alert">
+              <Aviso tom="bad" icone={AlertCircle}>{erro}</Aviso>
+            </div>
+          )}
+          {aviso && (
+            <div role="status">
+              <Aviso tom="ok" icone={CheckCircle2}>{aviso}</Aviso>
+            </div>
+          )}
+          <button disabled={loading} className="btn-primary w-full">
+            {loading ? (
+              <Loader2 className="animate-spin" size={18} aria-hidden />
+            ) : modo === "criar" ? (
+              "Criar conta grátis"
+            ) : (
+              "Entrar"
+            )}
+          </button>
+        </form>
       </div>
-    </div>
+      <Link href="/acesso" className="btn-ghost mt-3 w-full">
+        <KeyRound size={17} aria-hidden /> É vendedora? Acesse aqui
+      </Link>
+      <p className="mt-4 text-center text-xs text-muted">
+        Ao criar a conta você concorda com os{" "}
+        <Link href="/termos" className="underline hover:text-strong">Termos de Uso</Link> e a{" "}
+        <Link href="/privacidade" className="underline hover:text-strong">Política de Privacidade</Link>.
+      </p>
+    </EntradaShell>
   );
 }
 

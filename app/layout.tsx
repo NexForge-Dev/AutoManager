@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { Figtree } from "next/font/google";
 import "./globals.css";
 import { APARENCIA_NO_FLASH } from "@/lib/aparencia";
 import { ORDEM_PLANOS, PLANOS, brlPreco } from "@/lib/plans";
+
+// fonte do produto (auto-hospedada no build). A loja pode trocar em Aparência.
+const fonte = Figtree({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const MENOR_PRECO = brlPreco(Math.min(...ORDEM_PLANOS.map((id) => PLANOS[id].precoCentavos)));
@@ -48,7 +52,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // o script APARENCIA_NO_FLASH muda class/style do <html> antes da hidratação
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className={fonte.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: APARENCIA_NO_FLASH }} />
       </head>

@@ -81,8 +81,7 @@ contra o banco real**.
   Mercado Pago saiu na migração para o Stripe); o **Banco Inter** (origem `inter`) está modelado
   mas não conectado. A tela tem um modo "Testar o fluxo"
   para simular entradas enquanto não há banco conectado.
-- **Prova social da landing:** números/depoimentos estão marcados como ilustrativos —
-  substituir por dados reais conforme a base cresce.
+- **Landing social proof:** the landing has no testimonials or customer numbers. Add them only when real.
 - **Resolvido recentemente:** janela de ativação da revendedora (agora há **código de
   convite** de uso único — §7); auditoria das ações do super-admin (`admin_log` — §12).
 
@@ -384,14 +383,15 @@ components/
   AppShell.tsx    → navegação (sidebar desktop + bottom nav mobile) + badges + transição de rota
   Guard.tsx       → hidratação (skeleton da app), onboarding e bloqueio por papel
   Dialog.tsx      → DialogProvider + useDialog: confirmar/prompt/alerta (substitui confirm/alert/prompt nativos)
+  ui.tsx          → UI kit: PageHeader, Stat, Painel, Aviso, EstadoVazio, Selo, Segmentado, Progresso, Avatar
   Skeleton.tsx    → Skeleton/SkeletonCard/List/Metrics (loaders com shimmer)
   CountUp.tsx     → número animando (count-up) · PageTransition.tsx → fade entre rotas
   MembrosManager.tsx → gestão de equipe (vendedor/motoboy), usado em configurações e perfil
   UpgradeGate.tsx → modal/bloco de upgrade de plano (com animação)
   ThemeToggle.tsx → tema claro/escuro; Reporte.tsx → abrir chamado de suporte
   charts/         → VendasArea (gráfico de vendas; usa a cor da marca, tooltip e animação)
-  landing/        → LiveDashboard (hero vivo), Reveal (scroll-reveal), Pricing, Faq,
-                    StickyCta, DashboardMock (mock legado) — ver LANDING.md
+  landing/        → Pricing, Faq, StickyCta, Rodape, ContatoEmpresa, LegalLayout, Mostras (labelled
+                    illustrative UI samples), EntradaShell (login/acesso/redefinir-senha frame)
 scripts/criar-admin.mjs → cria/reseta a conta superadmin
 supabase/migrations/  → SQL versionado (§9)
 ```
@@ -482,6 +482,12 @@ Reforma transversal para dar à app uma sensação premium (fluidez, resposta in
 feedback em tudo). A base é **CSS** (zero peso de bundle) com alguns componentes React; tudo
 respeita `prefers-reduced-motion`.
 
+> **Visual system (2026-11 redesign).** Tokens and classes live at the top of `app/globals.css`; compositions in
+> `components/ui.tsx`. Font: Figtree (`next/font`, stores can override it). `--accent` / `text-accent` is the brand colour
+> for text and icons, with contrast per theme; solid `brand-600` is for primary buttons. State colours: `ok`, `warn`, `bad`,
+> `info` (Tailwind colours backed by CSS variables, redefined in `html.light`). Chips and `Segmentado` show selection through
+> `aria-pressed`. Screens with a table use it from `lg`/`xl` and fall back to `.card-list` rows on phones.
+
 **Fundação em `app/globals.css`** (propaga para todas as telas):
 - **Hover/feedback automáticos:** cards clicáveis (`a.card`/`button.card`) ganham elevação +
   sombra; `.btn-ghost`, `.chip` e `.input` ganham hover; **foco visível** acessível (teclado).
@@ -521,14 +527,11 @@ respeita `prefers-reduced-motion`.
 
 ## 15. Landing page (`app/page.tsx` + `components/landing/*`)
 
-Reconstrução **nível Stripe/Linear**: dark premium **auto-contido** (a landing força um tema
-dark próprio via CSS vars, independente do tema salvo do visitante), com:
-- **Hero vivo** (`LiveDashboard`): faturamento contando, venda registrada, estoque baixando,
-  comissão calculada e notificações aparecendo — demonstra valor sem texto.
-- **Scroll storytelling** (`Reveal`, via IntersectionObserver) em todas as seções.
-- Estrutura: nav glass → hero → prova social → dor→solução → benefícios (feature→resultado) →
-  como funciona (fluxo) → diferencial → casos de uso → depoimentos → planos → FAQ curada → CTA.
-- **Pricing** com destaque do plano Equipe; **Faq** aceita lista curada de objeções.
+Self-contained dark page aimed at small Brazilian shop owners, in plain language. Sections: hero, problems (today vs with
+AutoManager), how it works, features, who it is for, phone/PWA, plans, FAQ, closing CTA, full footer.
 
-> A estratégia, a copy e as variações de headline ficam em **`LANDING.md`**. Números e
-> depoimentos estão marcados como **ilustrativos** — trocar por dados reais.
+- Plans and the comparison table read from `lib/plans.ts`; no price or limit is typed by hand.
+- Every interface sample is drawn in HTML (`Mostras.tsx`) and carries a visible "Exemplo ilustrativo" label.
+- No testimonials, customer counts or ratings. No promise of offline use: the app is installable, but has no service worker.
+- Page-level `metadata` sets title, description, canonical, Open Graph and Twitter; `app/opengraph-image.tsx` is the share image.
+- `/` does not redirect signed-in users.

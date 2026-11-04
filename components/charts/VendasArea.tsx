@@ -51,20 +51,25 @@ export default function VendasArea({
   formatLabel?: (v: any) => string;
 }) {
   const cor = useCorMarca();
+  // sem animação para quem prefere menos movimento
+  const [animar, setAnimar] = useState(false);
+  useEffect(() => {
+    setAnimar(!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  }, []);
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 6, right: 6, left: 6, bottom: 0 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={cor} stopOpacity={0.4} />
+              <stop offset="5%" stopColor={cor} stopOpacity={0.28} />
               <stop offset="95%" stopColor={cor} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.6} strokeDasharray="3 3" />
+          <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.6} />
           <XAxis
             dataKey={xKey}
-            fontSize={10}
+            fontSize={11}
             tickLine={false}
             axisLine={false}
             interval={interval}
@@ -80,10 +85,10 @@ export default function VendasArea({
             dataKey={yKey}
             stroke={cor}
             fill={`url(#${gradientId})`}
-            strokeWidth={2.5}
+            strokeWidth={2}
             dot={false}
             activeDot={{ r: 5, fill: cor, stroke: "var(--surface)", strokeWidth: 2 }}
-            isAnimationActive
+            isAnimationActive={animar}
             animationDuration={750}
             animationEasing="ease-out"
           />

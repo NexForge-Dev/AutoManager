@@ -8,7 +8,27 @@ import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import Modal from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, MessageCircle, Power, BadgeDollarSign, Target, Pencil, KeyRound, Check, Mail, Link2 } from "lucide-react";
+import { Aviso, Avatar, EstadoVazio, PageHeader, Progresso, Selo, Stat, type Tom } from "@/components/ui";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeDollarSign,
+  Check,
+  CheckCheck,
+  Clock,
+  HandCoins,
+  KeyRound,
+  Link2,
+  Mail,
+  MessageCircle,
+  Pencil,
+  Plus,
+  Power,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { linkConvite, mensagemConvite } from "@/lib/acessoRevendedora";
 import type { Revendedora } from "@/lib/types";
 import type { Resultado } from "@/lib/store";
@@ -87,6 +107,12 @@ function Revendedoras() {
           v.revendedoraId === id && v.statusPagamento !== "cancelada" && v.data >= inicioMes
       )
       .reduce((a, v) => a + v.total, 0);
+  }
+  // comissão já acertada com a revendedora (só exibição)
+  function comissaoPaga(id: string) {
+    return vendas
+      .filter((v) => v.revendedoraId === id && v.statusComissao === "paga")
+      .reduce((a, v) => a + v.comissaoTotal, 0);
   }
 
   async function salvar() {
@@ -188,36 +214,51 @@ function Revendedoras() {
     if (!res.ok) alerta({ titulo: "Não foi possível marcar como pago", mensagem: res.erro || "Tente novamente." });
   }
 
+  // resumo da equipe: somas das mesmas funções usadas em cada linha
+  const totalVendidoMes = revendedoras.reduce((a, r) => a + vendidoNoMes(r.id), 0);
+  const comissoesAPagar = revendedoras.map((r) =>
+    vendasPendentes(r.id).reduce((a, v) => a + v.comissaoTotal, 0)
+  );
+  const totalAPagar = comissoesAPagar.reduce((a, v) => a + v, 0);
+  const qtdAPagar = comissoesAPagar.filter((v) => v > 0).length;
+  const totalPago = revendedoras.reduce((a, r) => a + comissaoPaga(r.id), 0);
+  const qtdComAcesso = revendedoras.filter((r) => r.temAcesso).length;
+  const qtdAguardando = revendedoras.filter((r) => !r.temAcesso && r.acessoLiberado).length;
+
   return (
-    <div className="space-y-3">
-      <header className="flex items-center justify-between pt-1">
-        <div>
-          <h1 className="text-2xl font-bold">Revendedoras</h1>
-          <p className="text-xs text-muted">
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Revendedoras"
+        descricao={
+          <span className="tnum">
             {uso.revendedoras} / {fmtLimite(caps.maxRevendedoras)} no seu plano
-          </p>
-        </div>
-        <button onClick={novaRevendedora} className="btn-primary py-2 px-3 text-sm">
-          <Plus size={18} /> Nova
-        </button>
-      </header>
+          </span>
+        }
+        acoes={
+          <button onClick={novaRevendedora} className="btn-primary btn-sm">
+            <Plus size={17} aria-hidden /> Nova
+          </button>
+        }
+      />
 
       {noLimite && (
-        <button
-          onClick={() => setUpsell(true)}
-          className="card w-full text-left bg-brand-500/5 border-brand-500/30 flex items-center justify-between"
+        <Aviso
+          tom="brand"
+          icone={Users}
+          acao={
+            <button onClick={() => setUpsell(true)} className="btn-ghost btn-sm whitespace-nowrap">
+              Fazer upgrade <ArrowRight size={15} aria-hidden />
+            </button>
+          }
         >
-          <span className="text-sm">
-            {caps.maxRevendedoras === 0 ? (
-              "Seu plano não inclui revendedoras."
-            ) : (
-              <>
-                Você atingiu o limite de <b>{fmtLimite(caps.maxRevendedoras)}</b> revendedoras.
-              </>
-            )}
-          </span>
-          <span className="text-brand-500 text-sm font-semibold">Fazer upgrade →</span>
-        </button>
+          {caps.maxRevendedoras === 0 ? (
+            "Seu plano não inclui revendedoras."
+          ) : (
+            <>
+              Você atingiu o limite de <b className="text-strong">{fmtLimite(caps.maxRevendedoras)}</b> revendedoras.
+            </>
+          )}
+        </Aviso>
       )}
 
       <UpgradeModal
@@ -232,131 +273,173 @@ function Revendedoras() {
         planoNecessario={planoUpgrade}
       />
 
-      {revendedoras.length === 0 && (
-        <div className="card text-center text-muted">
-          Cadastre suas revendedoras para acompanhar vendas e comissões.
+      {revendedoras.length === 0 ? (
+        <div className="card p-0">
+          <EstadoVazio
+            icone={Users}
+            titulo="Nenhuma revendedora ainda"
+            acao={
+              <button onClick={novaRevendedora} className="btn-primary">
+                <Plus size={17} aria-hidden /> Cadastrar revendedora
+              </button>
+            }
+          >
+            Cadastre suas revendedoras para acompanhar vendas e comissões.
+          </EstadoVazio>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Stat rotulo="Vendido no mês" icone={TrendingUp} tom="brand" valor={brl(totalVendidoMes)} apoio="por toda a equipe" />
+            <Stat
+              rotulo="Comissão a pagar"
+              icone={HandCoins}
+              tom="warn"
+              valorTom={totalAPagar > 0 ? "warn" : undefined}
+              valor={brl(totalAPagar)}
+              apoio={qtdAPagar > 0 ? `para ${qtdAPagar} revendedora(s)` : "nada pendente"}
+            />
+            <Stat rotulo="Comissão já paga" icone={CheckCheck} tom="ok" valor={brl(totalPago)} apoio="total acertado" />
+            <Stat
+              rotulo="Com acesso ativo"
+              icone={ShieldCheck}
+              tom="info"
+              valor={`${qtdComAcesso} de ${revendedoras.length}`}
+              apoio={qtdAguardando > 0 ? `${qtdAguardando} aguardando 1º acesso` : "entram com e-mail e senha"}
+            />
+          </div>
+
+          <div className="card-list stagger">
+            {revendedoras.map((r) => {
+              const pendVendas = vendasPendentes(r.id);
+              const pend = pendVendas.reduce((a, v) => a + v.comissaoTotal, 0);
+              const paga = comissaoPaga(r.id);
+              const vendMes = vendidoNoMes(r.id);
+              const pct = r.metaMensal > 0 ? Math.min(100, (vendMes / r.metaMensal) * 100) : 0;
+              const bateu = r.metaMensal > 0 && vendMes >= r.metaMensal;
+              return (
+                <div key={r.id} className={r.ativa ? "" : "opacity-70"}>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_auto] gap-x-2 md:gap-x-6 gap-y-3 px-4 pt-3.5 pb-3 xl:items-center">
+                    {/* quem é */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar nome={r.nome} className="hidden min-[360px]:grid" />
+                      <div className="min-w-0">
+                        <div className="font-semibold leading-snug line-clamp-2 break-words">{r.nome}</div>
+                        <div className="text-xs text-muted tnum flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          {r.comissaoPercent.toLocaleString("pt-BR")}% de comissão
+                          {!r.ativa && <Selo>Desativada</Selo>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ações */}
+                    <div className="flex items-center justify-self-end -mr-2 xl:order-last">
+                      {r.whatsapp && (
+                        <a
+                          href={`https://wa.me/${waNumero(r.whatsapp)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Conversar com ${r.nome} no WhatsApp`}
+                          className="icon-btn !text-ok"
+                        >
+                          <MessageCircle size={18} aria-hidden />
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => editarRevendedora(r)}
+                        aria-label={`Editar ${r.nome}`}
+                        title="Editar"
+                        className="icon-btn"
+                      >
+                        <Pencil size={17} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => alternarAtiva(r)}
+                        aria-label={r.ativa ? `Desativar ${r.nome}` : `Reativar ${r.nome}`}
+                        title={r.ativa ? "Desativar" : "Reativar"}
+                        className={`icon-btn ${r.ativa ? "" : "!text-accent"}`}
+                      >
+                        <Power size={18} aria-hidden />
+                      </button>
+                    </div>
+
+                    {/* vendas e meta mensal */}
+                    <div className="col-span-2 md:col-span-1 min-w-0">
+                      <div className="eyebrow">Vendeu no mês</div>
+                      <div className="font-bold text-lg leading-snug tnum">{brl(vendMes)}</div>
+                      {r.metaMensal > 0 && (
+                        <Progresso
+                          className="mt-1.5"
+                          pct={pct}
+                          tom={bateu ? "ok" : "brand"}
+                          rotulo={`Meta do mês de ${r.nome}`}
+                        />
+                      )}
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted mt-1">
+                        <span className="flex items-center gap-1 min-w-0 flex-wrap tnum">
+                          <Target size={13} className="shrink-0" aria-hidden />
+                          {r.metaMensal > 0 ? (
+                            <>
+                              Meta {brl(r.metaMensal)} · {pct.toFixed(0)}%
+                              {bateu && (
+                                <Selo tom="ok" icone={Check} className="ml-1">
+                                  batida
+                                </Selo>
+                              )}
+                            </>
+                          ) : (
+                            "Sem meta definida"
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => editarMeta(r.id, r.metaMensal)}
+                          aria-label="Editar meta do mês"
+                          className="icon-btn !text-accent -my-2.5 -mr-2"
+                        >
+                          <Pencil size={14} aria-hidden />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* comissão: quanto ela deve receber */}
+                    <div className="col-span-2 md:col-span-1 flex items-center justify-between gap-3 min-w-0">
+                      <div className="min-w-0">
+                        <div className="eyebrow">Comissão a pagar</div>
+                        <div className={`font-bold text-lg leading-snug tnum ${pend > 0 ? "text-warn" : "text-muted"}`}>
+                          {brl(pend)}
+                        </div>
+                        <div className="text-xs text-muted tnum">Já pago: {brl(paga)}</div>
+                      </div>
+                      {pend > 0 && (
+                        <button
+                          onClick={() => pagarComissao(r.id, r.nome, pendVendas.map((v) => v.id), pend)}
+                          disabled={pagando === r.id}
+                          className="btn-ghost btn-sm shrink-0"
+                        >
+                          <BadgeDollarSign size={15} aria-hidden /> {pagando === r.id ? "Salvando…" : "Pagar"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* acesso da revendedora */}
+                  <AcessoRevendedora r={r} onUpdate={updateRevendedora} />
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
-
-      <div className="space-y-2 stagger">
-        {revendedoras.map((r) => {
-          const pendVendas = vendasPendentes(r.id);
-          const pend = pendVendas.reduce((a, v) => a + v.comissaoTotal, 0);
-          const vendMes = vendidoNoMes(r.id);
-          const pct = r.metaMensal > 0 ? Math.min(100, (vendMes / r.metaMensal) * 100) : 0;
-          const bateu = r.metaMensal > 0 && vendMes >= r.metaMensal;
-          return (
-            <div key={r.id} className={`card space-y-2 ${r.ativa ? "" : "opacity-70"}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold flex items-center gap-2">
-                    <span className="truncate">{r.nome}</span>
-                    {!r.ativa && (
-                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 surface-alt text-muted">
-                        Desativada
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted">
-                    {r.comissaoPercent.toLocaleString("pt-BR")}% · vendeu {brl(vendMes)} no mês
-                  </div>
-                </div>
-                <div className="flex items-center shrink-0 -mr-2">
-                  {r.whatsapp && (
-                    <a
-                      href={`https://wa.me/${waNumero(r.whatsapp)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Conversar com ${r.nome} no WhatsApp`}
-                      className="grid place-items-center h-11 w-11 rounded-full text-green-600 hover:bg-[var(--hover)]"
-                    >
-                      <MessageCircle />
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => editarRevendedora(r)}
-                    aria-label={`Editar ${r.nome}`}
-                    title="Editar"
-                    className="grid place-items-center h-11 w-11 rounded-full text-muted hover:bg-[var(--hover)]"
-                  >
-                    <Pencil size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alternarAtiva(r)}
-                    aria-label={r.ativa ? `Desativar ${r.nome}` : `Reativar ${r.nome}`}
-                    title={r.ativa ? "Desativar" : "Reativar"}
-                    className={`grid place-items-center h-11 w-11 rounded-full hover:bg-[var(--hover)] ${
-                      r.ativa ? "text-muted" : "text-brand-500"
-                    }`}
-                  >
-                    <Power size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* meta mensal */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="flex items-center gap-1 text-muted">
-                    <Target size={13} />
-                    {r.metaMensal > 0 ? (
-                      <>
-                        Meta {brl(r.metaMensal)} · {pct.toFixed(0)}%
-                        {bateu && <span className="text-green-500 font-semibold"> ✓ batida</span>}
-                      </>
-                    ) : (
-                      "Sem meta definida"
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => editarMeta(r.id, r.metaMensal)}
-                    aria-label="Editar meta do mês"
-                    className="grid place-items-center h-11 w-11 -my-3 -mr-3 rounded-full text-brand-500 hover:bg-[var(--hover)]"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                </div>
-                {r.metaMensal > 0 && (
-                  <div className="h-2 rounded-full surface-alt overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${bateu ? "bg-green-500" : "bg-brand-600"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between bg-brand-500/10 rounded-xl px-3 py-2">
-                <span className="text-sm text-brand-500">
-                  Comissão pendente: <b>{brl(pend)}</b>
-                </span>
-                {pend > 0 && (
-                  <button
-                    onClick={() => pagarComissao(r.id, r.nome, pendVendas.map((v) => v.id), pend)}
-                    disabled={pagando === r.id}
-                    className="text-xs btn-primary py-1.5 px-2 disabled:opacity-60"
-                  >
-                    <BadgeDollarSign size={14} /> {pagando === r.id ? "Salvando…" : "Pagar"}
-                  </button>
-                )}
-              </div>
-
-              {/* acesso da revendedora */}
-              <AcessoRevendedora r={r} onUpdate={updateRevendedora} />
-            </div>
-          );
-        })}
-      </div>
 
       {/* link de acesso das revendedoras */}
       {revendedoras.some((r) => r.email) && (
-        <div className="card text-xs text-muted">
+        <Aviso tom="info" icone={Link2}>
           Libere o acesso e envie o link pelo WhatsApp: a revendedora toca no link e cria a senha. Depois ela entra
           pela tela de login normal, com o e-mail e a senha dela.
-        </div>
+        </Aviso>
       )}
 
       {aberto && (
@@ -387,7 +470,7 @@ function Revendedoras() {
                   value={emailNova}
                   onChange={(e) => setEmailNova(e.target.value)}
                 />
-                <p className="text-xs text-muted mt-1">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas.</p>
+                <p className="hint">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas.</p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -414,11 +497,11 @@ function Revendedoras() {
               </div>
             </div>
             {editId && (
-              <p className="text-xs text-muted">
+              <p className="hint !mt-0">
                 A nova comissão vale para as próximas vendas; as já registradas mantêm o percentual da época.
               </p>
             )}
-            <button onClick={salvar} disabled={salvandoRev} className="btn-primary w-full disabled:opacity-60">
+            <button onClick={salvar} disabled={salvandoRev} className="btn-primary w-full">
               {salvandoRev ? "Salvando…" : "Salvar"}
             </button>
         </Modal>
@@ -515,96 +598,96 @@ function AcessoRevendedora({
   }
 
   // estado do acesso
-  let status: { txt: string; cls: string };
-  if (r.temAcesso) status = { txt: "Acesso ativo", cls: "text-green-600" };
-  else if (r.acessoLiberado) status = { txt: "Aguardando 1º acesso", cls: "text-amber-600" };
-  else status = { txt: "Sem acesso", cls: "text-muted" };
+  let status: { txt: string; tom: Tom; icone: LucideIcon };
+  if (r.temAcesso) status = { txt: "Acesso ativo", tom: "ok", icone: ShieldCheck };
+  else if (r.acessoLiberado) status = { txt: "Aguardando 1º acesso", tom: "warn", icone: Clock };
+  else status = { txt: "Sem acesso", tom: "neutral", icone: KeyRound };
 
   return (
-    <div className="rounded-xl border border-default p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium flex items-center gap-1.5">
-          <KeyRound size={14} className="text-brand-500" /> Acesso da revendedora
-        </span>
-        <span className={`text-xs font-semibold ${status.cls}`}>{status.txt}</span>
+    <div className="border-t border-dashed border-default px-4 py-2.5 space-y-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Selo tom={status.tom} icone={status.icone} className="shrink-0">
+          {status.txt}
+        </Selo>
+
+        {editando ? (
+          <div className="flex gap-2 flex-1 basis-56 min-w-0 max-w-md">
+            <input
+              className="input flex-1 min-w-0"
+              type="email"
+              placeholder="email@dela.com"
+              aria-label={`E-mail de acesso de ${r.nome}`}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <button
+              onClick={salvarEmail}
+              disabled={salvando}
+              aria-label="Salvar e-mail"
+              className="btn-ghost !px-0 w-11 shrink-0"
+            >
+              {salvando ? "…" : <Check size={16} aria-hidden />}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 flex-1 basis-40 min-w-0 text-sm">
+            <span className="flex items-center gap-1.5 text-muted min-w-0">
+              <Mail size={13} className="shrink-0" aria-hidden /> <span className="truncate">{r.email}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setEditando(true)}
+              aria-label="Editar e-mail"
+              className="icon-btn !text-accent -my-2"
+            >
+              <Pencil size={14} aria-hidden />
+            </button>
+          </div>
+        )}
+
+        {r.email && !r.temAcesso && (
+          <button
+            onClick={r.acessoLiberado ? revogar : liberar}
+            disabled={liberando}
+            className="btn-ghost btn-sm w-full sm:w-auto"
+          >
+            {liberando ? (r.acessoLiberado ? "Cancelando…" : "Gerando…") : r.acessoLiberado ? "Cancelar liberação" : "Liberar acesso (gerar código)"}
+          </button>
+        )}
       </div>
-
-      {editando ? (
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            type="email"
-            placeholder="email@dela.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button
-            onClick={salvarEmail}
-            disabled={salvando}
-            aria-label="Salvar e-mail"
-            className="btn-primary px-3 py-2 text-sm min-w-[44px] min-h-[44px]"
-          >
-            {salvando ? "…" : <Check size={15} />}
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1.5 text-muted truncate">
-            <Mail size={13} /> {r.email}
-          </span>
-          <button
-            type="button"
-            onClick={() => setEditando(true)}
-            aria-label="Editar e-mail"
-            className="grid place-items-center h-11 w-11 -my-3 -mr-3 shrink-0 rounded-full text-brand-500 hover:bg-[var(--hover)]"
-          >
-            <Pencil size={14} />
-          </button>
-        </div>
-      )}
-
-      {r.email && !r.temAcesso && (
-        <button
-          onClick={r.acessoLiberado ? revogar : liberar}
-          disabled={liberando}
-          className={`w-full rounded-lg py-2 text-sm font-semibold disabled:opacity-60 ${
-            r.acessoLiberado ? "surface-alt text-muted" : "btn-primary"
-          }`}
-        >
-          {liberando ? (r.acessoLiberado ? "Cancelando…" : "Gerando…") : r.acessoLiberado ? "Cancelar liberação" : "Liberar acesso (gerar código)"}
-        </button>
-      )}
 
       {/* código recém-gerado: mostrado uma vez, para o dono copiar e enviar */}
       {codigo && !r.temAcesso && (
-        <div className="rounded-lg bg-brand-500/10 border border-brand-500/30 p-3 space-y-1.5">
-          <div className="text-[11px] text-muted">Código de acesso (válido por 7 dias)</div>
-          <span className="block font-mono text-xl font-bold tracking-[0.25em] text-brand-600">{codigo}</span>
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <a
-              href={whatsLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary py-2 text-sm flex items-center justify-center gap-1.5"
-            >
-              <MessageCircle size={15} /> WhatsApp
-            </a>
-            <button onClick={copiar} className="btn-ghost py-2 text-sm flex items-center justify-center gap-1.5 whitespace-nowrap">
-              {copiado ? <Check size={15} /> : <Link2 size={15} />} {copiado ? "Copiado" : "Copiar convite"}
-            </button>
+        <div
+          className="bg-brand-500/[.06] border border-brand-500/30 p-3 space-y-2"
+          style={{ borderRadius: "var(--r-input)" }}
+        >
+          <div className="sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <div className="eyebrow">Código de acesso (válido por 7 dias)</div>
+              <span className="block font-mono text-xl font-bold tracking-[0.25em] text-accent">{codigo}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2 sm:mt-0 sm:shrink-0">
+              <a href={whatsLink} target="_blank" rel="noopener noreferrer" className="btn-primary btn-sm">
+                <MessageCircle size={15} aria-hidden /> WhatsApp
+              </a>
+              <button onClick={copiar} className="btn-ghost btn-sm whitespace-nowrap">
+                {copiado ? <Check size={15} aria-hidden /> : <Link2 size={15} aria-hidden />}{" "}
+                {copiado ? "Copiado" : "Copiar convite"}
+              </button>
+            </div>
           </div>
-          <p className="text-[11px] text-muted">
+          <p className="text-xs text-muted">
             O link já leva o e-mail e o código: ela só toca e cria a senha. Só aparece agora — some quando ela ativar.
           </p>
         </div>
       )}
 
       {r.email && !r.temAcesso && r.acessoLiberado && !codigo && (
-        <p className="text-[11px] text-muted">
+        <p className="text-xs text-muted">
           Acesso liberado. Se ela perdeu o código, clique em <b>Cancelar liberação</b> e libere de novo para gerar um novo.
         </p>
       )}
     </div>
   );
 }
-

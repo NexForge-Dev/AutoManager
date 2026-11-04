@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { registrarMetrica } from "@/lib/metricas/cliente";
 import Guard from "@/components/Guard";
-import { SkeletonList } from "@/components/Skeleton";
-import { MessageCircle, Send, ChevronLeft, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/Skeleton";
+import { Aviso, Avatar, EstadoVazio, PageHeader, Selo } from "@/components/ui";
+import { AlertTriangle, MessageCircle, Send, ChevronLeft, Loader2, Store } from "lucide-react";
 
 export default function ConversasPage() {
   return (
@@ -31,6 +33,12 @@ function hora(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+// última atividade na lista: hora se foi hoje; senão, a data
+function quando(iso: string) {
+  const d = new Date(iso);
+  if (d.toDateString() === new Date().toDateString()) return hora(iso);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
 function Conversas() {
@@ -235,133 +243,187 @@ function Conversas() {
   const selConversa = conversas.find((c) => c.id === sel);
   const totalNaoLidas = conversas.filter(naoLida).length;
 
+  // sem nenhuma conversa: um único bloco explicando, sem painel de chat vazio
+  const semConversas = !carregando && !erroLista && conversas.length === 0;
+
   return (
-    <div className="space-y-3">
-      <header className="flex items-center gap-2 pt-1">
-        {sel && (
-          <button
-            onClick={() => setSel(null)}
-            aria-label="Voltar"
-            className="grid place-items-center h-11 w-11 -ml-2 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
+    <div className="space-y-4 md:space-y-5">
+      {/* no celular, com conversa aberta, o cabeçalho do chat assume o topo */}
+      <div className={sel ? "hidden lg:block" : ""}>
+        <PageHeader
+          titulo={
+            <span className="flex items-center gap-2">
+              Conversas
+              {totalNaoLidas > 0 && (
+                <Selo tom="bad" className="tnum">
+                  {totalNaoLidas > 99 ? "99+" : totalNaoLidas}
+                </Selo>
+              )}
+            </span>
+          }
+          descricao="Mensagens dos clientes que entram em contato pela sua vitrine."
+        />
+      </div>
+
+      {semConversas ? (
+        <div className="card p-0">
+          <EstadoVazio
+            icone={MessageCircle}
+            titulo="Nenhuma conversa ainda."
+            acao={
+              <Link href="/minha-loja" className="btn-primary">
+                <Store size={17} aria-hidden /> Ir para Minha Loja
+              </Link>
+            }
           >
-            <ChevronLeft />
-          </button>
-        )}
-        <MessageCircle className="text-brand-600" />
-        <h1 className="text-2xl font-bold truncate min-w-0">{sel ? selConversa?.cliente_nome || "Cliente" : "Conversas"}</h1>
-        {!sel && totalNaoLidas > 0 && (
-          <span className="ml-1 text-xs font-bold text-white bg-red-500 rounded-full min-w-[20px] h-5 px-1.5 grid place-items-center">
-            {totalNaoLidas > 99 ? "99+" : totalNaoLidas}
-          </span>
-        )}
-      </header>
-
-      {/* lista */}
-      {!sel && carregando && <SkeletonList count={4} />}
-      {!sel && !carregando && (
-        <div className="space-y-2 stagger">
-          {erroLista && (
-            <div role="alert" className="card text-center text-red-500 text-sm">
-              Não foi possível carregar as conversas. Confira a conexão e abra a página de novo.
-            </div>
-          )}
-          {!erroLista && conversas.length === 0 && (
-            <div className="card text-center text-muted">
-              Nenhuma conversa ainda. Coloque a loja no ar em Minha Loja e compartilhe o link.
-            </div>
-          )}
-          {conversas.map((c) => {
-            const nova = naoLida(c);
-            return (
-              <button
-                key={c.id}
-                onClick={() => abrir(c.id)}
-                className={`card w-full text-left flex items-center gap-3 ${nova ? "border-brand-500/40" : ""}`}
-              >
-                <div className="relative h-10 w-10 rounded-full bg-brand-600/15 grid place-items-center text-brand-500 font-bold">
-                  {(c.cliente_nome || "C").slice(0, 1).toUpperCase()}
-                  {nova && (
-                    <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 border-2 border-[var(--surface)]" />
-                  )}
-                </div>
-                <div className={`flex-1 min-w-0 truncate ${nova ? "font-bold" : "font-medium"}`}>{c.cliente_nome || "Cliente"}</div>
-                {nova && (
-                  <span className="text-[11px] font-semibold text-white bg-brand-600 rounded-full px-2 py-0.5">nova</span>
-                )}
-              </button>
-            );
-          })}
+            Coloque a loja no ar em Minha Loja e compartilhe o link.
+          </EstadoVazio>
         </div>
-      )}
-
-      {/* chat */}
-      {sel && (
-        <div className="card flex flex-col h-[70dvh] p-0 overflow-hidden">
-          <div ref={scrollRef} onScroll={aoRolar} className="flex-1 overflow-auto p-4 space-y-2">
-            {msgsCarregando && msgs.length === 0 && (
-              <div className="space-y-2">
-                <div className="skeleton h-9 w-1/2 rounded-2xl" />
-                <div className="skeleton h-9 w-2/3 rounded-2xl ml-auto" />
-                <div className="skeleton h-9 w-2/5 rounded-2xl" />
+      ) : (
+        <div className="card p-0 overflow-hidden lg:grid lg:grid-cols-[19rem_minmax(0,1fr)] lg:h-[calc(100dvh-9.5rem)] lg:min-h-[28rem]">
+          {/* lista: no celular some quando há conversa aberta */}
+          <aside
+            className={`${sel ? "hidden lg:flex" : "flex"} flex-col min-h-0 lg:border-r lg:border-default`}
+            aria-label="Lista de conversas"
+          >
+            {carregando && (
+              <div className="divide-y divide-[var(--border)]">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-3.5 w-2/5" />
+                      <Skeleton className="h-3 w-1/4" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-            {!msgsCarregando && erroMsgs && (
-              <p role="alert" className="text-center text-sm text-red-500">Não foi possível carregar as mensagens.</p>
-            )}
-            {!msgsCarregando && !erroMsgs && msgs.length === 0 && (
-              <p className="text-center text-sm text-muted">Sem mensagens ainda.</p>
-            )}
-            {msgs.map((m) => {
-              const daLoja = m.autor_tipo === "loja";
-              return (
-                <div key={m.id} className={`reveal flex flex-col ${daLoja ? "items-end" : "items-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                      daLoja ? "bg-brand-600 text-white" : "surface-alt"
-                    } ${m.pendente ? "opacity-70" : ""} ${m.falhou ? "ring-1 ring-red-500" : ""}`}
-                  >
-                    {m.texto}
+            {!carregando && (
+              <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)] stagger">
+                {erroLista && (
+                  <div role="alert" className="p-3">
+                    <Aviso tom="bad" icone={AlertTriangle}>
+                      Não foi possível carregar as conversas. Confira a conexão e abra a página de novo.
+                    </Aviso>
                   </div>
-                  <div className="text-[10px] text-muted mt-0.5 px-1 flex items-center gap-1">
-                    {m.falhou ? (
-                      <button onClick={() => reenviar(m)} className="text-red-500 font-semibold hover:underline">
-                        falhou · tocar para reenviar
-                      </button>
-                    ) : m.pendente ? (
-                      "enviando…"
-                    ) : (
-                      hora(m.criada_em)
-                    )}
+                )}
+                {conversas.map((c) => {
+                  const nova = naoLida(c);
+                  const aberta = sel === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => abrir(c.id)}
+                      aria-current={aberta ? "true" : undefined}
+                      className={`row ${aberta ? "bg-brand-500/10" : ""}`}
+                    >
+                      <span className="relative shrink-0">
+                        <Avatar nome={c.cliente_nome || "Cliente"} />
+                        {nova && (
+                          <span
+                            className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-[var(--surface)]"
+                            aria-hidden
+                          />
+                        )}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className={`block truncate ${nova ? "font-bold" : "font-medium"}`}>
+                          {c.cliente_nome || "Cliente"}
+                        </span>
+                        <span className="block text-xs text-muted tnum">{quando(c.ultima_em)}</span>
+                      </span>
+                      {nova && <Selo tom="brand">nova</Selo>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </aside>
+
+          {/* conversa aberta */}
+          {sel ? (
+            <section className="flex flex-col min-h-0 min-w-0 h-[calc(100dvh-11rem)] lg:h-auto" aria-label="Conversa">
+              <header className="flex items-center gap-2.5 pl-2 lg:pl-4 pr-4 py-2 min-h-[56px] border-b border-default">
+                <button onClick={() => setSel(null)} aria-label="Voltar" className="icon-btn lg:hidden">
+                  <ChevronLeft size={20} aria-hidden />
+                </button>
+                <Avatar nome={selConversa?.cliente_nome || "Cliente"} />
+                <h2 className="section-title truncate min-w-0">{selConversa?.cliente_nome || "Cliente"}</h2>
+              </header>
+              <div ref={scrollRef} onScroll={aoRolar} className="flex-1 min-h-0 overflow-auto p-4 space-y-2">
+                {msgsCarregando && msgs.length === 0 && (
+                  <div className="space-y-2">
+                    <div className="skeleton h-9 w-1/2 rounded-2xl" />
+                    <div className="skeleton h-9 w-2/3 rounded-2xl ml-auto" />
+                    <div className="skeleton h-9 w-2/5 rounded-2xl" />
                   </div>
-                </div>
-              );
-            })}
-            <div ref={fimRef} />
-          </div>
-          <div className="p-3 border-t border-default flex gap-2">
-            <input
-              className="input flex-1"
-              placeholder="Responder…"
-              aria-label="Responder"
-              maxLength={2000}
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  enviar();
-                }
-              }}
-            />
-            <button
-              onClick={() => enviar()}
-              disabled={enviando || !texto.trim()}
-              className="btn-primary px-4 disabled:opacity-50"
-              aria-label="Enviar"
-            >
-              {enviando ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-            </button>
-          </div>
+                )}
+                {!msgsCarregando && erroMsgs && (
+                  <p role="alert" className="text-center text-sm text-bad">Não foi possível carregar as mensagens.</p>
+                )}
+                {!msgsCarregando && !erroMsgs && msgs.length === 0 && (
+                  <p className="text-center text-sm text-muted">Sem mensagens ainda.</p>
+                )}
+                {msgs.map((m) => {
+                  const daLoja = m.autor_tipo === "loja";
+                  return (
+                    <div key={m.id} className={`reveal flex flex-col ${daLoja ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`max-w-[80%] lg:max-w-[65%] rounded-2xl px-3 py-2 text-sm break-words ${
+                          daLoja ? "bg-brand-600 text-white" : "surface-alt"
+                        } ${m.pendente ? "opacity-70" : ""} ${m.falhou ? "ring-1 ring-bad" : ""}`}
+                      >
+                        {m.texto}
+                      </div>
+                      <div className="text-[11px] text-muted mt-0.5 px-1 flex items-center gap-1 tnum">
+                        {m.falhou ? (
+                          <button onClick={() => reenviar(m)} className="text-bad font-semibold py-1 hover:underline">
+                            falhou · tocar para reenviar
+                          </button>
+                        ) : m.pendente ? (
+                          "enviando…"
+                        ) : (
+                          hora(m.criada_em)
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={fimRef} />
+              </div>
+              <div className="p-3 border-t border-default flex gap-2">
+                <input
+                  className="input flex-1 min-w-0"
+                  placeholder="Responder…"
+                  aria-label="Responder"
+                  maxLength={2000}
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      enviar();
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => enviar()}
+                  disabled={enviando || !texto.trim()}
+                  className="btn-primary !px-0 w-11 shrink-0"
+                  aria-label="Enviar"
+                >
+                  {enviando ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <Send size={18} aria-hidden />}
+                </button>
+              </div>
+            </section>
+          ) : (
+            <div className="hidden lg:grid place-items-center min-h-0">
+              <EstadoVazio icone={MessageCircle} titulo="Escolha uma conversa">
+                As mensagens do cliente aparecem aqui.
+              </EstadoVazio>
+            </div>
+          )}
         </div>
       )}
     </div>

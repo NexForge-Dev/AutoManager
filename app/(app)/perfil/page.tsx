@@ -10,6 +10,7 @@ import { useDialog } from "@/components/Dialog";
 import MembrosManager from "@/components/MembrosManager";
 import ThemeToggle from "@/components/ThemeToggle";
 import CountUp from "@/components/CountUp";
+import { PageHeader, Painel, Selo, Stat } from "@/components/ui";
 import { Skeleton } from "@/components/Skeleton";
 import { brl, centavos } from "@/lib/analytics";
 import { Store, Mail, Palette, LogOut, BadgeCheck, ChevronRight } from "lucide-react";
@@ -54,49 +55,42 @@ function Perfil() {
   const ehDono = role === "owner";
 
   return (
-    <div className="space-y-4">
-      <header className="pt-1">
-        <h1 className="text-2xl font-bold">Perfil</h1>
-        <p className="text-sm text-muted">Conta e preferências</p>
-      </header>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader titulo="Perfil" descricao="Conta e preferências" />
 
       {/* conta */}
-      <div className="card space-y-3">
-        <div className="flex items-center gap-3">
-          <span className="h-11 w-11 rounded-xl bg-brand-600 text-white grid place-items-center">
-            <Store size={20} />
-          </span>
-          <div>
-            <div className="font-semibold">{config.nomeLoja || "Minha Loja"}</div>
-            <div className="text-xs text-muted capitalize">{config.segmento}</div>
+      <section className="card flex items-center gap-3">
+        <span className="grid place-items-center h-11 w-11 shrink-0 rounded-lg tone-brand" aria-hidden>
+          <Store size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold truncate">{config.nomeLoja || "Minha Loja"}</div>
+          <div className="text-xs text-muted capitalize">{config.segmento}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-sm text-muted min-w-0">
+            <Mail size={14} className="shrink-0" aria-hidden />
+            {email ? <span className="truncate">{email}</span> : <Skeleton className="h-4 w-40" />}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <Mail size={15} /> {email ? email : <Skeleton className="h-4 w-40" />}
+      </section>
+
+      {/* números da loja (produtos, vendas, faturado) são informação do dono — vendedor/entregador não vê */}
+      {/* no celular o faturado ocupa a linha inteira: valor em reais não cabe num terço */}
+      {ehDono && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 stagger">
+          <Stat rotulo="Produtos" valor={<CountUp value={produtos.length} />} />
+          <Stat rotulo="Vendas" valor={<CountUp value={validas.length} />} />
+          <Stat
+            rotulo="Faturado"
+            className="col-span-2 sm:col-span-1"
+            valor={<CountUp value={faturamento} format={brl} />}
+          />
         </div>
-        {/* números da loja (produtos, vendas, faturado) são informação do dono — vendedor/entregador não vê */}
-        {/* no celular o faturado ocupa a linha inteira: valor em reais não cabe num terço */}
-        {ehDono && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 stagger">
-            <Stat label="Produtos" value={<CountUp value={produtos.length} />} />
-            <Stat label="Vendas" value={<CountUp value={validas.length} />} />
-            <Stat
-              label="Faturado"
-              className="col-span-2 sm:col-span-1"
-              value={<CountUp value={faturamento} format={brl} />}
-            />
-          </div>
-        )}
-      </div>
+      )}
 
       {/* tema */}
-      <div className="card space-y-3">
-        <div className="flex items-center gap-2 font-semibold">
-          <Palette size={18} className="text-brand-500" /> Aparência
-        </div>
-        <p className="text-sm text-muted -mt-1">Escolha o tema do aplicativo.</p>
+      <Painel titulo="Aparência" descricao="Escolha o tema do aplicativo." icone={Palette}>
         <ThemeToggle />
-      </div>
+      </Painel>
 
       {/* plano */}
       <PlanoLinha />
@@ -104,19 +98,9 @@ function Perfil() {
       {/* equipe (vendedor / entregador) — só o dono, papéis conforme o plano */}
       {ehDono && <MembrosManager />}
 
-      <button onClick={sair} className="btn-ghost w-full text-red-500">
-        <LogOut size={18} /> Sair da conta
+      <button onClick={sair} className="btn-danger w-full">
+        <LogOut size={18} aria-hidden /> Sair da conta
       </button>
-    </div>
-  );
-}
-
-function Stat({ label, value, className = "" }: { label: string; value: React.ReactNode; className?: string }) {
-  return (
-    <div className={`surface-alt rounded-xl px-2 py-2.5 text-center min-w-0 ${className}`}>
-      {/* sem truncate ("R$ 106..."): o valor inteiro aparece; se faltar espaço, quebra */}
-      <div className="font-bold text-base leading-tight tabular-nums [overflow-wrap:anywhere]">{value}</div>
-      <div className="text-[11px] text-muted">{label}</div>
     </div>
   );
 }
@@ -126,27 +110,27 @@ function PlanoLinha() {
   const { defContratado, emTrial, diasTrial } = usePlano();
   const conteudo = (
     <>
-      <div className="flex items-center gap-2">
-        <BadgeCheck size={18} className="text-brand-500" />
+      <span className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+        <BadgeCheck size={18} className="text-accent shrink-0" aria-hidden />
         <span className="font-semibold">Plano {defContratado.nome}</span>
-        {emTrial && (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-600 text-white whitespace-nowrap">
-            Teste grátis · {diasTrial}d
-          </span>
-        )}
-      </div>
+        {emTrial && <Selo tom="brand">Teste grátis · {diasTrial}d</Selo>}
+      </span>
       {role === "owner" ? (
-        <ChevronRight size={18} className="text-muted" />
+        <ChevronRight size={18} className="text-muted shrink-0" aria-hidden />
       ) : (
-        <span className="text-xs surface-alt rounded-full px-3 py-1 text-muted">Ativo</span>
+        <Selo className="shrink-0">Ativo</Selo>
       )}
     </>
   );
-  return role === "owner" ? (
-    <Link href="/configuracoes/plano" className="card flex items-center justify-between hover:surface-alt transition">
-      {conteudo}
-    </Link>
-  ) : (
-    <div className="card flex items-center justify-between">{conteudo}</div>
+  return (
+    <div className="card-list">
+      {role === "owner" ? (
+        <Link href="/configuracoes/plano" className="row">
+          {conteudo}
+        </Link>
+      ) : (
+        <div className="row">{conteudo}</div>
+      )}
+    </div>
   );
 }

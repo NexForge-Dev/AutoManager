@@ -8,6 +8,7 @@ import { ORDEM_PLANOS, PLANOS, brlPreco, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useMetricaAoAbrir } from "@/lib/metricas/cliente";
 import { useDialog } from "@/components/Dialog";
+import { Aviso, PageHeader, Selo } from "@/components/ui";
 import { FUSO_LOJA } from "@/lib/fuso";
 import { Check, Sparkles, Star, Loader2, ArrowLeft, ShieldCheck, Info, X } from "lucide-react";
 
@@ -154,84 +155,87 @@ function Planos() {
   }
 
   return (
-    <div className="space-y-5 pb-10">
-      <header className="pt-1">
+    <div className="space-y-4 md:space-y-5">
+      <div>
         {/* destino fixo: router.back() depois de cancelar no Stripe voltaria ao Checkout */}
-        <Link href="/configuracoes/plano" className="text-sm text-muted flex items-center gap-1 mb-2 w-fit">
-          <ArrowLeft size={15} /> Voltar
+        <Link href="/configuracoes/plano" className="inline-flex items-center gap-1 min-h-[36px] w-fit text-sm text-muted hover:text-strong">
+          <ArrowLeft size={15} aria-hidden /> Voltar
         </Link>
-        <h1 className="text-2xl font-bold">Planos & assinatura</h1>
-        <p className="text-sm text-muted">Escolha o plano que acompanha o crescimento da sua loja.</p>
-      </header>
+        <PageHeader titulo="Planos & assinatura" descricao="Escolha o plano que acompanha o crescimento da sua loja." />
+      </div>
 
       {aviso && (
-        <div role="status" className="card flex items-start gap-3 text-sm bg-amber-500/10 border-amber-500/30">
-          <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
-          <span className="flex-1">{aviso}</span>
-          <button
-            type="button"
-            onClick={() => setAviso(null)}
-            aria-label="Fechar aviso"
-            className="text-muted hover:text-strong shrink-0"
+        <div role="status">
+          <Aviso
+            tom="warn"
+            icone={Info}
+            acao={
+              <button
+                type="button"
+                onClick={() => setAviso(null)}
+                aria-label="Fechar aviso"
+                className="icon-btn -my-2 -mr-2"
+              >
+                <X size={16} aria-hidden />
+              </button>
+            }
           >
-            <X size={16} />
-          </button>
+            {aviso}
+          </Aviso>
         </div>
       )}
 
       {emTrial && (
-        <div className="card bg-brand-500/5 border-brand-500/30 flex items-center gap-3">
-          <Sparkles className="text-brand-500 shrink-0" />
-          <div className="text-sm">
-            <b>Teste grátis ativo</b> - você está com acesso total (Expansão) por mais{" "}
-            <b>{diasTrial} dia{diasTrial === 1 ? "" : "s"}</b>.{" "}
-            {cobrancaNoFimDoTrial ? (
-              <>
-                Assine agora sem custo: a 1ª cobrança só acontece quando o teste acabar
-                {fimTrial ? <>, em <b>{fimTrial}</b></> : null}.
-              </>
-            ) : (
-              <>Seu teste está no fim: ao assinar, a 1ª cobrança é feita na hora.</>
-            )}
-          </div>
-        </div>
+        <Aviso tom="brand" icone={Sparkles} titulo="Teste grátis ativo">
+          Você está com acesso total (Expansão) por mais{" "}
+          <b className="text-strong">
+            {diasTrial} dia{diasTrial === 1 ? "" : "s"}
+          </b>
+          .{" "}
+          {cobrancaNoFimDoTrial ? (
+            <>
+              Assine agora sem custo: a 1ª cobrança só acontece quando o teste acabar
+              {fimTrial ? <>, em <b className="text-strong tnum">{fimTrial}</b></> : null}.
+            </>
+          ) : (
+            <>Seu teste está no fim: ao assinar, a 1ª cobrança é feita na hora.</>
+          )}
+        </Aviso>
       )}
 
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-3 items-start stagger">
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4">
         {ORDEM_PLANOS.map((id) => {
           const p = PLANOS[id];
           const atual = ehAtual(id);
           return (
-            <div
+            <section
               key={id}
-              className={`card relative flex flex-col transition-transform duration-200 hover:-translate-y-1 ${
-                p.destaque ? "ring-2 ring-brand-500 shadow-card xl:scale-[1.03] xl:hover:scale-[1.05]" : ""
-              }`}
+              className={`card flex flex-col min-w-0 ${p.destaque ? "border-brand-500/60 ring-1 ring-brand-500/60" : ""}`}
             >
-              {p.destaque && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap bg-brand-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                  <Star size={12} /> Mais vendido
-                </span>
-              )}
-
-              <div className="text-center pt-2">
-                <div className="font-bold text-lg">{p.nome}</div>
-                <div className="text-xs text-muted">{p.publico}</div>
-                <div className="mt-3">
-                  <span className="text-3xl font-extrabold">{brlPreco(p.precoCentavos)}</span>
-                  <span className="text-muted text-sm">/mês</span>
-                </div>
-                {cobrancaNoFimDoTrial && !atual && (
-                  <div className="text-xs text-brand-500 font-medium mt-1">
-                    Grátis até o fim do teste{fimTrial ? ` (${fimTrial})` : ""}
-                  </div>
+              <div className="flex items-center justify-between gap-2 min-h-[24px]">
+                <h2 className="text-lg font-bold leading-tight">{p.nome}</h2>
+                {p.destaque && (
+                  <Selo tom="brand" icone={Star}>
+                    Mais vendido
+                  </Selo>
                 )}
               </div>
+              <p className="text-xs text-muted mt-0.5 min-h-[2rem]">{p.publico}</p>
 
-              <ul className="mt-4 space-y-2 flex-1">
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="figure text-3xl">{brlPreco(p.precoCentavos)}</span>
+                <span className="text-muted text-sm">/mês</span>
+              </div>
+              {cobrancaNoFimDoTrial && !atual && (
+                <div className="text-xs text-accent font-medium mt-1">
+                  Grátis até o fim do teste{fimTrial ? ` (${fimTrial})` : ""}
+                </div>
+              )}
+
+              <ul className="mt-4 pt-4 border-t border-default space-y-2 flex-1">
                 {p.beneficios.map((b) => (
                   <li key={b} className="flex items-start gap-2 text-sm">
-                    <Check size={16} className="text-green-500 shrink-0 mt-0.5" /> {b}
+                    <Check size={15} className="text-ok shrink-0 mt-0.5" aria-hidden /> {b}
                   </li>
                 ))}
               </ul>
@@ -240,40 +244,40 @@ function Planos() {
                 onClick={() => selecionar(id)}
                 disabled={atual || ocupado}
                 className={`mt-5 w-full whitespace-nowrap ${
-                  atual ? "btn-ghost opacity-70 cursor-default" : p.destaque ? "btn-primary" : "btn-ghost"
+                  atual ? "btn-ghost cursor-default" : p.destaque ? "btn-primary" : "btn-ghost"
                 }`}
               >
                 {salvando === id ? (
                   <>
-                    <Loader2 className="animate-spin" size={18} /> Aguarde…
+                    <Loader2 className="animate-spin" size={18} aria-hidden /> Aguarde…
                   </>
                 ) : atual ? (
                   <>
-                    <Check size={16} /> Plano atual
+                    <Check size={16} aria-hidden /> Plano atual
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} /> {cobrancaNoFimDoTrial ? "Escolher" : "Assinar"} {p.nome}
+                    <Sparkles size={16} aria-hidden /> {cobrancaNoFimDoTrial ? "Escolher" : "Assinar"} {p.nome}
                   </>
                 )}
               </button>
-            </div>
+            </section>
           );
         })}
       </div>
 
-      <div className="card flex items-start gap-3 text-sm text-muted">
-        <ShieldCheck size={18} className="text-brand-500 shrink-0 mt-0.5" />
-        <div>
-          Pagamento seguro pelo <b>Stripe</b>. A cobrança é mensal e recorrente
+      <div className="flex items-start gap-3 px-1 text-sm text-muted">
+        <ShieldCheck size={18} className="text-ok shrink-0 mt-0.5" aria-hidden />
+        <p className="max-w-3xl">
+          Pagamento seguro pelo <b className="text-strong">Stripe</b>. A cobrança é mensal e recorrente
           {cobrancaNoFimDoTrial ? " e só começa no fim do teste grátis" : ""}; você cancela quando
           quiser (
-          <Link href="/cancelamento" className="font-medium text-brand-500 hover:underline">
+          <Link href="/cancelamento" className="font-medium text-accent hover:underline">
             veja como cancelar
           </Link>
           ) e seus dados nunca são apagados. Ao assinar, você é levado ao ambiente seguro do Stripe para
           concluir o pagamento; o AutoManager não recebe o número do seu cartão.
-        </div>
+        </p>
       </div>
     </div>
   );

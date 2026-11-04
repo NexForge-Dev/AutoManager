@@ -117,7 +117,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className={`modal-backdrop fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm md:p-4 ${backdropClassName}`}
+      className={`modal-backdrop fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/55 md:p-4 ${backdropClassName}`}
       // fecha só com clique que começou E terminou no fundo (não ao arrastar seleção)
       onMouseDown={(e) => {
         cliqueNoFundo.current = e.target === e.currentTarget;
@@ -133,10 +133,10 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={tituloId}
         tabIndex={-1}
-        className={`sheet-panel md:modal-panel surface shadow-pop w-full ${largura} rounded-t-3xl md:rounded-3xl border border-default p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5 max-h-[92dvh] md:max-h-[88vh] overflow-auto overscroll-contain outline-none focus:outline-none focus-visible:outline-none ${className}`}
+        className={`sheet-panel md:modal-panel surface shadow-pop w-full ${largura} rounded-t-2xl md:rounded-2xl border border-default p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5 max-h-[92dvh] md:max-h-[88vh] overflow-auto overscroll-contain outline-none focus:outline-none focus-visible:outline-none ${className}`}
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id={tituloId} className="text-lg font-bold flex items-center gap-2 min-w-0">
+          <h2 id={tituloId} className="text-[1.0625rem] font-bold flex items-center gap-2 min-w-0">
             {icone}
             <span className="min-w-0">{titulo}</span>
           </h2>

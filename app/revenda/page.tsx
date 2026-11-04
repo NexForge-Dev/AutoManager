@@ -7,7 +7,26 @@ import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
 import { parseNumero } from "@/lib/csvProdutos";
 import type { Canal } from "@/lib/types";
-import { Gem, Loader2, Plus, Minus, ShoppingBag, LogOut, ClipboardList, Check, X } from "lucide-react";
+import { Skeleton } from "@/components/Skeleton";
+import { Aviso, EstadoVazio, Segmentado, Selo, type Tom } from "@/components/ui";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  Gem,
+  ImageOff,
+  Loader2,
+  LogOut,
+  Minus,
+  Package,
+  Plus,
+  ShoppingBag,
+  WifiOff,
+  X,
+} from "lucide-react";
 
 type Variacao = { id: string; nome: string; preco_ajuste: number; estoque_atual: number };
 type Prod = {
@@ -41,6 +60,11 @@ const FORMAS: { id: Forma; label: string }[] = [
   { id: "credito", label: "Crédito" },
   { id: "boleto", label: "Boleto" },
 ];
+
+const ABAS = [
+  ["vender", "Vender"],
+  ["vendas", "Minhas vendas"],
+] as const;
 
 export default function RevendaPage() {
   const router = useRouter();
@@ -121,69 +145,87 @@ export default function RevendaPage() {
 
   if (falha && me === undefined)
     return (
-      <div className="min-h-screen grid place-items-center text-center px-6">
-        <div>
-          <h1 className="text-xl font-bold">Não foi possível carregar</h1>
-          <p className="text-muted mt-1">Confira sua conexão com a internet e tente de novo.</p>
-          <button onClick={() => setTentativa((t) => t + 1)} className="btn-primary mt-6 inline-flex">
-            Tentar de novo
-          </button>
-        </div>
+      <div className="min-h-screen grid place-items-center px-4 bg-[var(--bg)]">
+        <EstadoVazio
+          icone={WifiOff}
+          titulo="Não foi possível carregar"
+          acao={
+            <button onClick={() => setTentativa((t) => t + 1)} className="btn-primary">
+              Tentar de novo
+            </button>
+          }
+        >
+          Confira sua conexão com a internet e tente de novo.
+        </EstadoVazio>
       </div>
     );
 
   if (!me)
     return (
-      <div className="min-h-screen grid place-items-center text-brand-500">
-        <Loader2 className="animate-spin" />
+      <div className="min-h-screen bg-[var(--bg)]" role="status" aria-label="Carregando">
+        <div className="h-[3.75rem] surface border-b border-default" />
+        <div className="max-w-6xl mx-auto px-4 py-4 space-y-3">
+          <Skeleton className="h-8 w-56" />
+          <div className="card-list">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="row py-2.5">
+                <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-2/5" />
+                  <Skeleton className="h-3 w-1/4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] pb-28">
+    <div className="min-h-screen bg-[var(--bg)]">
       <header className="surface border-b border-default sticky top-0 z-20">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
           {me?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={me.logo_url} alt={me.loja_nome} className="h-10 w-10 rounded-xl object-cover border border-default" />
+            <img src={me.logo_url} alt={me.loja_nome} className="h-10 w-10 rounded-lg object-cover border border-default" />
           ) : (
-            <div className="h-10 w-10 rounded-xl bg-brand-600 grid place-items-center text-white">
+            <span className="h-10 w-10 shrink-0 rounded-lg grid place-items-center tone-brand" aria-hidden>
               <Gem size={18} />
-            </div>
+            </span>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="font-bold leading-tight truncate text-base">{me?.loja_nome}</h1>
+            <h1 className="font-bold leading-tight truncate">{me?.loja_nome}</h1>
             <div className="text-xs text-muted truncate">
-              {me?.nome} · comissão {me?.comissao_percent}%
+              {me?.nome} · comissão <span className="tnum">{me?.comissao_percent}%</span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={sair}
-            className="grid place-items-center h-11 w-11 -mr-2 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong"
-            aria-label="Sair da conta"
-          >
-            <LogOut size={20} />
+          <Segmentado
+            rotulo="Área da revendedora"
+            opcoes={ABAS}
+            valor={aba}
+            onChange={setAba}
+            className="order-last w-full flex md:order-none md:w-auto [&>button]:flex-1"
+          />
+          <button type="button" onClick={sair} className="icon-btn -mr-2" aria-label="Sair da conta">
+            <LogOut size={20} aria-hidden />
           </button>
-        </div>
-        <div className="max-w-2xl mx-auto px-4 flex gap-1 pb-2">
-          <Tab on={aba === "vender"} onClick={() => setAba("vender")} icon={<ShoppingBag size={16} />} txt="Vender" />
-          <Tab on={aba === "vendas"} onClick={() => setAba("vendas")} icon={<ClipboardList size={16} />} txt="Minhas vendas" />
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-4">
+      <main className="max-w-6xl mx-auto px-4 py-4 md:py-5 space-y-4">
         {erroDados && (
-          <div className="card mb-4 flex items-center justify-between gap-3 text-sm" role="alert">
-            <span className="text-red-600">Não foi possível carregar o catálogo e as vendas.</span>
-            <button
-              type="button"
-              onClick={recarregar}
-              disabled={recarregando}
-              className="btn-primary shrink-0 px-3 py-1.5 text-xs disabled:opacity-60"
+          <div role="alert">
+            <Aviso
+              tom="bad"
+              icone={AlertCircle}
+              acao={
+                <button type="button" onClick={recarregar} disabled={recarregando} className="btn-ghost btn-sm">
+                  {recarregando ? <Loader2 className="animate-spin" size={14} aria-hidden /> : "Tentar de novo"}
+                </button>
+              }
             >
-              {recarregando ? <Loader2 className="animate-spin" size={14} /> : "Tentar de novo"}
-            </button>
+              Não foi possível carregar o catálogo e as vendas.
+            </Aviso>
           </div>
         )}
         {aba === "vender" ? (
@@ -193,19 +235,6 @@ export default function RevendaPage() {
         )}
       </main>
     </div>
-  );
-}
-
-function Tab({ on, onClick, icon, txt }: { on: boolean; onClick: () => void; icon: React.ReactNode; txt: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold ${on ? "bg-brand-600 text-white" : "surface-alt text-muted"}`}
-    >
-      {icon} {txt}
-    </button>
   );
 }
 
@@ -308,192 +337,275 @@ function Vender({
     await onVendido();
   }
 
+  const qtdItens = carrinho.reduce((a, i) => a + i.qtd, 0);
+  const qtdNoCarrinho = (produtoId: string, variacaoId: string | null) =>
+    carrinho.find((x) => x.produtoId === produtoId && x.variacaoId === variacaoId)?.qtd ?? 0;
+
   return (
-    <div className="space-y-4">
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-5 lg:items-start">
       {/* catálogo */}
-      <div>
-        <div className="text-sm font-semibold mb-2">Catálogo</div>
+      <div className="min-w-0">
+        <h2 className="section-title mb-2">Catálogo</h2>
         {catalogo.length === 0 ? (
           erroDados ? null : (
-            <div className="card text-center text-muted text-sm">A loja ainda não tem produtos disponíveis.</div>
+            <div className="card p-0">
+              <EstadoVazio icone={Package} titulo="A loja ainda não tem produtos disponíveis.">
+                Quando a loja cadastrar produtos, eles aparecem aqui.
+              </EstadoVazio>
+            </div>
           )
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="card-list">
             {catalogo.map((p) => (
-              <ProdutoCard key={p.id} p={p} onAdd={addItem} />
+              <ProdutoLinha key={p.id} p={p} qtdDe={qtdNoCarrinho} onAdd={addItem} onSub={mudarQtd} />
             ))}
           </div>
         )}
+        {/* espaço para a barra fixa não cobrir os últimos produtos */}
+        <div aria-hidden className={`${carrinho.length > 0 ? (carrinhoAberto ? "h-[70vh]" : "h-40") : "h-4"} lg:hidden`} />
       </div>
 
-      {/* carrinho fixo */}
+      {/* venda: barra fixa no celular/tablet, coluna lateral no desktop */}
       {carrinho.length > 0 && (
-        <div className="card space-y-3 sticky bottom-4 shadow-xl max-h-[75dvh] overflow-auto">
-          <button
-            type="button"
-            onClick={() => setCarrinhoAberto((v) => !v)}
-            aria-expanded={carrinhoAberto}
-            aria-controls="rev-carrinho"
-            className="md:hidden w-full flex items-center justify-between gap-2 min-h-[44px] -my-1 text-sm"
-          >
-            <span className="flex items-center gap-2 font-semibold">
-              <ShoppingBag size={16} className="text-brand-500" />
-              {carrinho.reduce((a, i) => a + i.qtd, 0)} item(ns) · {brl(total)}
-            </span>
-            <span className="font-semibold text-brand-500">{carrinhoAberto ? "Ocultar" : "Ver venda"}</span>
-          </button>
-          <div id="rev-carrinho" className={`${carrinhoAberto ? "" : "hidden"} md:block space-y-3`}>
-          <div className="flex items-center justify-between font-semibold">
-            <span className="flex items-center gap-2"><ShoppingBag size={16} className="text-brand-500" /> Venda</span>
-            <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="-mr-2 grid h-11 w-11 place-items-center text-muted"><X size={18} /></button>
-          </div>
-          <div className="space-y-1.5 max-h-40 overflow-auto">
-            {carrinho.map((i) => {
-              const chave = chaveItem(i.produtoId, i.variacaoId);
-              return (
-              <div key={chave} className="flex items-center gap-2 text-sm">
-                <div className="flex-1 min-w-0 truncate">{i.nome}</div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button type="button" onClick={() => mudarQtd(chave, -1)} aria-label={`Diminuir quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center"><Minus size={16} /></button>
-                  <span className="w-5 text-center">{i.qtd}</span>
-                  <button type="button" onClick={() => mudarQtd(chave, 1)} aria-label={`Aumentar quantidade de ${i.nome}`} className="h-11 w-11 rounded-full surface-alt grid place-items-center disabled:opacity-40" disabled={i.qtd >= i.max}><Plus size={16} /></button>
-                </div>
-                <div className="w-20 shrink-0 text-right font-medium">{brl(i.preco * i.qtd)}</div>
+        <div className="fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 px-4 lg:px-0 lg:sticky lg:top-20 lg:bottom-auto">
+          <div className="card shadow-pop lg:shadow-none space-y-3 max-w-3xl lg:max-w-none mx-auto max-h-[75dvh] lg:max-h-[calc(100vh-6rem)] overflow-auto">
+            <button
+              type="button"
+              onClick={() => setCarrinhoAberto((v) => !v)}
+              aria-expanded={carrinhoAberto}
+              aria-controls="rev-carrinho"
+              className="lg:hidden w-full flex items-center justify-between gap-2 min-h-[44px] -my-1 text-sm"
+            >
+              <span className="flex items-center gap-2 min-w-0 text-muted">
+                <ShoppingBag size={16} className="text-accent shrink-0" aria-hidden />
+                <span className="truncate tnum">
+                  {qtdItens} {qtdItens === 1 ? "item" : "itens"} · {CANAIS.find((c) => c.id === canal)?.label} ·{" "}
+                  {FORMAS.find((f) => f.id === forma)?.label}
+                </span>
+              </span>
+              <span className="shrink-0 flex items-center gap-1 font-semibold text-accent">
+                {carrinhoAberto ? "Ocultar" : "Ver venda"}
+                {carrinhoAberto ? <ChevronDown size={16} aria-hidden /> : <ChevronUp size={16} aria-hidden />}
+              </span>
+            </button>
+
+            <div id="rev-carrinho" className={`${carrinhoAberto ? "" : "hidden"} lg:block space-y-3`}>
+              <div className="flex items-center justify-between">
+                <h2 className="section-title">Venda</h2>
+                <button onClick={() => setCarrinho([])} aria-label="Limpar venda" className="icon-btn -mr-2">
+                  <X size={18} aria-hidden />
+                </button>
               </div>
-              );
-            })}
-          </div>
+              <ul className="space-y-1 max-h-40 overflow-auto">
+                {carrinho.map((i) => {
+                  const chave = chaveItem(i.produtoId, i.variacaoId);
+                  return (
+                    <li key={chave} className="flex items-center gap-2 text-sm">
+                      <span className="flex-1 min-w-0 truncate">{i.nome}</span>
+                      <Stepper
+                        nome={i.nome}
+                        qtd={i.qtd}
+                        max={i.max}
+                        onAdd={() => mudarQtd(chave, 1)}
+                        onSub={() => mudarQtd(chave, -1)}
+                      />
+                      <span className="w-[4.5rem] shrink-0 text-right font-medium tnum">{brl(i.preco * i.qtd)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
 
-          {/* canal */}
-          <div>
-            <div className="label" id="rev-canal">Onde foi a venda?</div>
-            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="rev-canal">
-              {CANAIS.map((c) => (
-                <button
-                  type="button"
-                  key={c.id}
-                  aria-pressed={canal === c.id}
-                  onClick={() => setCanal(c.id)}
-                  className={`chip ${canal === c.id ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
-                >
-                  {c.label}
-                </button>
-              ))}
+              {/* canal */}
+              <div>
+                <div className="eyebrow mb-1.5" id="rev-canal">Onde foi a venda?</div>
+                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="rev-canal">
+                  {CANAIS.map((c) => (
+                    <button type="button" key={c.id} aria-pressed={canal === c.id} onClick={() => setCanal(c.id)} className="chip">
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* pagamento */}
+              <div>
+                <div className="eyebrow mb-1.5" id="rev-forma">Como foi o pagamento?</div>
+                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="rev-forma">
+                  {FORMAS.map((f) => (
+                    <button type="button" key={f.id} aria-pressed={forma === f.id} onClick={() => setForma(f.id)} className="chip">
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {forma === "credito" && (
+                <div>
+                  <label htmlFor="rev-parcelas" className="label">Parcelas no cartão</label>
+                  <select id="rev-parcelas" className="input" value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))}>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n}x {n === 1 ? "(à vista)" : `de ${brl(total / n)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="rev-desconto" className="label">Desconto (R$)</label>
+                <input id="rev-desconto" className="input" inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} placeholder="0,00" />
+              </div>
+            </div>
+
+            {msg && (
+              <div role={msg.ok ? "status" : "alert"}>
+                <Aviso tom={msg.ok ? "ok" : "bad"} icone={msg.ok ? CheckCircle2 : AlertCircle}>{msg.txt}</Aviso>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 lg:pt-3 lg:border-t lg:border-default">
+              <div className="min-w-0">
+                <div className="figure">{brl(total)}</div>
+                <div className="text-xs text-accent truncate tnum">comissão {brl(comissao)}</div>
+              </div>
+              <button type="button" onClick={registrar} disabled={enviando || carrinho.length === 0} className="btn-primary px-4 shrink-0">
+                {enviando ? <Loader2 className="animate-spin" size={18} aria-hidden /> : <Check size={18} aria-hidden />}{" "}
+                {enviando ? "Registrando…" : "Registrar venda"}
+              </button>
             </div>
           </div>
-
-          {/* pagamento */}
-          <div>
-            <div className="label" id="rev-forma">Como foi o pagamento?</div>
-            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="rev-forma">
-              {FORMAS.map((f) => (
-                <button
-                  type="button"
-                  key={f.id}
-                  aria-pressed={forma === f.id}
-                  onClick={() => setForma(f.id)}
-                  className={`chip ${forma === f.id ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {forma === "credito" && (
-            <div>
-              <label htmlFor="rev-parcelas" className="label">Parcelas no cartão</label>
-              <select id="rev-parcelas" className="input" value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))}>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>
-                    {n}x {n === 1 ? "(à vista)" : `de ${brl(total / n)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2 items-end">
-            <div>
-              <label htmlFor="rev-desconto" className="label">Desconto (R$)</label>
-              <input id="rev-desconto" className="input" inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} placeholder="0,00" />
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-muted">Total</div>
-              <div className="text-xl font-bold">{brl(total)}</div>
-              <div className="text-[11px] text-brand-500">comissão {brl(comissao)}</div>
-            </div>
-          </div>
-
-          </div>
-          {msg && (
-            <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-green-600" : "text-red-600"}`}>
-              {msg.txt}
-            </p>
-          )}
-
-          <button type="button" onClick={registrar} disabled={enviando || carrinho.length === 0} className="btn-primary w-full disabled:opacity-60">
-            {enviando ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />} {enviando ? "Registrando…" : "Registrar venda"}
-          </button>
         </div>
       )}
 
-      {msg?.ok && carrinho.length === 0 && (
-        <p role="status" className="text-sm text-green-600 text-center">{msg.txt}</p>
+      {carrinho.length === 0 && (
+        <aside className="fixed inset-x-4 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 space-y-3 lg:sticky lg:inset-x-0 lg:top-20 lg:bottom-auto">
+          {msg?.ok && (
+            <div role="status" className="surface shadow-pop lg:shadow-none" style={{ borderRadius: "var(--r-card)" }}>
+              <Aviso tom="ok" icone={CheckCircle2}>{msg.txt}</Aviso>
+            </div>
+          )}
+          <div className="card p-0 hidden lg:block">
+            <EstadoVazio compacto icone={ShoppingBag} titulo="Nenhum item na venda">
+              Adicione produtos do catálogo para registrar a venda.
+            </EstadoVazio>
+          </div>
+        </aside>
       )}
     </div>
   );
 }
 
-function ProdutoCard({ p, onAdd }: { p: Prod; onAdd: (p: Prod, v: Variacao | null) => void }) {
-  const [escolha, setEscolha] = useState(false);
-  const esgotado = p.estoque_atual <= 0;
-  const temGrade = p.variacoes.length > 0;
+function Miniatura({ url }: { url?: string }) {
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" loading="lazy" decoding="async" className="h-10 w-10 rounded-lg object-cover shrink-0" />;
+  }
   return (
-    <div className="surface rounded-2xl border border-default overflow-hidden flex flex-col">
-      <div className="aspect-square surface-alt relative">
-        {p.imagens[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.imagens[0]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-        ) : (
-          <div className="h-full w-full grid place-items-center text-muted"><Gem size={24} /></div>
-        )}
-        <span className={`absolute top-1.5 left-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${esgotado ? "bg-red-500 text-white" : "bg-black/55 text-white"}`}>
-          {esgotado ? "Esgotado" : `${p.estoque_atual} un`}
-        </span>
-      </div>
-      <div className="p-2.5 flex-1 flex flex-col">
-        <div className="text-xs font-semibold leading-tight line-clamp-2">{p.nome}</div>
-        <div className="font-bold text-brand-500 text-sm mt-0.5">{brl(p.preco_venda)}</div>
+    <span className="grid place-items-center h-10 w-10 rounded-lg surface-alt text-muted shrink-0" aria-hidden>
+      <ImageOff size={16} />
+    </span>
+  );
+}
 
-        {!escolha ? (
-          <button
-            type="button"
-            onClick={() => (temGrade ? setEscolha(true) : onAdd(p, null))}
-            disabled={esgotado}
-            className="btn-primary mt-2 py-1.5 text-xs disabled:opacity-50"
-          >
-            <Plus size={14} /> {temGrade ? "Escolher" : "Adicionar"}
-          </button>
-        ) : (
-          <div className="mt-2 space-y-1">
-            {p.variacoes.map((v) => (
-              <button
-                type="button"
-                key={v.id}
-                onClick={() => { onAdd(p, v); setEscolha(false); }}
-                disabled={v.estoque_atual <= 0}
-                className="w-full text-left text-[11px] rounded-lg surface-alt px-2 py-1 disabled:opacity-40 flex justify-between gap-1"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate">{v.nome}</span>
-                  <span className="block font-semibold text-brand-500">{brl(p.preco_venda + Number(v.preco_ajuste || 0))}</span>
-                </span>
-                <span className="shrink-0 text-muted">{v.estoque_atual > 0 ? `${v.estoque_atual} un` : "esgotado"}</span>
-              </button>
-            ))}
-            <button type="button" onClick={() => setEscolha(false)} className="min-h-[40px] w-full rounded-lg px-3 text-sm text-muted underline">cancelar</button>
+function Disponivel({ qtd }: { qtd: number }) {
+  if (qtd <= 0) return <Selo tom="bad">Esgotado</Selo>;
+  return <span className="text-xs text-muted tnum">{qtd} un</span>;
+}
+
+function Stepper({
+  nome,
+  qtd,
+  max,
+  onAdd,
+  onSub,
+}: {
+  nome: string;
+  qtd: number;
+  max: number;
+  onAdd: () => void;
+  onSub: () => void;
+}) {
+  if (qtd === 0) {
+    return (
+      <button type="button" onClick={onAdd} disabled={max <= 0} aria-label={`Adicionar ${nome}`} className="btn-ghost h-11 w-11 min-h-0 p-0 shrink-0">
+        <Plus size={18} aria-hidden />
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <button type="button" onClick={onSub} aria-label={`Diminuir quantidade de ${nome}`} className="btn-ghost h-11 w-11 min-h-0 p-0">
+        <Minus size={16} aria-hidden />
+      </button>
+      <span className="font-bold w-6 text-center tnum">{qtd}</span>
+      <button type="button" onClick={onAdd} disabled={qtd >= max} aria-label={`Aumentar quantidade de ${nome}`} className="btn-primary h-11 w-11 min-h-0 p-0">
+        <Plus size={16} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+function ProdutoLinha({
+  p,
+  qtdDe,
+  onAdd,
+  onSub,
+}: {
+  p: Prod;
+  qtdDe: (produtoId: string, variacaoId: string | null) => number;
+  onAdd: (p: Prod, v: Variacao | null) => void;
+  onSub: (chave: string, delta: number) => void;
+}) {
+  const esgotado = p.estoque_atual <= 0;
+  if (p.variacoes.length === 0) {
+    return (
+      <div className="row py-2.5">
+        <Miniatura url={p.imagens[0]} />
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold truncate">{p.nome}</div>
+          <div className="text-sm flex items-center gap-2 flex-wrap">
+            <span className="tnum">{brl(p.preco_venda)}</span>
+            <Disponivel qtd={p.estoque_atual} />
           </div>
-        )}
+        </div>
+        <Stepper
+          nome={p.nome}
+          qtd={qtdDe(p.id, null)}
+          max={p.estoque_atual}
+          onAdd={() => onAdd(p, null)}
+          onSub={() => onSub(chaveItem(p.id, null), -1)}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="px-4 py-2.5">
+      <div className="flex items-center gap-3">
+        <Miniatura url={p.imagens[0]} />
+        <div className="min-w-0">
+          <div className="font-semibold truncate">{p.nome}</div>
+          {esgotado && <Selo tom="bad">Esgotado</Selo>}
+        </div>
+      </div>
+      <div className="mt-1 divide-y divide-[color:var(--border)] sm:pl-[3.25rem]">
+        {p.variacoes.map((v) => (
+          <div key={v.id} className="flex items-center justify-between gap-3 py-1.5">
+            <div className="text-sm min-w-0">
+              <div className="font-medium truncate">{v.nome}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="tnum">{brl(p.preco_venda + Number(v.preco_ajuste || 0))}</span>
+                <Disponivel qtd={v.estoque_atual} />
+              </div>
+            </div>
+            <Stepper
+              nome={`${p.nome} ${v.nome}`}
+              qtd={qtdDe(p.id, v.id)}
+              max={esgotado ? 0 : v.estoque_atual}
+              onAdd={() => onAdd(p, v)}
+              onSub={() => onSub(chaveItem(p.id, v.id), -1)}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -502,33 +614,81 @@ function ProdutoCard({ p, onAdd }: { p: Prod; onAdd: (p: Prod, v: Variacao | nul
 const FORMA_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", boleto: "Boleto", credito: "Crédito", debito: "Débito" };
 
 const STATUS_COMISSAO: Record<string, string> = { paga: "paga", pendente: "pendente", cancelada: "cancelada" };
+const TOM_COMISSAO: Record<string, Tom> = { paga: "ok", pendente: "warn", cancelada: "neutral" };
 
 function MinhasVendas({ vendas, erroDados }: { vendas: any[]; erroDados: boolean }) {
   if (vendas.length === 0)
-    return erroDados ? null : <div className="card text-center text-muted">Você ainda não registrou vendas.</div>;
+    return erroDados ? null : (
+      <div className="card p-0">
+        <EstadoVazio icone={ClipboardList} titulo="Você ainda não registrou vendas.">
+          As vendas que você registrar aparecem aqui, com a sua comissão.
+        </EstadoVazio>
+      </div>
+    );
+  const linhas = vendas.map((v) => {
+    const d = new Date(v.data);
+    return {
+      id: v.id as string,
+      total: brl(Number(v.total)),
+      data: `${d.toLocaleDateString("pt-BR")} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
+      itens: (v.itens || []).map((i: any) => `${i.qtd}× ${i.nome}${i.variacao_nome ? ` (${i.variacao_nome})` : ""}`).join(", "),
+      pag: `${FORMA_LABEL[v.forma_pagamento] || v.forma_pagamento || ""}${v.forma_pagamento === "credito" && Number(v.parcelas) > 1 ? ` ${v.parcelas}x` : ""}`,
+      comissao: brl(Number(v.comissao_total)),
+      cancelada: v.status_comissao === "cancelada",
+      status: STATUS_COMISSAO[v.status_comissao] ?? "pendente",
+    };
+  });
   return (
-    <div className="space-y-2">
-      {vendas.map((v) => {
-        const d = new Date(v.data);
-        const itens = (v.itens || []).map((i: any) => `${i.qtd}× ${i.nome}${i.variacao_nome ? ` (${i.variacao_nome})` : ""}`).join(", ");
-        const pag = FORMA_LABEL[v.forma_pagamento] || v.forma_pagamento;
-        return (
-          <div key={v.id} className="card space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">{brl(Number(v.total))}</span>
-              <span className="text-xs text-muted">{d.toLocaleDateString("pt-BR")} {d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+    <>
+      {/* celular: linhas */}
+      <div className="card-list md:hidden">
+        {linhas.map((l) => (
+          <div key={l.id} className="px-4 py-3 space-y-1">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-semibold tnum">{l.total}</span>
+              <span className="text-xs text-muted tnum shrink-0">{l.data}</span>
             </div>
-            <div className="text-xs text-muted">{itens}</div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="chip border-default">{pag}{v.forma_pagamento === "credito" && Number(v.parcelas) > 1 ? ` ${v.parcelas}x` : ""}</span>
-              <span className={v.status_comissao === "cancelada" ? "text-muted line-through" : "text-brand-500"}>
-                comissão {brl(Number(v.comissao_total))} · {STATUS_COMISSAO[v.status_comissao] ?? "pendente"}
+            <div className="text-sm text-muted">{l.itens}</div>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted">{l.pag}</span>
+              <span className="flex items-center gap-2">
+                <span className={`tnum ${l.cancelada ? "text-muted line-through" : ""}`}>{l.comissao}</span>
+                <Selo tom={TOM_COMISSAO[l.status]}>{l.status}</Selo>
               </span>
             </div>
           </div>
-        );
-      })}
-    </div>
+        ))}
+      </div>
+      {/* desktop: tabela */}
+      <div className="card p-0 overflow-hidden hidden md:block">
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Itens</th>
+                <th scope="col">Pagamento</th>
+                <th scope="col" className="num">Total</th>
+                <th scope="col" className="num">Comissão</th>
+                <th scope="col">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((l) => (
+                <tr key={l.id}>
+                  <td className="whitespace-nowrap text-muted tnum">{l.data}</td>
+                  <td>{l.itens}</td>
+                  <td className="whitespace-nowrap">{l.pag}</td>
+                  <td className="num font-semibold">{l.total}</td>
+                  <td className={`num ${l.cancelada ? "text-muted line-through" : ""}`}>{l.comissao}</td>
+                  <td><Selo tom={TOM_COMISSAO[l.status]}>{l.status}</Selo></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
 

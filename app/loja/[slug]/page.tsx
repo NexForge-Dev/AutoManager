@@ -8,7 +8,57 @@ import { aplicarFavicon } from "@/lib/aparencia";
 import { carregarFonte } from "@/lib/fontes";
 import { waLink, igLink, fbLink, ttLink } from "@/lib/contato";
 import { brl } from "@/lib/analytics";
-import { MessageCircle, X, Send, Gem, Loader2, Phone, Mail, Instagram, Facebook, Music2 } from "lucide-react";
+import { Skeleton } from "@/components/Skeleton";
+import { Aviso, EstadoVazio, iniciais } from "@/components/ui";
+import {
+  AlertCircle,
+  ChevronRight,
+  Facebook,
+  Instagram,
+  Loader2,
+  Mail,
+  MessageCircle,
+  Music2,
+  Phone,
+  Search,
+  Send,
+  ShoppingBag,
+  Store,
+  WifiOff,
+  X,
+} from "lucide-react";
+
+// A vitrine é da LOJA, não do AutoManager: fundo claro e neutro, sobre o qual a cor,
+// a fonte e a logo do lojista aparecem. Não depende do tema salvo no navegador do cliente.
+const TEMA_VITRINE = {
+  "--bg": "#fafaf9",
+  "--surface": "#ffffff",
+  "--surface-alt": "#f1f0ee",
+  "--text": "#1c1917",
+  "--text-muted": "#6b6560",
+  "--border": "#e7e5e1",
+  "--accent": "var(--brand-700)",
+  "--ok": "4 120 87",
+  "--warn": "180 83 9",
+  "--bad": "185 28 28",
+  "--info": "29 78 216",
+  "--hover": "rgb(28 25 23 / 0.04)",
+  "--shadow-soft": "0 1px 2px rgb(28 25 23 / 0.04)",
+  "--shadow-md": "0 4px 12px rgb(28 25 23 / 0.08)",
+  "--shadow-pop": "0 12px 32px rgb(28 25 23 / 0.16)",
+  colorScheme: "light",
+} as React.CSSProperties;
+
+function Vitrine({ fonte, children }: { fonte?: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="min-h-screen bg-[var(--bg)] text-strong"
+      style={fonte ? { ...TEMA_VITRINE, fontFamily: fonte } : TEMA_VITRINE}
+    >
+      {children}
+    </div>
+  );
+}
 
 // localStorage pode lançar (modo privado, cookies bloqueados): o chat segue sem ele
 function lsLer(chave: string): string | null {
@@ -152,33 +202,53 @@ export default function LojaPage() {
 
   if (falhaRede)
     return (
-      <div className="min-h-screen grid place-items-center text-center px-6">
-        <div>
-          <h1 className="text-2xl font-bold">Não foi possível carregar a loja</h1>
-          <p className="text-muted mt-1">Confira sua conexão com a internet e tente de novo.</p>
-          <button onClick={() => setTentativa((t) => t + 1)} className="btn-primary mt-6 inline-flex">
-            Tentar de novo
-          </button>
-        </div>
-      </div>
+      <Vitrine>
+        <main className="min-h-screen grid place-items-center px-4">
+          <EstadoVazio
+            icone={WifiOff}
+            titulo="Não foi possível carregar a loja"
+            acao={
+              <button onClick={() => setTentativa((t) => t + 1)} className="btn-primary">
+                Tentar de novo
+              </button>
+            }
+          >
+            Confira sua conexão com a internet e tente de novo.
+          </EstadoVazio>
+        </main>
+      </Vitrine>
     );
 
   if (loja === undefined)
     return (
-      <div className="min-h-screen grid place-items-center text-brand-500">
-        <Loader2 className="animate-spin" />
-      </div>
+      <Vitrine>
+        <div role="status" aria-label="Carregando">
+          <Skeleton className="h-24 md:h-36 w-full !rounded-none" />
+          <div className="max-w-5xl mx-auto px-4 md:px-6 py-5 space-y-5">
+            <Skeleton className="h-8 w-48" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="aspect-square w-full" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </Vitrine>
     );
 
   if (loja === null)
     return (
-      <div className="min-h-screen grid place-items-center text-center px-6">
-        <div>
-          <h1 className="text-2xl font-bold">Loja não encontrada</h1>
-          <p className="text-muted mt-1">Este link pode estar incorreto ou a loja está fora do ar.</p>
-          <Link href="/" className="btn-primary mt-6 inline-flex">Conhecer o AutoManager</Link>
-        </div>
-      </div>
+      <Vitrine>
+        <main className="min-h-screen grid place-items-center px-4">
+          <EstadoVazio
+            icone={Search}
+            titulo="Loja não encontrada"
+            acao={<Link href="/" className="btn-primary">Conhecer o AutoManager</Link>}
+          >
+            Este link pode estar incorreto ou a loja está fora do ar.
+          </EstadoVazio>
+        </main>
+      </Vitrine>
     );
 
   const temSobre = !!loja.sobre;
@@ -191,53 +261,65 @@ export default function LojaPage() {
   const abaAtual = abas.some((a) => a.key === aba) ? aba : "inicio";
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] pb-24" style={fontStack ? { fontFamily: fontStack } : undefined}>
+    <Vitrine fonte={fontStack}>
       {/* cabeçalho da loja */}
       <header className="surface border-b border-default">
-        {loja.capa_url && (
+        {loja.capa_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={loja.capa_url} alt="" className="h-36 md:h-52 w-full object-cover" />
+          <img src={loja.capa_url} alt="" className="h-40 md:h-64 w-full object-cover" />
+        ) : (
+          <div className="h-20 md:h-32 bg-brand-500/15" aria-hidden />
         )}
-        <div className="max-w-3xl mx-auto px-5">
-          <div className={`flex items-center gap-4 ${loja.capa_url ? "-mt-10" : "py-6"}`}>
+        <div className="max-w-5xl mx-auto px-4 md:px-6">
+          <div className="-mt-10 md:-mt-12">
             {loja.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={loja.logo_url} alt={loja.nome} className="h-20 w-20 rounded-2xl object-cover border-4 border-[var(--surface)]" />
+              <img
+                src={loja.logo_url}
+                alt={loja.nome}
+                className="relative h-20 w-20 md:h-24 md:w-24 rounded-full object-cover border-4 border-[var(--surface)] bg-[var(--surface)]"
+              />
             ) : (
-              <div className="h-20 w-20 rounded-2xl bg-brand-600 grid place-items-center text-white border-4 border-[var(--surface)]">
-                <Gem size={30} />
+              <div
+                className="relative h-20 w-20 md:h-24 md:w-24 rounded-full bg-brand-600 grid place-items-center text-white text-2xl font-bold border-4 border-[var(--surface)]"
+                aria-hidden
+              >
+                {iniciais(loja.nome)}
               </div>
             )}
-            <div className={`min-w-0 ${loja.capa_url ? "pt-10" : ""}`}>
-              <h1 className="text-2xl font-bold truncate">{loja.nome}</h1>
-            </div>
+            <h1 className="mt-2 text-2xl md:text-[2rem] font-bold leading-tight tracking-tight break-words">{loja.nome}</h1>
+            {loja.descricao && abaAtual === "inicio" && (
+              <p className="mt-1 text-muted max-w-2xl">{loja.descricao}</p>
+            )}
           </div>
 
           {/* navegação */}
-          {abas.length > 1 && (
-            <nav className="flex gap-2 pb-3 pt-1">
+          {abas.length > 1 ? (
+            <nav aria-label="Seções da loja" className="flex gap-6 mt-3 -mb-px">
               {abas.map((a) => (
                 <button
                   key={a.key}
                   onClick={() => setAba(a.key)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-                    abaAtual === a.key ? "bg-brand-600 text-white" : "surface-alt text-muted hover:text-strong"
+                  aria-current={abaAtual === a.key ? "page" : undefined}
+                  className={`min-h-[44px] border-b-2 text-sm font-semibold transition-colors ${
+                    abaAtual === a.key ? "border-brand-600 text-strong" : "border-transparent text-muted hover:text-strong"
                   }`}
                 >
                   {a.label}
                 </button>
               ))}
             </nav>
+          ) : (
+            <div className="h-4" />
           )}
         </div>
       </header>
 
-      {/* INÍCIO: descrição + catálogo */}
+      {/* INÍCIO: catálogo */}
       {abaAtual === "inicio" && (
-        <main className="max-w-3xl mx-auto px-5 py-5">
-          {loja.descricao && <p className="text-muted mb-4">{loja.descricao}</p>}
+        <main className="max-w-5xl mx-auto px-4 md:px-6 pt-5 pb-28">
           {loja.produtos.length === 0 ? (
-            <div className="card text-center text-muted">Catálogo em breve.</div>
+            <EstadoVazio icone={Store} titulo="Catálogo em breve." />
           ) : (
             (() => {
               const categorias = Array.from(
@@ -250,29 +332,22 @@ export default function LojaPage() {
               return (
                 <>
                   {categorias.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
-                      <button
-                        onClick={() => setFiltroCat(null)}
-                        className={`chip whitespace-nowrap ${
-                          filtroCat === null ? "bg-brand-600 text-white border-brand-600" : "border-default"
-                        }`}
-                      >
-                        Tudo <span className="opacity-70">({loja.produtos.length})</span>
+                    <div
+                      className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap [scrollbar-width:none]"
+                      role="group"
+                      aria-label="Filtrar por categoria"
+                    >
+                      <button onClick={() => setFiltroCat(null)} aria-pressed={filtroCat === null} className="chip">
+                        Tudo <span className="opacity-70 tnum">({loja.produtos.length})</span>
                       </button>
                       {categorias.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => setFiltroCat(c)}
-                          className={`chip whitespace-nowrap ${
-                            filtroCat === c ? "bg-brand-600 text-white border-brand-600" : "border-default"
-                          }`}
-                        >
-                          {c} <span className="opacity-70">({contagem.get(c) || 0})</span>
+                        <button key={c} onClick={() => setFiltroCat(c)} aria-pressed={filtroCat === c} className="chip">
+                          {c} <span className="opacity-70 tnum">({contagem.get(c) || 0})</span>
                         </button>
                       ))}
                     </div>
                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 md:gap-x-5 gap-y-6">
                     {lista.map((p) => (
                       <ProdutoCard key={p.id} p={p} />
                     ))}
@@ -286,17 +361,15 @@ export default function LojaPage() {
 
       {/* SOBRE */}
       {abaAtual === "sobre" && temSobre && (
-        <main className="max-w-3xl mx-auto px-5 py-5">
-          <div className="card">
-            <div className="font-semibold mb-2 text-lg">Sobre {loja.nome}</div>
-            <p className="text-muted whitespace-pre-line">{loja.sobre}</p>
-          </div>
+        <main className="max-w-2xl mx-auto px-4 md:px-6 pt-6 pb-28">
+          <h2 className="text-xl font-bold">Sobre {loja.nome}</h2>
+          <p className="mt-2 leading-relaxed text-muted whitespace-pre-line">{loja.sobre}</p>
         </main>
       )}
 
       {/* CONTATO */}
       {abaAtual === "contato" && temContato && (
-        <main className="max-w-3xl mx-auto px-5 py-5">
+        <main className="max-w-2xl mx-auto px-4 md:px-6 pt-6 pb-28">
           <LojaContato loja={loja} />
         </main>
       )}
@@ -304,18 +377,18 @@ export default function LojaPage() {
       {/* botão de chat */}
       <button
         onClick={abrirChat}
-        className="fixed bottom-5 right-5 z-40 bg-brand-600 text-white rounded-full shadow-lg shadow-brand-600/30 flex items-center gap-2 px-5 py-3.5 font-semibold"
+        className="btn-primary fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 md:right-6 z-40 rounded-full px-5 min-h-[48px] shadow-pop"
       >
-        <MessageCircle size={20} /> Falar com a loja
+        <MessageCircle size={20} aria-hidden /> Falar com a loja
         {naoLidas > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold grid place-items-center border-2 border-[var(--bg)]">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1.5 rounded-full bg-bad text-white text-xs font-bold grid place-items-center border-2 border-[var(--bg)]">
             {naoLidas > 9 ? "9+" : naoLidas}
           </span>
         )}
       </button>
 
       {chat && <ChatWidget orgId={loja.org_id} sb={sb.current} nomeLoja={loja.nome} onClose={fecharChat} />}
-    </div>
+    </Vitrine>
   );
 }
 
@@ -323,69 +396,69 @@ function ProdutoCard({ p }: { p: ProdutoPub }) {
   const temDesconto = p.preco_comparativo != null && p.preco_comparativo > p.preco_venda;
   const esgotado = p.esgotado;
   return (
-    <div className={`surface rounded-2xl border border-default overflow-hidden flex flex-col ${esgotado ? "opacity-70" : ""}`}>
-      <div className="aspect-square surface-alt relative">
+    <article className="min-w-0 flex flex-col">
+      <div className={`aspect-square relative overflow-hidden ${p.imagens[0] ? "surface-alt" : "bg-brand-500/10"}`} style={{ borderRadius: "var(--r-card)" }}>
         {p.imagens[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.imagens[0]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          <img
+            src={p.imagens[0]}
+            alt={p.nome}
+            loading="lazy"
+            decoding="async"
+            className={`h-full w-full object-cover ${esgotado ? "opacity-60" : ""}`}
+          />
         ) : (
-          <div className="h-full w-full grid place-items-center text-muted">
-            <Gem size={28} />
+          <div className="h-full w-full grid place-items-center text-accent opacity-50" aria-hidden>
+            <ShoppingBag size={28} />
           </div>
         )}
         {esgotado && (
-          <span className="absolute top-2 left-2 rounded-full bg-red-500 text-white px-2 py-0.5 text-[11px] font-semibold">
-            Esgotado
-          </span>
+          <span className="absolute top-2 left-2 badge bg-black/75 text-white">Esgotado</span>
         )}
       </div>
-      <div className="p-3 flex-1 flex flex-col">
-        <div className="text-sm font-semibold leading-tight">{p.nome}</div>
-        {p.marca && <div className="text-[11px] text-muted">{p.marca}</div>}
-        {p.descricao && <p className="text-[11px] text-muted mt-1 line-clamp-3 whitespace-pre-line">{p.descricao}</p>}
-        <div className="mt-auto pt-2">
+      <div className="pt-2.5 flex-1 flex flex-col">
+        <h2 className={`text-[0.9375rem] font-semibold leading-snug ${esgotado ? "text-muted" : ""}`}>{p.nome}</h2>
+        {p.marca && <div className="text-xs text-muted mt-0.5">{p.marca}</div>}
+        {p.descricao && <p className="text-xs text-muted mt-1 line-clamp-2 whitespace-pre-line">{p.descricao}</p>}
+        <div className="mt-auto pt-1.5">
           {temDesconto && (
-            <div className="text-[11px] text-muted line-through">{brl(p.preco_comparativo!)}</div>
+            <div className="text-xs text-muted line-through tnum">{brl(p.preco_comparativo!)}</div>
           )}
-          <div className="font-bold text-brand-500">{brl(p.preco_venda)}</div>
+          <div className="font-bold tnum">{brl(p.preco_venda)}</div>
           {p.variacoes.length > 0 && (
-            <div className="text-[11px] text-muted">{p.variacoes.length} opções</div>
+            <div className="text-xs text-muted">{p.variacoes.length} {p.variacoes.length === 1 ? "opção" : "opções"}</div>
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
 function LojaContato({ loja }: { loja: Loja }) {
   const links = [
-    loja.whatsapp && { href: waLink(loja.whatsapp), icon: <MessageCircle size={18} />, label: "WhatsApp" },
-    loja.telefone && { href: `tel:${loja.telefone.replace(/[^\d+]/g, "")}`, icon: <Phone size={18} />, label: "Telefone" },
-    loja.email && { href: `mailto:${loja.email}`, icon: <Mail size={18} />, label: "E-mail" },
-    loja.instagram && { href: igLink(loja.instagram), icon: <Instagram size={18} />, label: "Instagram" },
-    loja.facebook && { href: fbLink(loja.facebook), icon: <Facebook size={18} />, label: "Facebook" },
-    loja.tiktok && { href: ttLink(loja.tiktok), icon: <Music2 size={18} />, label: "TikTok" },
+    loja.whatsapp && { href: waLink(loja.whatsapp), icon: <MessageCircle size={18} aria-hidden />, label: "WhatsApp" },
+    loja.telefone && { href: `tel:${loja.telefone.replace(/[^\d+]/g, "")}`, icon: <Phone size={18} aria-hidden />, label: "Telefone" },
+    loja.email && { href: `mailto:${loja.email}`, icon: <Mail size={18} aria-hidden />, label: "E-mail" },
+    loja.instagram && { href: igLink(loja.instagram), icon: <Instagram size={18} aria-hidden />, label: "Instagram" },
+    loja.facebook && { href: fbLink(loja.facebook), icon: <Facebook size={18} aria-hidden />, label: "Facebook" },
+    loja.tiktok && { href: ttLink(loja.tiktok), icon: <Music2 size={18} aria-hidden />, label: "TikTok" },
   ].filter(Boolean) as { href: string; icon: React.ReactNode; label: string }[];
 
   if (links.length === 0) return null;
 
   return (
-    <div className="card">
-      <div className="font-semibold mb-3 text-lg">Fale com a gente</div>
-      <div className="flex flex-wrap gap-2">
+    <>
+      <h2 className="text-xl font-bold mb-3">Fale com a gente</h2>
+      <div className="card-list">
         {links.map((l) => (
-          <a
-            key={l.label}
-            href={l.href}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full surface-alt hover:bg-brand-600 hover:text-white px-4 py-2 text-sm font-medium transition"
-          >
-            {l.icon} {l.label}
+          <a key={l.label} href={l.href} target="_blank" rel="noreferrer" className="row font-medium">
+            <span className="text-accent">{l.icon}</span>
+            <span className="flex-1">{l.label}</span>
+            <ChevronRight size={17} className="text-muted" aria-hidden />
           </a>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -572,28 +645,30 @@ function ChatWidget({
   }, [sb]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+    <div className="modal-backdrop fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="chat-titulo"
-        className="surface w-full max-w-md md:rounded-3xl rounded-t-3xl flex flex-col h-[80dvh] md:h-[600px]"
+        className="sheet-panel surface w-full max-w-md md:rounded-2xl rounded-t-2xl flex flex-col h-[80dvh] md:h-[600px] shadow-pop"
       >
-        <header className="flex items-center justify-between p-4 border-b border-default">
+        <header className="flex items-center justify-between gap-3 pl-4 pr-3 py-2.5 border-b border-default">
           <div id="chat-titulo" className="font-semibold truncate">{nomeLoja}</div>
-          <button onClick={onClose} aria-label="Fechar chat" className="grid place-items-center h-11 w-11 -mr-2 rounded-full">
-            <X />
+          <button onClick={onClose} aria-label="Fechar chat" className="icon-btn">
+            <X size={20} aria-hidden />
           </button>
         </header>
 
         {restaurando ? (
-          <div className="flex-1 grid place-items-center text-brand-500">
-            <Loader2 className="animate-spin" />
+          <div className="flex-1 grid place-items-center text-accent" role="status" aria-label="Carregando">
+            <Loader2 className="animate-spin" aria-hidden />
           </div>
         ) : !iniciado ? (
           <div className="flex-1 grid place-items-center p-6 text-center">
             <div className="space-y-3 w-full">
-              <MessageCircle className="mx-auto text-brand-500" size={36} />
+              <span className="mx-auto grid place-items-center h-11 w-11 rounded-xl tone-brand" aria-hidden>
+                <MessageCircle size={21} />
+              </span>
               <p className="text-sm text-muted">Mande uma mensagem direto para a loja.</p>
               <input
                 className="input"
@@ -603,9 +678,13 @@ function ChatWidget({
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
               />
-              {erro && <p role="alert" className="text-sm text-red-500">{erro}</p>}
-              <button onClick={iniciar} disabled={carregando} className="btn-primary w-full disabled:opacity-60">
-                {carregando ? <Loader2 className="animate-spin" size={18} /> : "Iniciar conversa"}
+              {erro && (
+                <div role="alert" className="text-left">
+                  <Aviso tom="bad" icone={AlertCircle}>{erro}</Aviso>
+                </div>
+              )}
+              <button onClick={iniciar} disabled={carregando} className="btn-primary w-full">
+                {carregando ? <Loader2 className="animate-spin" size={18} aria-hidden /> : "Iniciar conversa"}
               </button>
             </div>
           </div>
@@ -613,15 +692,15 @@ function ChatWidget({
           <>
             <div className="flex-1 overflow-auto p-4 space-y-2">
               {msgs.length === 0 && (
-                <p className="text-center text-sm text-muted">Diga olá 👋</p>
+                <p className="text-center text-sm text-muted">Diga olá</p>
               )}
               {msgs.map((m) => (
                 <div
                   key={m.id}
-                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                  className={`w-fit max-w-[80%] rounded-2xl px-3 py-2 text-sm break-words ${
                     m.autor_tipo === "cliente"
-                      ? "bg-brand-600 text-white ml-auto"
-                      : "surface-alt"
+                      ? "bg-brand-600 text-white ml-auto rounded-br-md"
+                      : "surface-alt rounded-bl-md"
                   }`}
                 >
                   {m.texto}
@@ -629,10 +708,10 @@ function ChatWidget({
               ))}
               <div ref={fimRef} />
             </div>
-            {erro && <p role="alert" className="px-4 pt-2 text-sm text-red-500">{erro}</p>}
-            <div className="p-3 border-t border-default flex gap-2">
+            {erro && <p role="alert" className="px-4 pt-2 text-sm text-bad">{erro}</p>}
+            <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-default flex gap-2">
               <input
-                className="input flex-1"
+                className="input flex-1 min-w-0"
                 placeholder="Escreva uma mensagem…"
                 aria-label="Mensagem"
                 maxLength={2000}
@@ -640,8 +719,8 @@ function ChatWidget({
                 onChange={(e) => setTexto(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && enviar()}
               />
-              <button onClick={enviar} disabled={enviando} aria-label="Enviar mensagem" className="btn-primary px-4 disabled:opacity-60">
-                <Send size={18} />
+              <button onClick={enviar} disabled={enviando} aria-label="Enviar mensagem" className="btn-primary h-11 w-11 min-h-0 p-0 shrink-0">
+                <Send size={18} aria-hidden />
               </button>
             </div>
           </>

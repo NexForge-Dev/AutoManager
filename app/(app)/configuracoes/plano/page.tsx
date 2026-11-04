@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { usePlano, type SituacaoAssinatura } from "@/lib/usePlano";
 import { fmtLimite, brlPreco, limiteDoRecurso } from "@/lib/plans";
 import Guard from "@/components/Guard";
+import { Aviso, EstadoVazio, PageHeader, Painel, Progresso, Selo, type Tom } from "@/components/ui";
 import {
   Sparkles,
   Check,
@@ -30,13 +31,13 @@ export default function PlanoAdminPage() {
 
 // Selo pela situação efetiva (lib/usePlano), não pelo status cru: sem linha de
 // assinatura ou com o ciclo pago vencido a loja está no piso, não "Ativa".
-const STATUS_LABEL: Record<SituacaoAssinatura, { txt: string; cls: string }> = {
-  sem_assinatura: { txt: "Sem assinatura", cls: "surface-alt text-muted" },
-  trial: { txt: "Teste grátis", cls: "bg-brand-500/15 text-brand-500" },
-  trial_vencido: { txt: "Teste encerrado", cls: "bg-red-500/15 text-red-600" },
-  ativa: { txt: "Ativa", cls: "bg-green-500/15 text-green-600" },
-  pendente: { txt: "Pagamento pendente", cls: "bg-amber-500/15 text-amber-600" },
-  cancelada: { txt: "Cancelada", cls: "bg-red-500/15 text-red-600" },
+const STATUS_LABEL: Record<SituacaoAssinatura, { txt: string; tom: Tom }> = {
+  sem_assinatura: { txt: "Sem assinatura", tom: "neutral" },
+  trial: { txt: "Teste grátis", tom: "brand" },
+  trial_vencido: { txt: "Teste encerrado", tom: "bad" },
+  ativa: { txt: "Ativa", tom: "ok" },
+  pendente: { txt: "Pagamento pendente", tom: "warn" },
+  cancelada: { txt: "Cancelada", tom: "bad" },
 };
 
 // Explicação do bloqueio para quem está no piso (recursos pagos desligados).
@@ -161,7 +162,11 @@ function PlanoAdmin() {
   }
 
   if (role !== "owner") {
-    return <div className="card text-center text-muted mt-6">Só o dono gerencia a assinatura.</div>;
+    return (
+      <div className="card p-0 mt-6">
+        <EstadoVazio icone={Lock} titulo="Só o dono gerencia a assinatura." />
+      </div>
+    );
   }
 
   const status = STATUS_LABEL[situacao];
@@ -175,119 +180,108 @@ function PlanoAdmin() {
       type="button"
       onClick={abrirPortal}
       disabled={abrindoPortal}
-      className={`${situacao === "pendente" ? "btn-primary" : "btn-ghost"} w-full`}
+      className={`${situacao === "pendente" ? "btn-primary" : "btn-ghost"} flex-1 basis-56 text-center leading-snug`}
     >
-      {abrindoPortal ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+      {abrindoPortal ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <CreditCard size={16} aria-hidden />}
       {situacao === "pendente" ? "Gerenciar pagamento (atualizar cartão)" : "Gerenciar pagamento, faturas ou cancelar"}
     </button>
   );
 
   return (
-    <div className="space-y-4 pb-10">
-      <header className="pt-1">
-        <Link href="/configuracoes" className="text-sm text-muted flex items-center gap-1 mb-2">
-          <ArrowLeft size={15} /> Configurações
+    <div className="space-y-4 md:space-y-5">
+      <div>
+        <Link href="/configuracoes" className="inline-flex items-center gap-1 min-h-[36px] text-sm text-muted hover:text-strong">
+          <ArrowLeft size={15} aria-hidden /> Configurações
         </Link>
-        <h1 className="text-2xl font-bold">Assinatura</h1>
-      </header>
+        <PageHeader titulo="Assinatura" />
+      </div>
 
       {confirmando && (
-        <div className="card flex items-center gap-3 text-sm bg-brand-500/5 border-brand-500/30">
-          <Loader2 size={18} className="animate-spin text-brand-500 shrink-0" />
+        <Aviso tom="brand" icone={Loader2} className="[&>svg]:animate-spin">
           {confirmando}
-        </div>
+        </Aviso>
       )}
       {retorno && (
-        <div
-          className={`card flex items-start gap-3 text-sm ${
-            retorno.ok
-              ? "bg-green-500/10 border-green-500/30"
-              : "bg-amber-500/10 border-amber-500/30"
-          }`}
-        >
-          {retorno.ok ? (
-            <Check size={18} className="text-green-600 shrink-0 mt-0.5" />
-          ) : (
-            <Sparkles size={18} className="text-amber-600 shrink-0 mt-0.5" />
-          )}
-          <span>{retorno.msg}</span>
-        </div>
+        <Aviso tom={retorno.ok ? "ok" : "warn"} icone={retorno.ok ? Check : AlertTriangle}>
+          {retorno.msg}
+        </Aviso>
       )}
 
       {/* cartão do plano atual */}
       <section className="card space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Crown size={20} className="text-brand-500 shrink-0" />
-            <span className="text-lg font-bold truncate">
-              {situacao === "sem_assinatura" ? "Nenhum plano" : `Plano ${defContratado.nome}`}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="grid place-items-center h-10 w-10 shrink-0 rounded-lg tone-brand" aria-hidden>
+              <Crown size={20} />
             </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold leading-tight truncate">
+                {situacao === "sem_assinatura" ? "Nenhum plano" : `Plano ${defContratado.nome}`}
+              </h2>
+              {situacao !== "sem_assinatura" && (
+                <p className="text-sm text-muted tnum">
+                  {brlPreco(defContratado.precoCentavos)}/mês · {defContratado.publico}
+                </p>
+              )}
+            </div>
           </div>
-          <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${status.cls}`}>
+          <Selo tom={status.tom} className="shrink-0">
             {status.txt}
-          </span>
+          </Selo>
         </div>
-        {situacao !== "sem_assinatura" && (
-          <div className="text-sm text-muted">
-            {brlPreco(defContratado.precoCentavos)}/mês · {defContratado.publico}
-          </div>
-        )}
         {emTrial && (
-          <div className="rounded-xl bg-brand-500/5 border border-brand-500/30 px-3 py-2 text-sm flex items-center gap-2">
-            <Sparkles size={15} className="text-brand-500 shrink-0" />
-            <span>
-              Teste com acesso total por mais <b>{diasTrial} dia{diasTrial === 1 ? "" : "s"}</b>.
-            </span>
-          </div>
+          <Aviso tom="brand" icone={Sparkles}>
+            Teste com acesso total por mais{" "}
+            <b className="text-strong">
+              {diasTrial} dia{diasTrial === 1 ? "" : "s"}
+            </b>
+            .
+          </Aviso>
         )}
         {bloqueado && (
-          <div
-            role="alert"
-            className="rounded-xl bg-red-500/5 border border-red-500/30 px-3 py-2 text-sm flex items-start gap-2"
-          >
-            <AlertTriangle size={15} className="text-red-500 shrink-0 mt-0.5" />
-            <span>
-              <b>Recursos pagos bloqueados.</b> {MSG_BLOQUEIO[situacao]}
-            </span>
+          <div role="alert">
+            <Aviso tom="bad" icone={AlertTriangle} titulo="Recursos pagos bloqueados.">
+              {MSG_BLOQUEIO[situacao]}
+            </Aviso>
           </div>
         )}
-        {/* inadimplente: o caminho é o portal (o checkout recusa trocar de plano com fatura pendente) */}
-        {situacao === "pendente" && botaoPortal}
-        <Link href="/planos" className={`${situacao === "pendente" ? "btn-ghost" : "btn-primary"} w-full`}>
-          <Sparkles size={16} />{" "}
-          {emTrial
-            ? "Escolher meu plano"
-            : situacao === "cancelada" || situacao === "trial_vencido" || situacao === "sem_assinatura"
-              ? "Assinar um plano"
-              : "Mudar de plano"}
-        </Link>
-        {situacao !== "pendente" && botaoPortal}
+        <div className="flex flex-wrap gap-2 pt-1">
+          {/* inadimplente: o caminho é o portal (o checkout recusa trocar de plano com fatura pendente) */}
+          {situacao === "pendente" && botaoPortal}
+          <Link href="/planos" className={`${situacao === "pendente" ? "btn-ghost" : "btn-primary"} flex-1 basis-56`}>
+            <Sparkles size={16} aria-hidden />{" "}
+            {emTrial
+              ? "Escolher meu plano"
+              : situacao === "cancelada" || situacao === "trial_vencido" || situacao === "sem_assinatura"
+                ? "Assinar um plano"
+                : "Mudar de plano"}
+          </Link>
+          {situacao !== "pendente" && botaoPortal}
+        </div>
       </section>
 
       {/* uso x limites */}
-      <section className="card space-y-4">
-        <div className="font-semibold">Uso do plano</div>
-
+      <Painel titulo="Uso do plano" lista>
         {/* revendedoras */}
-        <div>
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span className="flex items-center gap-2">
-              <Users size={15} className="text-brand-500" /> Revendedoras
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="flex items-center gap-2 min-w-0">
+              <Users size={15} className="text-muted shrink-0" aria-hidden /> Revendedoras
             </span>
-            <span className="font-semibold">
+            <span className="font-semibold tnum shrink-0">
               {uso.revendedoras} / {fmtLimite(limRev)}
             </span>
           </div>
           {limRev !== Infinity && (
-            <div className="h-2 rounded-full surface-alt overflow-hidden">
-              <div
-                className={`h-full rounded-full ${pctRev >= 100 ? "bg-red-500" : "bg-brand-600"}`}
-                style={{ width: `${pctRev}%` }}
-              />
-            </div>
+            <Progresso
+              className="mt-2 h-1.5"
+              pct={pctRev}
+              tom={pctRev >= 100 ? "bad" : "brand"}
+              rotulo="Revendedoras usadas do limite do plano"
+            />
           )}
           {limRev === 0 ? (
-            <p className="text-xs text-amber-600 mt-1">
+            <p className="hint text-warn">
               {bloqueado
                 ? "Revendedoras ficam bloqueadas até a assinatura ser regularizada."
                 : "Seu plano não inclui revendedoras. Faça upgrade para cadastrar."}
@@ -295,7 +289,7 @@ function PlanoAdmin() {
           ) : (
             limRev !== Infinity &&
             uso.revendedoras >= limRev && (
-              <p className="text-xs text-amber-600 mt-1">
+              <p className="hint text-warn">
                 Limite atingido. Faça upgrade ou desative uma revendedora para cadastrar outra.
               </p>
             )
@@ -303,25 +297,25 @@ function PlanoAdmin() {
         </div>
 
         <LinhaRecurso
-          icon={<UserCog size={15} />}
+          icon={<UserCog size={15} aria-hidden />}
           nome="Vendedores internos"
           valor={`${uso.vendedores} / ${fmtLimite(limiteDoRecurso(caps, "vendedores"))}`}
           liberado={caps.allowVendedores}
         />
         <LinhaRecurso
-          icon={<Truck size={15} />}
+          icon={<Truck size={15} aria-hidden />}
           nome="Motoboys / entregas"
           valor={`${uso.motoboys} / ${fmtLimite(limiteDoRecurso(caps, "motoboys"))}`}
           liberado={caps.allowMotoboys}
         />
-        <LinhaRecurso icon={<BarChart3 size={15} />} nome="Ranking de revendedoras" liberado={caps.allowRanking} />
-        <LinhaRecurso icon={<BarChart3 size={15} />} nome="Analytics de vendas" liberado={caps.allowAnalytics} />
+        <LinhaRecurso icon={<BarChart3 size={15} aria-hidden />} nome="Ranking de revendedoras" liberado={caps.allowRanking} />
+        <LinhaRecurso icon={<BarChart3 size={15} aria-hidden />} nome="Analytics de vendas" liberado={caps.allowAnalytics} />
         <LinhaRecurso
-          icon={<BarChart3 size={15} />}
+          icon={<BarChart3 size={15} aria-hidden />}
           nome="Analytics avançado (tendência + ruptura)"
           liberado={caps.allowAdvancedAnalytics}
         />
-      </section>
+      </Painel>
     </div>
   );
 }
@@ -338,20 +332,20 @@ function LinhaRecurso({
   liberado: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="flex items-center gap-2">
-        <span className="text-brand-500">{icon}</span> {nome}
+    <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+      <span className="flex items-center gap-2 min-w-0">
+        <span className="text-muted shrink-0">{icon}</span> {nome}
       </span>
       {valor ? (
-        <span className={`font-semibold ${liberado ? "" : "text-muted"}`}>{valor}</span>
+        <span className={`font-semibold tnum shrink-0 ${liberado ? "" : "text-muted"}`}>{valor}</span>
       ) : liberado ? (
-        <span className="text-green-600 flex items-center gap-1 text-xs font-semibold">
-          <Check size={14} /> Incluso
-        </span>
+        <Selo tom="ok" icone={Check} className="shrink-0">
+          Incluso
+        </Selo>
       ) : (
-        <span className="text-muted flex items-center gap-1 text-xs font-semibold">
-          <Lock size={13} /> Bloqueado
-        </span>
+        <Selo icone={Lock} className="shrink-0">
+          Bloqueado
+        </Selo>
       )}
     </div>
   );

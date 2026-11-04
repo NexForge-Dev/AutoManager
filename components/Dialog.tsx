@@ -143,7 +143,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
       {children}
       {estado && (
         <div
-          className="modal-backdrop fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+          className="modal-backdrop fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
           onClick={() => fechar(estado.tipo === "prompt" ? null : false)}
           data-dialog-ativo=""
         >
@@ -151,12 +151,12 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
             role={estado.tipo === "confirm" ? "alertdialog" : "dialog"}
             aria-modal="true"
             aria-labelledby="am-dialog-titulo"
-            className="sheet-panel sm:modal-panel surface shadow-pop w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl border border-default p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 space-y-4"
+            className="sheet-panel sm:modal-panel surface shadow-pop w-full sm:max-w-md max-h-[90dvh] overflow-y-auto rounded-t-[calc(var(--r-card)+0.5rem)] sm:rounded-[var(--r-card)] border border-default p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
               {estado.tipo !== "prompt" && (estado as any).opts.perigo && (
-                <span className="shrink-0 grid place-items-center h-10 w-10 rounded-xl bg-red-500/10 text-red-500">
+                <span className="shrink-0 grid place-items-center h-10 w-10 rounded-xl tone-bad" aria-hidden>
                   <AlertTriangle size={20} />
                 </span>
               )}
@@ -169,9 +169,9 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => fechar(estado.tipo === "prompt" ? null : false)}
                 aria-label="Fechar"
-                className="shrink-0 grid place-items-center h-8 w-8 -mr-1 -mt-1 rounded-full text-muted hover:bg-[var(--hover)] hover:text-strong active:scale-90 transition"
+                className="icon-btn -mr-2 -mt-2"
               >
-                <X size={18} />
+                <X size={18} aria-hidden />
               </button>
             </div>
 
@@ -179,6 +179,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
               <input
                 ref={inputRef}
                 className="input"
+                aria-labelledby="am-dialog-titulo"
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
                 placeholder={estado.opts.placeholder}
@@ -204,7 +205,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => fechar(estado.tipo === "prompt" ? valor : estado.tipo === "alerta" ? null : true)}
                 className={`flex-1 btn ${
                   estado.tipo !== "prompt" && (estado as any).opts.perigo
-                    ? "bg-red-600 text-white hover:bg-red-700 px-4 py-3"
+                    ? "bg-red-600 text-white hover:bg-red-700 px-4 min-h-[44px] py-2.5"
                     : "btn-primary"
                 }`}
               >

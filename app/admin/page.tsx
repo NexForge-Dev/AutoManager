@@ -6,9 +6,10 @@ import { brlPreco, ORDEM_PLANOS, PLANOS, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import { SkeletonMetrics, SkeletonList } from "@/components/Skeleton";
+import { Aviso, EstadoVazio, PageHeader, Painel, Progresso, Segmentado, Selo, Stat, type Tom } from "@/components/ui";
 import type { Chamado } from "@/lib/types";
 import {
-  ShieldCheck,
+  AlertTriangle,
   Lock,
   RefreshCw,
   CheckCircle2,
@@ -43,20 +44,20 @@ const TIPO_LABEL: Record<string, string> = {
   sugestao: "Sugestão",
 };
 
-const PLANO_CLS: Record<PlanoId, string> = {
-  ambulante: "bg-teal-500/15 text-teal-600",
-  solo: "bg-slate-500/15 text-slate-500",
-  equipe: "bg-brand-500/15 text-brand-600",
-  expansao: "bg-amber-500/15 text-amber-600",
+const PLANO_TOM: Record<PlanoId, Tom> = {
+  ambulante: "info",
+  solo: "neutral",
+  equipe: "brand",
+  expansao: "warn",
 };
 
-const STATUS_INFO: Record<string, { txt: string; cls: string }> = {
-  active: { txt: "Ativa", cls: "bg-green-500/15 text-green-600" },
-  trialing: { txt: "Trial", cls: "bg-brand-500/15 text-brand-600" },
-  past_due: { txt: "Pendente", cls: "bg-amber-500/15 text-amber-600" },
-  canceled: { txt: "Cancelada", cls: "bg-red-500/15 text-red-600" },
-  trial_vencido: { txt: "Trial vencido", cls: "bg-amber-500/15 text-amber-600" },
-  cortesia: { txt: "Cortesia", cls: "bg-sky-500/15 text-sky-600" },
+const STATUS_INFO: Record<string, { txt: string; tom: Tom }> = {
+  active: { txt: "Ativa", tom: "ok" },
+  trialing: { txt: "Trial", tom: "brand" },
+  past_due: { txt: "Pendente", tom: "warn" },
+  canceled: { txt: "Cancelada", tom: "bad" },
+  trial_vencido: { txt: "Trial vencido", tom: "warn" },
+  cortesia: { txt: "Cortesia", tom: "info" },
 };
 
 type Acesso = "ativo" | "desativado" | "banido";
@@ -74,10 +75,10 @@ type Loja = {
   desde: string | null;
 };
 
-const ACESSO_INFO: Record<Acesso, { txt: string; cls: string }> = {
-  ativo: { txt: "Ativa", cls: "bg-green-500/15 text-green-600" },
-  desativado: { txt: "Desativada", cls: "bg-amber-500/15 text-amber-600" },
-  banido: { txt: "Banida", cls: "bg-red-500/15 text-red-600" },
+const ACESSO_INFO: Record<Acesso, { txt: string; tom: Tom }> = {
+  ativo: { txt: "Ativa", tom: "ok" },
+  desativado: { txt: "Desativada", tom: "warn" },
+  banido: { txt: "Banida", tom: "bad" },
 };
 
 type AdminLog = {
@@ -176,7 +177,9 @@ function Admin() {
     return (
       <div className="grid place-items-center py-20 text-center">
         <div className="space-y-3 max-w-sm">
-          <Lock size={40} className="text-muted mx-auto" />
+          <span className="mx-auto grid place-items-center h-11 w-11 rounded-xl tone-neutral" aria-hidden>
+            <Lock size={21} />
+          </span>
           <h1 className="text-xl font-bold">Área restrita</h1>
           <p className="text-muted text-sm">
             Esta tela é exclusiva da administração do AutoManager. Sua conta não tem acesso.
@@ -189,38 +192,29 @@ function Admin() {
   const abertos = chamados.filter((c) => c.status !== "resolvido").length;
 
   return (
-    <div className="space-y-4">
-      <header className="pt-1 flex items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-brand-600 font-bold text-2xl">
-            <ShieldCheck size={24} /> Admin
-          </div>
-          <p className="text-sm text-muted">Painel da plataforma AutoManager</p>
-        </div>
-        <button onClick={carregar} className="btn-ghost flex items-center gap-2 text-sm" disabled={carregando}>
-          <RefreshCw size={16} className={carregando ? "animate-spin" : ""} /> Atualizar
-        </button>
-      </header>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Admin"
+        descricao="Painel da plataforma AutoManager"
+        acoes={
+          <button onClick={carregar} className="btn-ghost btn-sm" disabled={carregando}>
+            <RefreshCw size={16} className={carregando ? "animate-spin" : ""} aria-hidden /> Atualizar
+          </button>
+        }
+      />
 
       {/* abas */}
-      <div className="flex gap-2 overflow-x-auto">
-        {([
+      <Segmentado
+        rotulo="Seções do painel"
+        valor={aba}
+        onChange={setAba}
+        opcoes={[
           ["resumo", "Resumo"],
           ["lojas", "Lojas & usuários"],
           ["chamados", `Chamados${abertos ? ` (${abertos})` : ""}`],
           ["auditoria", "Auditoria"],
-        ] as const).map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setAba(id)}
-            className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium border transition ${
-              aba === id ? "bg-brand-600 text-white border-brand-600" : "border-default text-muted hover:surface-alt"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        ] as const}
+      />
 
       {carregando ? (
         <>
@@ -248,55 +242,44 @@ function Admin() {
 
 /* --------------------------------------------------------------- RESUMO */
 function ResumoView({ overview }: { overview: Overview | null }) {
-  if (!overview) return <div className="card text-center text-muted py-10">Não foi possível carregar o resumo.</div>;
+  if (!overview)
+    return (
+      <div className="card p-0">
+        <EstadoVazio icone={AlertTriangle} titulo="Não foi possível carregar o resumo." />
+      </div>
+    );
   const r = overview.resumo;
 
-  const cards = [
-    { icon: DollarSign, label: "Faturamento mensal (MRR)", valor: brlPreco(r.mrrCentavos), destaque: true },
-    { icon: TrendingUp, label: "Projeção anual (ARR)", valor: brlPreco(r.arrCentavos) },
-    { icon: CheckCircle2, label: "Assinaturas ativas", valor: String(r.ativas) },
-    { icon: Sparkles, label: "Em teste grátis", valor: String(r.trial) },
-    { icon: Store, label: "Total de lojas", valor: String(r.totalLojas) },
-    { icon: Ban, label: "Canceladas", valor: String(r.canceladas) },
-  ];
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {cards.map((c) => (
-          <div key={c.label} className={`card ${c.destaque ? "bg-brand-600 text-white" : ""}`}>
-            <div className={`flex items-center gap-2 text-xs ${c.destaque ? "text-brand-50" : "text-muted"}`}>
-              <c.icon size={15} /> {c.label}
-            </div>
-            <div className={`mt-1 text-2xl font-extrabold ${c.destaque ? "" : ""}`}>{c.valor}</div>
-          </div>
-        ))}
+        <Stat rotulo="Faturamento mensal (MRR)" icone={DollarSign} tom="brand" valorTom="brand" valor={brlPreco(r.mrrCentavos)} />
+        <Stat rotulo="Projeção anual (ARR)" icone={TrendingUp} valor={brlPreco(r.arrCentavos)} />
+        <Stat rotulo="Assinaturas ativas" icone={CheckCircle2} tom="ok" valor={r.ativas} />
+        <Stat rotulo="Em teste grátis" icone={Sparkles} tom="info" valor={r.trial} />
+        <Stat rotulo="Total de lojas" icone={Store} valor={r.totalLojas} />
+        <Stat rotulo="Canceladas" icone={Ban} tom="bad" valor={r.canceladas} />
       </div>
 
-      <div className="card space-y-3">
-        <div className="flex items-center gap-2 font-semibold">
-          <Crown size={18} className="text-brand-500" /> Faturamento por plano
-        </div>
-        {r.porPlano.map((p) => {
-          const pct = r.mrrCentavos > 0 ? Math.round((p.mrrCentavos / r.mrrCentavos) * 100) : 0;
-          return (
-            <div key={p.plano}>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="flex items-center gap-2">
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${PLANO_CLS[p.plano]}`}>
-                    {p.nome}
+      <Painel titulo="Faturamento por plano" icone={Crown}>
+        <div className="space-y-3.5">
+          {r.porPlano.map((p) => {
+            const pct = r.mrrCentavos > 0 ? Math.round((p.mrrCentavos / r.mrrCentavos) * 100) : 0;
+            return (
+              <div key={p.plano}>
+                <div className="flex items-center justify-between gap-3 text-sm mb-1.5">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Selo tom={PLANO_TOM[p.plano]}>{p.nome}</Selo>
+                    <span className="text-muted truncate">{p.ativas} ativa(s)</span>
                   </span>
-                  <span className="text-muted">{p.ativas} ativa(s)</span>
-                </span>
-                <span className="font-semibold">{brlPreco(p.mrrCentavos)}/mês</span>
+                  <span className="font-semibold tnum shrink-0">{brlPreco(p.mrrCentavos)}/mês</span>
+                </div>
+                <Progresso pct={pct} className="h-1.5" rotulo={`Participação do plano ${p.nome} no faturamento`} />
               </div>
-              <div className="h-2 rounded-full surface-alt overflow-hidden">
-                <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </Painel>
     </div>
   );
 }
@@ -400,7 +383,12 @@ function LojasView({
     }
   }
 
-  if (!overview) return <div className="card text-center text-muted py-10">Não foi possível carregar as lojas.</div>;
+  if (!overview)
+    return (
+      <div className="card p-0">
+        <EstadoVazio icone={AlertTriangle} titulo="Não foi possível carregar as lojas." />
+      </div>
+    );
 
   const termo = busca.trim().toLowerCase();
   const lojas = termo
@@ -412,125 +400,183 @@ function LojasView({
       )
     : overview.lojas;
 
+  // selos, plano e moderação são os mesmos na tabela (desktop) e nas linhas (celular)
+  const selos = (l: Loja) => {
+    const st = STATUS_INFO[l.status] ?? STATUS_INFO.active;
+    return (
+      <>
+        <Selo tom={st.tom}>{st.txt}</Selo>
+        {l.acesso !== "ativo" && <Selo tom={ACESSO_INFO[l.acesso].tom}>{ACESSO_INFO[l.acesso].txt}</Selo>}
+      </>
+    );
+  };
+
+  // troca manual de plano (cortesia / suporte)
+  const seletorPlano = (l: Loja, id: string) => (
+    <select
+      id={id}
+      className="input min-h-[40px] xl:min-h-[36px] py-1 md:text-sm"
+      aria-label={`Mudar plano de ${l.nome}`}
+      value={l.plano}
+      disabled={salvando === l.orgId}
+      onChange={(e) => mudarPlano(l, e.target.value as PlanoId)}
+    >
+      {ORDEM_PLANOS.map((id) => (
+        <option key={id} value={id}>
+          {PLANOS[id].nome} · {brlPreco(PLANOS[id].precoCentavos)}/mês
+        </option>
+      ))}
+    </select>
+  );
+
+  // moderação da conta
+  const moderacao = (l: Loja) => (
+    <>
+      {l.acesso === "ativo" ? (
+        <>
+          <button onClick={() => moderar(l, "desativar")} disabled={salvando === l.orgId} className="btn-ghost btn-sm text-warn">
+            <Power size={14} aria-hidden /> Desativar
+          </button>
+          <button onClick={() => moderar(l, "banir")} disabled={salvando === l.orgId} className="btn-danger btn-sm">
+            <Ban size={14} aria-hidden /> Banir
+          </button>
+        </>
+      ) : (
+        <button onClick={() => moderar(l, "reativar")} disabled={salvando === l.orgId} className="btn-ghost btn-sm text-ok">
+          <RotateCcw size={14} aria-hidden /> Reativar
+        </button>
+      )}
+      <button onClick={() => moderar(l, "deletar")} disabled={salvando === l.orgId} className="btn-danger btn-sm">
+        <Trash2 size={14} aria-hidden /> Deletar
+      </button>
+    </>
+  );
+
+  const linkLoja = (l: Loja) =>
+    l.slug && (
+      <a
+        href={`/loja/${l.slug}`}
+        className="inline-flex items-center gap-1 min-w-0 text-xs text-muted hover:text-accent"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <Store size={12} className="shrink-0" aria-hidden /> <span className="truncate">/{l.slug}</span>
+      </a>
+    );
+
   return (
     <div className="space-y-3">
-      <input
-        className="input"
-        placeholder="Buscar por loja, e-mail ou link…"
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-      />
-      <p className="text-xs text-muted">
-        {lojas.length} loja(s){termo ? ` de ${overview.lojas.length}` : ""}
-      </p>
+      <div>
+        <input
+          className="input"
+          aria-label="Buscar lojas"
+          placeholder="Buscar por loja, e-mail ou link…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <p className="hint">
+          {lojas.length} loja(s){termo ? ` de ${overview.lojas.length}` : ""}
+        </p>
+      </div>
 
-      {lojas.map((l) => {
-        const st = STATUS_INFO[l.status] ?? STATUS_INFO.active;
-        return (
-          <div key={l.orgId} className="card space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-semibold truncate">{l.nome}</div>
-                <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
-                  <Users size={12} /> {l.ownerEmail ?? "sem dono"} · {l.membros} usuário(s)
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${PLANO_CLS[l.plano]}`}>
-                  {l.plano.toUpperCase()}
-                </span>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${st.cls}`}>{st.txt}</span>
-                {l.acesso !== "ativo" && (
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ACESSO_INFO[l.acesso].cls}`}>
-                    {ACESSO_INFO[l.acesso].txt}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted">
-              <span>
-                {l.status === "active" ? `${brlPreco(l.precoCentavos)}/mês` : "-"} · desde {dataCurta(l.desde)}
-              </span>
-              {l.slug && (
-                <a
-                  href={`/loja/${l.slug}`}
-                  className="flex items-center gap-1 hover:text-brand-600"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Store size={12} /> /{l.slug}
-                </a>
-              )}
-            </div>
-
-            {/* troca manual de plano (cortesia / suporte) */}
-            <div className="flex items-center gap-2 pt-1 border-t border-default/60">
-              <span className="text-xs text-muted shrink-0">Mudar plano:</span>
-              <select
-                className="input py-1 text-xs flex-1"
-                value={l.plano}
-                disabled={salvando === l.orgId}
-                onChange={(e) => mudarPlano(l, e.target.value as PlanoId)}
-              >
-                {ORDEM_PLANOS.map((id) => (
-                  <option key={id} value={id}>
-                    {PLANOS[id].nome} · {brlPreco(PLANOS[id].precoCentavos)}/mês
-                  </option>
-                ))}
-              </select>
-              {salvando === l.orgId && <Loader2 size={14} className="animate-spin text-brand-600 shrink-0" />}
-            </div>
-
-            {/* moderação da conta */}
-            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-default/60">
-              {l.acesso === "ativo" ? (
-                <>
-                  <button
-                    onClick={() => moderar(l, "desativar")}
-                    disabled={salvando === l.orgId}
-                    className="btn-ghost text-xs py-1.5 px-3 text-amber-600 disabled:opacity-60"
-                  >
-                    <Power size={14} /> Desativar
-                  </button>
-                  <button
-                    onClick={() => moderar(l, "banir")}
-                    disabled={salvando === l.orgId}
-                    className="btn-ghost text-xs py-1.5 px-3 text-red-600 disabled:opacity-60"
-                  >
-                    <Ban size={14} /> Banir
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => moderar(l, "reativar")}
-                  disabled={salvando === l.orgId}
-                  className="btn-ghost text-xs py-1.5 px-3 text-green-600 disabled:opacity-60"
-                >
-                  <RotateCcw size={14} /> Reativar
-                </button>
-              )}
-              <button
-                onClick={() => moderar(l, "deletar")}
-                disabled={salvando === l.orgId}
-                className="btn-ghost text-xs py-1.5 px-3 text-red-600 ml-auto disabled:opacity-60"
-              >
-                <Trash2 size={14} /> Deletar
-              </button>
+      {lojas.length === 0 ? (
+        <div className="card p-0">
+          {termo ? (
+            <EstadoVazio compacto titulo="Nenhuma loja encontrada." />
+          ) : (
+            <EstadoVazio icone={Store} titulo="Nenhuma loja cadastrada ainda." />
+          )}
+        </div>
+      ) : (
+        <>
+          {/* desktop: tabela */}
+          <div className="card p-0 overflow-hidden hidden xl:block">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Loja</th>
+                    <th>Situação</th>
+                    <th className="min-w-[14.5rem]">Plano</th>
+                    <th className="!text-right">Mensalidade</th>
+                    <th className="!text-right">Moderação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lojas.map((l) => (
+                    <tr key={l.orgId}>
+                      <td className="max-w-[260px]">
+                        <div className="font-semibold truncate">{l.nome}</div>
+                        <div className="text-xs text-muted truncate">
+                          {l.ownerEmail ?? "sem dono"} · {l.membros} usuário(s)
+                        </div>
+                        <div className="flex">{linkLoja(l)}</div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col items-start gap-1">{selos(l)}</div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          {seletorPlano(l, `plano-t-${l.orgId}`)}
+                          {salvando === l.orgId && <Loader2 size={14} className="animate-spin text-accent shrink-0" aria-hidden />}
+                        </div>
+                      </td>
+                      <td className="num">
+                        <div>{l.status === "active" ? `${brlPreco(l.precoCentavos)}/mês` : "-"}</div>
+                        <div className="text-xs text-muted">desde {dataCurta(l.desde)}</div>
+                      </td>
+                      <td>
+                        <div className="flex items-center justify-end gap-1.5">{moderacao(l)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        );
-      })}
+
+          {/* celular e tablet: linhas */}
+          <div className="card-list xl:hidden">
+            {lojas.map((l) => (
+              <div key={l.orgId} className="px-4 py-3 space-y-2.5">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{l.nome}</div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5 min-w-0">
+                    <Users size={12} className="shrink-0" aria-hidden />
+                    <span className="truncate">
+                      {l.ownerEmail ?? "sem dono"} · {l.membros} usuário(s)
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {selos(l)}
+                  <span className="text-xs text-muted tnum">
+                    {l.status === "active" ? `${brlPreco(l.precoCentavos)}/mês` : "-"} · desde {dataCurta(l.desde)}
+                  </span>
+                </div>
+                {linkLoja(l)}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted shrink-0">Mudar plano:</span>
+                  {seletorPlano(l, `plano-l-${l.orgId}`)}
+                  {salvando === l.orgId && <Loader2 size={14} className="animate-spin text-accent shrink-0" aria-hidden />}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap [&>button:last-child]:ml-auto">{moderacao(l)}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 /* --------------------------------------------------------------- AUDITORIA */
-const ACAO_INFO: Record<string, { txt: string; cls: string }> = {
-  desativar: { txt: "Desativou", cls: "bg-amber-500/15 text-amber-600" },
-  banir: { txt: "Baniu", cls: "bg-red-500/15 text-red-600" },
-  reativar: { txt: "Reativou", cls: "bg-green-500/15 text-green-600" },
-  deletar: { txt: "Deletou", cls: "bg-red-500/15 text-red-600" },
-  mudar_plano: { txt: "Mudou plano", cls: "bg-brand-500/15 text-brand-600" },
+const ACAO_INFO: Record<string, { txt: string; tom: Tom }> = {
+  desativar: { txt: "Desativou", tom: "warn" },
+  banir: { txt: "Baniu", tom: "bad" },
+  reativar: { txt: "Reativou", tom: "ok" },
+  deletar: { txt: "Deletou", tom: "bad" },
+  mudar_plano: { txt: "Mudou plano", tom: "brand" },
 };
 
 function detalheTexto(acao: string, d: Record<string, unknown> | null): string | null {
@@ -543,42 +589,89 @@ function detalheTexto(acao: string, d: Record<string, unknown> | null): string |
 
 function AuditoriaView({ logs }: { logs: AdminLog[] | null }) {
   if (!logs)
-    return <div className="card text-center text-muted py-10">Não foi possível carregar a auditoria.</div>;
+    return (
+      <div className="card p-0">
+        <EstadoVazio icone={AlertTriangle} titulo="Não foi possível carregar a auditoria." />
+      </div>
+    );
   if (logs.length === 0)
     return (
-      <div className="card text-center text-muted py-10 flex flex-col items-center gap-2">
-        <ScrollText size={32} />
-        Nenhuma ação registrada ainda.
+      <div className="card p-0">
+        <EstadoVazio icone={ScrollText} titulo="Nenhuma ação registrada ainda." />
       </div>
     );
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <p className="text-xs text-muted">
         Registro das ações sensíveis da plataforma (moderação de contas e troca de plano). Somente leitura.
       </p>
-      {logs.map((l) => {
-        const info = ACAO_INFO[l.acao] ?? { txt: l.acao, cls: "bg-slate-500/15 text-slate-500" };
-        const det = detalheTexto(l.acao, l.detalhe);
-        return (
-          <div key={l.id} className="card space-y-1">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${info.cls}`}>{info.txt}</span>
-              <span className="text-xs text-muted">{quando(l.criadoEm)}</span>
+
+      {/* desktop: tabela */}
+      <div className="card p-0 overflow-hidden hidden lg:block">
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Ação</th>
+                <th>Alvo</th>
+                <th>Autor</th>
+                <th>Detalhe</th>
+                <th className="!text-right">Quando</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((l) => {
+                const info = ACAO_INFO[l.acao] ?? { txt: l.acao, tom: "neutral" as Tom };
+                return (
+                  <tr key={l.id}>
+                    <td>
+                      <Selo tom={info.tom}>{info.txt}</Selo>
+                    </td>
+                    <td className="max-w-[220px] truncate font-medium">{l.alvoDescricao ?? "—"}</td>
+                    <td className="max-w-[220px] truncate text-muted">{l.actorEmail}</td>
+                    <td className="text-muted">{detalheTexto(l.acao, l.detalhe) ?? "—"}</td>
+                    <td className="num text-muted">{quando(l.criadoEm)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* celular e tablet: linhas */}
+      <div className="card-list lg:hidden">
+        {logs.map((l) => {
+          const info = ACAO_INFO[l.acao] ?? { txt: l.acao, tom: "neutral" as Tom };
+          const det = detalheTexto(l.acao, l.detalhe);
+          return (
+            <div key={l.id} className="px-4 py-3 space-y-1">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Selo tom={info.tom}>{info.txt}</Selo>
+                <span className="text-xs text-muted tnum">{quando(l.criadoEm)}</span>
+              </div>
+              <div className="text-sm font-medium truncate">{l.alvoDescricao ?? "—"}</div>
+              <div className="text-xs text-muted break-words">
+                por {l.actorEmail}
+                {det ? ` · ${det}` : ""}
+              </div>
             </div>
-            <div className="text-sm font-medium truncate">{l.alvoDescricao ?? "—"}</div>
-            <div className="text-xs text-muted">
-              por {l.actorEmail}
-              {det ? ` · ${det}` : ""}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 /* --------------------------------------------------------------- CHAMADOS */
+const TIPO_TOM: Record<string, Tom> = { erro: "bad", sugestao: "warn", duvida: "brand" };
+
+const FILTROS_CHAMADO = [
+  ["abertos", "Abertos"],
+  ["todos", "Todos"],
+] as const;
+
 function ChamadosView({
   chamados,
   filtro,
@@ -596,99 +689,68 @@ function ChamadosView({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        {(["abertos", "todos"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFiltro(f)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium border transition ${
-              filtro === f ? "bg-brand-600 text-white border-brand-600" : "border-default text-muted hover:surface-alt"
-            }`}
-          >
-            {f === "abertos" ? "Abertos" : "Todos"}
-          </button>
-        ))}
-      </div>
+      <Segmentado rotulo="Filtrar chamados" opcoes={FILTROS_CHAMADO} valor={filtro} onChange={setFiltro} />
 
       {erro && (
-        <div role="alert" className="card text-sm text-red-500">
-          {erro}
+        <div role="alert">
+          <Aviso tom="bad" icone={AlertTriangle}>
+            {erro}
+          </Aviso>
         </div>
       )}
       {lista.length === 0 && !erro ? (
-        <div className="card text-center text-muted py-10 flex flex-col items-center gap-2">
-          <Inbox size={32} />
-          {filtro === "abertos" ? "Nenhum chamado em aberto 🎉" : "Nenhum chamado ainda."}
+        <div className="card p-0">
+          <EstadoVazio icone={Inbox} titulo={filtro === "abertos" ? "Nenhum chamado em aberto" : "Nenhum chamado ainda."} />
         </div>
-      ) : (
-        lista.map((c) => (
-          <div key={c.id} className={`card space-y-2 ${c.status === "resolvido" ? "opacity-70" : ""}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+      ) : lista.length > 0 ? (
+        <div className="card-list">
+          {lista.map((c) => (
+            <article key={c.id} className="px-4 py-3.5 space-y-2">
+              <div className={`space-y-2 ${c.status === "resolvido" ? "opacity-70" : ""}`}>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                      c.tipo === "erro"
-                        ? "bg-red-500/15 text-red-500"
-                        : c.tipo === "sugestao"
-                        ? "bg-amber-500/15 text-amber-600"
-                        : "bg-brand-500/15 text-brand-600"
-                    }`}
-                  >
-                    {TIPO_LABEL[c.tipo] ?? c.tipo}
-                  </span>
-                  {c.status === "resolvido" && (
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-500/15 text-green-600">
-                      Resolvido
+                  <Selo tom={TIPO_TOM[c.tipo] ?? "brand"}>{TIPO_LABEL[c.tipo] ?? c.tipo}</Selo>
+                  {c.status === "resolvido" && <Selo tom="ok">Resolvido</Selo>}
+                  <span className="text-xs text-muted tnum">{quando(c.criadoEm)}</span>
+                </div>
+                <h3 className="font-semibold truncate">{c.assunto}</h3>
+                <p className="text-sm whitespace-pre-wrap break-words">{c.mensagem}</p>
+                <div className="flex items-center gap-x-3 gap-y-1 text-xs text-muted flex-wrap">
+                  {c.nomeLoja && (
+                    <span className="flex items-center gap-1">
+                      <Store size={13} aria-hidden /> {c.nomeLoja}
                     </span>
                   )}
-                  <span className="text-xs text-muted">{quando(c.criadoEm)}</span>
+                  {c.emailContato && (
+                    <a href={`mailto:${c.emailContato}`} className="flex items-center gap-1 min-w-0 break-all hover:text-accent">
+                      <Mail size={13} className="shrink-0" aria-hidden /> {c.emailContato}
+                    </a>
+                  )}
+                  {c.whatsapp && (
+                    <a href={waLink(c.whatsapp)} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-ok">
+                      <MessageCircle size={13} aria-hidden /> {c.whatsapp}
+                    </a>
+                  )}
                 </div>
-                <div className="font-semibold mt-1 truncate">{c.assunto}</div>
               </div>
-            </div>
 
-            <p className="text-sm whitespace-pre-wrap break-words">{c.mensagem}</p>
-
-            <div className="flex items-center gap-3 text-xs text-muted flex-wrap pt-1">
-              {c.nomeLoja && (
-                <span className="flex items-center gap-1">
-                  <Store size={13} /> {c.nomeLoja}
-                </span>
-              )}
-              {c.emailContato && (
-                <a href={`mailto:${c.emailContato}`} className="flex items-center gap-1 hover:text-brand-600">
-                  <Mail size={13} /> {c.emailContato}
-                </a>
-              )}
-              {c.whatsapp && (
-                <a href={waLink(c.whatsapp)} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-green-600">
-                  <MessageCircle size={13} /> {c.whatsapp}
-                </a>
-              )}
-            </div>
-
-            <div className="pt-1">
               <button
                 onClick={() => alternar(c)}
-                className={`text-sm flex items-center gap-1.5 font-medium ${
-                  c.status === "resolvido" ? "text-muted" : "text-green-600"
-                }`}
+                className={`btn-ghost btn-sm ${c.status === "resolvido" ? "text-muted" : "text-ok"}`}
               >
                 {c.status === "resolvido" ? (
                   <>
-                    <RotateCcw size={15} /> Reabrir
+                    <RotateCcw size={15} aria-hidden /> Reabrir
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 size={15} /> Marcar como resolvido
+                    <CheckCircle2 size={15} aria-hidden /> Marcar como resolvido
                   </>
                 )}
               </button>
-            </div>
-          </div>
-        ))
-      )}
+            </article>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -11,7 +11,26 @@ import type { Produto, Variacao } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import Modal from "@/components/Modal";
-import { Plus, X, PackagePlus, Pencil, ImagePlus, Trash2, Layers, SlidersHorizontal, Search, Upload, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { EstadoVazio, PageHeader, Selo, Stat } from "@/components/ui";
+import {
+  Plus,
+  X,
+  PackagePlus,
+  Pencil,
+  ImagePlus,
+  Trash2,
+  Layers,
+  SlidersHorizontal,
+  Search,
+  Upload,
+  FileSpreadsheet,
+  AlertTriangle,
+  Package,
+  PackageX,
+  Boxes,
+  ImageOff,
+  Loader2,
+} from "lucide-react";
 
 export default function ProdutosPage() {
   return (
@@ -94,31 +113,45 @@ function Produtos() {
   });
 
   return (
-    <div className="space-y-3">
-      <header className="flex items-center justify-between pt-1">
-        <h1 className="text-2xl font-bold">Estoque</h1>
-        {podeEditar && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setImportar(true)}
-              className="btn-ghost py-2 px-3 text-sm"
-              title="Importar de planilha (CSV)"
-            >
-              <Upload size={16} /> Importar
-            </button>
-            <button
-              onClick={() => setForm({ open: true, editar: null })}
-              className="btn-primary py-2 px-3 text-sm"
-            >
-              <Plus size={18} /> Produto
-            </button>
-          </div>
-        )}
-      </header>
+    <div className="space-y-4">
+      <PageHeader
+        titulo="Estoque"
+        descricao={podeEditar ? "Produtos, preços e quantidades da sua loja." : "Produtos e quantidades disponíveis."}
+        acoes={
+          podeEditar && (
+            <>
+              <button
+                onClick={() => setImportar(true)}
+                className="btn-ghost btn-sm"
+                title="Importar de planilha (CSV)"
+              >
+                <Upload size={16} aria-hidden /> Importar
+              </button>
+              <button onClick={() => setForm({ open: true, editar: null })} className="btn-primary btn-sm">
+                <Plus size={17} aria-hidden /> Produto
+              </button>
+            </>
+          )
+        }
+      />
 
       {produtos.length === 0 && (
-        <div className="card text-center text-muted">
-          Nenhum produto ainda. Toque em <b>+ Produto</b>.
+        <div className="card p-0">
+          <EstadoVazio
+            icone={Package}
+            titulo="Nenhum produto ainda"
+            acao={
+              podeEditar ? (
+                <button onClick={() => setForm({ open: true, editar: null })} className="btn-primary">
+                  <Plus size={17} aria-hidden /> Cadastrar produto
+                </button>
+              ) : undefined
+            }
+          >
+            {podeEditar
+              ? "Cadastre o que você vende, ou importe de uma planilha."
+              : "Peça ao dono da loja para cadastrar os produtos."}
+          </EstadoVazio>
         </div>
       )}
 
@@ -131,10 +164,10 @@ function Produtos() {
           ).length;
           const ok = ativos.length - semEstoque - acabando;
           return (
-            <div className="grid grid-cols-3 gap-2">
-              <ResumoEstoque label="Em estoque" valor={ok} cor="text-green-500" />
-              <ResumoEstoque label="Acabando" valor={acabando} cor="text-amber-500" />
-              <ResumoEstoque label="Sem estoque" valor={semEstoque} cor="text-red-500" />
+            <div className="grid grid-cols-3 gap-3">
+              <Stat rotulo="Em estoque" valor={ok} icone={Boxes} tom="ok" />
+              <Stat rotulo="Acabando" valor={acabando} icone={AlertTriangle} tom="warn" valorTom={acabando > 0 ? "warn" : undefined} />
+              <Stat rotulo="Sem estoque" valor={semEstoque} icone={PackageX} tom="bad" valorTom={semEstoque > 0 ? "bad" : undefined} />
             </div>
           );
         })()}
@@ -142,20 +175,21 @@ function Produtos() {
       {/* busca */}
       {produtos.length > 0 && (
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+          <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" aria-hidden />
           <input
-            className="input pl-9"
-            placeholder="Buscar por nome, marca, categoria ou SKU…"
+            className="input pl-9 pr-10"
+            placeholder="Buscar produto, marca ou SKU…"
+            aria-label="Buscar produto"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
           {busca && (
             <button
               onClick={() => setBusca("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted p-1"
+              className="icon-btn absolute right-0.5 top-1/2 -translate-y-1/2"
               aria-label="Limpar busca"
             >
-              <X size={15} />
+              <X size={16} aria-hidden />
             </button>
           )}
         </div>
@@ -163,116 +197,110 @@ function Produtos() {
 
       {/* filtro por categoria (com contador) */}
       {catsPresentes.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          <button
-            onClick={() => setFiltroCat(null)}
-            className={`chip whitespace-nowrap ${
-              filtroCat === null ? "bg-brand-600 text-white border-brand-600" : "border-default"
-            }`}
-          >
-            Todas <span className="opacity-70">({produtos.length})</span>
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
+          <button onClick={() => setFiltroCat(null)} aria-pressed={filtroCat === null} className="chip">
+            Todas <span className="opacity-70 tnum">({produtos.length})</span>
           </button>
           {catsPresentes.map((c) => (
-            <button
-              key={c}
-              onClick={() => setFiltroCat(c)}
-              className={`chip whitespace-nowrap ${
-                filtroCat === c ? "bg-brand-600 text-white border-brand-600" : "border-default"
-              }`}
-            >
-              {c} <span className="opacity-70">({contagemPorCat.get(c) || 0})</span>
+            <button key={c} onClick={() => setFiltroCat(c)} aria-pressed={filtroCat === c} className="chip">
+              {c} <span className="opacity-70 tnum">({contagemPorCat.get(c) || 0})</span>
             </button>
           ))}
         </div>
       )}
 
-      <div className="space-y-2 stagger">
-        {produtosFiltrados.length === 0 && (filtroCat || termo) && (
-          <div className="card text-center text-muted">
+      {produtosFiltrados.length === 0 && (filtroCat || termo) && (
+        <div className="card p-0">
+          <EstadoVazio compacto icone={Search} titulo="Nada encontrado">
             {termo
               ? `Nenhum produto encontrado para “${busca.trim()}”${filtroCat ? ` em “${filtroCat}”` : ""}.`
               : `Nenhum produto em “${filtroCat}”.`}
+          </EstadoVazio>
+        </div>
+      )}
+
+      {/* desktop: tabela */}
+      {produtosFiltrados.length > 0 && (
+        <div className="hidden lg:block card p-0 overflow-hidden">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th className="num">Preço</th>
+                  {podeEditar && <th className="num">Margem</th>}
+                  <th className="num">Estoque</th>
+                  {podeEditar && <th className="w-px"><span className="sr-only">Ações</span></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {produtosFiltrados.map((p) => (
+                  <tr key={p.id} className={p.ativo ? "" : "opacity-60"}>
+                    <td>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FotoProduto p={p} />
+                        <NomeProduto p={p} />
+                      </div>
+                    </td>
+                    <td className="text-muted whitespace-nowrap">{p.categoria}</td>
+                    <td className="num">{brl(p.precoVenda)}</td>
+                    {podeEditar && <td className="num text-muted">{margemTexto(p)}</td>}
+                    <td className="num">
+                      <EstoqueSelo p={p} />
+                    </td>
+                    {podeEditar && (
+                      <td>
+                        <div className="flex justify-end gap-0.5">
+                          <AcoesProduto
+                            p={p}
+                            onEditar={() => setForm({ open: true, editar: p })}
+                            onRepor={() => reporEstoque(p)}
+                            onAjustar={() => ajustar(p)}
+                          />
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-        {produtosFiltrados.map((p) => {
-          const baixo = p.estoqueAtual <= p.estoqueMinimo;
-          const temGrade = p.variacoes.length > 0;
-          return (
-            <div key={p.id} className={`card flex items-center gap-3 ${p.ativo ? "" : "opacity-60"}`}>
-              {p.imagens[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={p.imagens[0]}
-                  alt={p.nome}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-12 w-12 rounded-lg object-cover shrink-0 border border-default"
-                />
-              ) : (
-                <div className="h-12 w-12 rounded-lg surface-alt shrink-0" />
+        </div>
+      )}
+
+      {/* celular e tablet: linhas com ações rotuladas */}
+      {produtosFiltrados.length > 0 && (
+        <div className="lg:hidden card-list">
+          {produtosFiltrados.map((p) => (
+            <div key={p.id} className={`px-4 py-3 ${p.ativo ? "" : "opacity-60"}`}>
+              <div className="flex items-center gap-3">
+                <FotoProduto p={p} />
+                <div className="min-w-0 flex-1">
+                  <NomeProduto p={p} />
+                  <div className="text-xs text-muted truncate tnum">
+                    {p.categoria} · {brl(p.precoVenda)}
+                    {podeEditar && !(p.custo > 0) && <> · sem custo</>}
+                    {podeEditar && p.custo > 0 && p.precoVenda > 0 && <> · margem {margemTexto(p)}</>}
+                  </div>
+                </div>
+                <EstoqueSelo p={p} />
+              </div>
+              {podeEditar && (
+                <div className="flex gap-2 mt-2.5">
+                  <AcoesProduto
+                    rotulada
+                    p={p}
+                    onEditar={() => setForm({ open: true, editar: p })}
+                    onRepor={() => reporEstoque(p)}
+                    onAjustar={() => ajustar(p)}
+                  />
+                </div>
               )}
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold truncate">
-                  {p.nome}
-                  {p.marca ? <span className="text-muted font-normal"> · {p.marca}</span> : null}
-                  {!p.ativo && (
-                    <span className="ml-1.5 align-middle text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 surface-alt text-muted">
-                      Inativo
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-muted truncate">
-                  {p.categoria} · {brl(p.precoVenda)}
-                  {podeEditar && p.custo > 0 && p.precoVenda > 0 && (
-                    <> · margem {(((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)}%</>
-                  )}
-                  {podeEditar && !(p.custo > 0) && <> · sem custo</>}
-                  {temGrade && (
-                    <span className="ml-1 inline-flex items-center gap-0.5 text-brand-500">
-                      <Layers size={11} /> {p.variacoes.length}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className={`font-bold ${baixo ? "text-red-500" : ""}`}>{p.estoqueAtual} un</div>
-                <div className="flex gap-1 mt-1 justify-end">
-                  {podeEditar && (
-                  <button
-                    onClick={() => setForm({ open: true, editar: p })}
-                    className="grid place-items-center h-10 w-10 rounded-lg text-brand-500 hover:bg-[var(--hover)] active:scale-90 transition"
-                    title="Editar produto"
-                    aria-label="Editar produto"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  )}
-                  {podeEditar && !temGrade && (
-                    <>
-                      <button
-                        onClick={() => reporEstoque(p)}
-                        className="grid place-items-center h-10 w-10 rounded-lg text-brand-600 hover:bg-[var(--hover)] active:scale-90 transition"
-                        title="Dar entrada (comprei)"
-                        aria-label="Dar entrada no estoque"
-                      >
-                        <PackagePlus size={18} />
-                      </button>
-                      <button
-                        onClick={() => ajustar(p)}
-                        className="grid place-items-center h-10 w-10 rounded-lg text-muted hover:bg-[var(--hover)] active:scale-90 transition"
-                        title="Ajustar estoque"
-                        aria-label="Ajustar estoque"
-                      >
-                        <SlidersHorizontal size={16} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
       {form.open && (
         <ProdutoForm
@@ -284,6 +312,95 @@ function Produtos() {
 
       {importar && <ImportarProdutos onClose={() => setImportar(false)} />}
     </div>
+  );
+}
+
+// margem exibida na lista: "—" quando o produto não tem custo cadastrado
+function margemTexto(p: Produto): string {
+  if (!(p.custo > 0)) return "—";
+  if (!(p.precoVenda > 0)) return "—";
+  return `${(((p.precoVenda - p.custo) / p.precoVenda) * 100).toFixed(0)}%`;
+}
+
+function FotoProduto({ p }: { p: Produto }) {
+  if (p.imagens[0]) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={p.imagens[0]}
+        alt={p.nome}
+        loading="lazy"
+        decoding="async"
+        className="h-10 w-10 rounded-lg object-cover shrink-0 border border-default"
+      />
+    );
+  }
+  return (
+    <span className="grid place-items-center h-10 w-10 rounded-lg surface-alt text-muted shrink-0" aria-hidden>
+      <ImageOff size={16} />
+    </span>
+  );
+}
+
+function NomeProduto({ p }: { p: Produto }) {
+  return (
+    <div className="min-w-0">
+      <div className="font-semibold truncate">
+        {p.nome}
+        {p.marca ? <span className="text-muted font-normal"> · {p.marca}</span> : null}
+      </div>
+      {(!p.ativo || p.variacoes.length > 0) && (
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {!p.ativo && <Selo>Inativo</Selo>}
+          {p.variacoes.length > 0 && (
+            <Selo tom="brand" icone={Layers}>
+              {p.variacoes.length} {p.variacoes.length === 1 ? "variação" : "variações"}
+            </Selo>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EstoqueSelo({ p }: { p: Produto }) {
+  if (p.estoqueAtual <= 0) return <Selo tom="bad" className="tnum shrink-0">{p.estoqueAtual} un</Selo>;
+  if (p.estoqueAtual <= p.estoqueMinimo) return <Selo tom="warn" className="tnum shrink-0">{p.estoqueAtual} un</Selo>;
+  return <span className="font-semibold tnum shrink-0 text-sm">{p.estoqueAtual} un</span>;
+}
+
+// produto com grade: entrada/ajuste são por variação, então só edita
+function AcoesProduto({
+  p,
+  rotulada = false,
+  onEditar,
+  onRepor,
+  onAjustar,
+}: {
+  p: Produto;
+  rotulada?: boolean;
+  onEditar: () => void;
+  onRepor: () => void;
+  onAjustar: () => void;
+}) {
+  const temGrade = p.variacoes.length > 0;
+  const estilo = rotulada ? "btn-ghost btn-sm flex-1 px-2" : "icon-btn";
+  return (
+    <>
+      {!temGrade && (
+        <>
+          <button onClick={onRepor} className={estilo} title="Dar entrada (comprei)" aria-label={`Dar entrada no estoque de ${p.nome}`}>
+            <PackagePlus size={16} aria-hidden /> {rotulada && "Entrada"}
+          </button>
+          <button onClick={onAjustar} className={estilo} title="Ajustar estoque" aria-label={`Ajustar estoque de ${p.nome}`}>
+            <SlidersHorizontal size={15} aria-hidden /> {rotulada && "Ajustar"}
+          </button>
+        </>
+      )}
+      <button onClick={onEditar} className={estilo} title="Editar produto" aria-label={`Editar produto ${p.nome}`}>
+        <Pencil size={15} aria-hidden /> {rotulada && "Editar"}
+      </button>
+    </>
   );
 }
 
@@ -345,7 +462,7 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
     <Modal
       onClose={onClose}
       largura="md:max-w-lg"
-      icone={<FileSpreadsheet size={20} className="text-brand-500" />}
+      icone={<FileSpreadsheet size={19} className="text-muted" aria-hidden />}
       titulo="Importar produtos"
     >
 
@@ -355,10 +472,10 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
         </p>
 
         <div className="flex gap-2">
-          <button onClick={() => fileRef.current?.click()} className="btn-primary flex-1 py-2 text-sm">
-            <Upload size={16} /> Escolher arquivo
+          <button onClick={() => fileRef.current?.click()} className="btn-primary btn-sm flex-1">
+            <Upload size={16} aria-hidden /> Escolher arquivo
           </button>
-          <button onClick={baixarModelo} className="btn-ghost py-2 px-3 text-sm whitespace-nowrap">
+          <button onClick={baixarModelo} className="btn-ghost btn-sm whitespace-nowrap">
             Baixar modelo
           </button>
           <input
@@ -378,8 +495,8 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
         )}
 
         {erros.length > 0 && (
-          <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 space-y-1">
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-red-600">
+          <div className="rounded-xl bg-bad/[.06] border border-bad/30 p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-bad">
               <AlertTriangle size={15} /> Linhas ignoradas
             </div>
             {erros.slice(0, 6).map((e, i) => (
@@ -404,8 +521,8 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
                 <div key={l._linha} className="grid grid-cols-12 px-3 py-1.5 text-sm">
                   <span className="col-span-5 truncate">{l.nome}</span>
                   <span className="col-span-3 truncate text-muted">{l.categoria}</span>
-                  <span className="col-span-2 text-right">{brl(l.precoVenda)}</span>
-                  <span className="col-span-2 text-right">{l.estoqueAtual}</span>
+                  <span className="col-span-2 text-right tnum">{brl(l.precoVenda)}</span>
+                  <span className="col-span-2 text-right tnum">{l.estoqueAtual}</span>
                 </div>
               ))}
             </div>
@@ -420,7 +537,7 @@ function ImportarProdutos({ onClose }: { onClose: () => void }) {
         <button
           onClick={confirmar}
           disabled={salvando || linhas.length === 0}
-          className="btn-primary w-full disabled:opacity-60"
+          className="btn-primary w-full"
         >
           {salvando
             ? "Importando…"
@@ -600,11 +717,11 @@ function ProdutoForm({
   }
 
   return (
-    <Modal onClose={onClose} titulo={editar ? "Editar produto" : "Novo produto"}>
+    <Modal onClose={onClose} titulo={editar ? "Editar produto" : "Novo produto"} largura="md:max-w-2xl" className="space-y-4">
 
         {/* fotos */}
         <div>
-          <label className="label">Fotos</label>
+          <div className="label">Fotos</div>
           <div className="flex gap-2 flex-wrap">
             {imagens.map((url, i) => (
               <div key={url} className="relative h-16 w-16">
@@ -614,9 +731,9 @@ function ProdutoForm({
                   type="button"
                   onClick={() => setImagens((p) => p.filter((_, idx) => idx !== i))}
                   aria-label="Remover foto"
-                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
+                  className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-1"
                 >
-                  <X size={12} />
+                  <X size={12} aria-hidden />
                 </button>
               </div>
             ))}
@@ -624,9 +741,9 @@ function ProdutoForm({
               onClick={() => fileRef.current?.click()}
               disabled={enviando}
               aria-label="Adicionar foto"
-              className="h-16 w-16 rounded-lg border border-dashed border-default flex items-center justify-center text-muted disabled:opacity-50"
+              className="h-16 w-16 rounded-lg border border-dashed border-default flex items-center justify-center text-muted hover:text-strong hover:bg-[var(--hover)] transition-colors disabled:opacity-50"
             >
-              {enviando ? "…" : <ImagePlus size={20} />}
+              {enviando ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <ImagePlus size={20} aria-hidden />}
             </button>
             <input
               ref={fileRef}
@@ -668,109 +785,122 @@ function ProdutoForm({
             placeholder="Detalhes que aparecem na mini-loja"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label" htmlFor="prod-custo">Custo (R$)</label>
-            <input id="prod-custo" className="input" inputMode="decimal" value={custo} onChange={(e) => onCusto(e.target.value)} />
-          </div>
-          <div>
-            <label className="label" htmlFor="prod-preco">Preço venda (R$)</label>
-            <input id="prod-preco" className="input" inputMode="decimal" value={preco} onChange={(e) => onPreco(e.target.value)} />
-          </div>
-          <div>
-            <label className="label" htmlFor="prod-preco-de">Preço &quot;de&quot; (R$)</label>
-            <input
-              id="prod-preco-de"
-              className="input"
-              inputMode="decimal"
-              placeholder="opcional"
-              value={precoDe}
-              onChange={(e) => setPrecoDe(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="prod-imposto">Imposto (%)</label>
-            <input id="prod-imposto" className="input" inputMode="decimal" value={imposto} onChange={(e) => setImposto(e.target.value)} />
-          </div>
-        </div>
 
-        {/* grade / variações */}
-        <div className="rounded-xl surface-alt p-3 space-y-2">
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" checked={usaGrade} onChange={(e) => setUsaGrade(e.target.checked)} />
-            <Layers size={15} className="text-brand-500" /> Usar variações / grade (tamanho, cor…)
-          </label>
-          {usaGrade && (
-            <div className="space-y-2">
-              <p className="text-[11px] text-muted">
-                O estoque do produto passa a ser a soma das variações.
-              </p>
-              {variacoes.map((v, i) => (
-                <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
-                  <input
-                    className="input col-span-4 py-1.5 text-sm"
-                    aria-label="Nome da variação"
-                    placeholder="Aro 16"
-                    value={v.nome}
-                    onChange={(e) => setVar(i, { nome: e.target.value })}
-                  />
-                  <input
-                    className="input col-span-3 py-1.5 text-sm"
-                    placeholder="SKU"
-                    aria-label="SKU da variação"
-                    value={v.sku ?? ""}
-                    onChange={(e) => setVar(i, { sku: e.target.value })}
-                  />
-                  <input
-                    className="input col-span-2 py-1.5 text-sm"
-                    inputMode="numeric"
-                    placeholder="Qtd"
-                    aria-label="Estoque da variação"
-                    value={v.estoqueAtual || ""}
-                    onChange={(e) => setVar(i, { estoqueAtual: Math.max(0, parseInt(e.target.value) || 0) })}
-                  />
-                  <input
-                    className="input col-span-2 py-1.5 text-sm"
-                    inputMode="decimal"
-                    placeholder="±R$"
-                    aria-label="Ajuste de preço da variação (R$)"
-                    value={ajustesTxt[i] ?? ""}
-                    onChange={(e) => {
-                      const t = e.target.value;
-                      setAjustesTxt((a) => a.map((x, idx) => (idx === i ? t : x)));
-                      setVar(i, { precoAjuste: parseNumero(t) || 0 });
-                    }}
-                  />
-                  <button type="button" onClick={() => rmVar(i)} aria-label="Remover variação" className="col-span-1 text-red-500 flex justify-center">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              ))}
-              <button onClick={addVariacao} className="text-brand-500 text-sm flex items-center gap-1">
-                <Plus size={14} /> Adicionar variação
-              </button>
+        <fieldset className="border-t border-default pt-3">
+          <legend className="section-title pr-2">Preços</legend>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
+            <div>
+              <label className="label" htmlFor="prod-custo">Custo (R$)</label>
+              <input id="prod-custo" className="input" inputMode="decimal" value={custo} onChange={(e) => onCusto(e.target.value)} />
+            </div>
+            <div>
+              <label className="label" htmlFor="prod-preco">Preço venda (R$)</label>
+              <input id="prod-preco" className="input" inputMode="decimal" value={preco} onChange={(e) => onPreco(e.target.value)} />
+            </div>
+            <div>
+              <label className="label" htmlFor="prod-preco-de">Preço &quot;de&quot; (R$)</label>
+              <input
+                id="prod-preco-de"
+                className="input"
+                inputMode="decimal"
+                placeholder="opcional"
+                value={precoDe}
+                onChange={(e) => setPrecoDe(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="prod-imposto">Imposto (%)</label>
+              <input id="prod-imposto" className="input" inputMode="decimal" value={imposto} onChange={(e) => setImposto(e.target.value)} />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset className="border-t border-default pt-3 space-y-3">
+          <legend className="section-title pr-2">Estoque</legend>
+
+          {/* grade / variações */}
+          <div className="rounded-xl surface-alt p-3 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium min-h-[28px]">
+              <input type="checkbox" checked={usaGrade} onChange={(e) => setUsaGrade(e.target.checked)} />
+              <Layers size={15} className="text-muted" aria-hidden /> Usar variações / grade (tamanho, cor…)
+            </label>
+            {usaGrade && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted">
+                  O estoque do produto passa a ser a soma das variações.
+                </p>
+                {variacoes.map((v, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_2.5rem] sm:grid-cols-[1.5fr_1fr_5rem_5rem_2.5rem] gap-1.5 items-center">
+                    <input
+                      className="input"
+                      aria-label="Nome da variação"
+                      placeholder="Aro 16"
+                      value={v.nome}
+                      onChange={(e) => setVar(i, { nome: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      placeholder="SKU"
+                      aria-label="SKU da variação"
+                      value={v.sku ?? ""}
+                      onChange={(e) => setVar(i, { sku: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => rmVar(i)}
+                      aria-label="Remover variação"
+                      className="icon-btn hover:!text-bad sm:order-last"
+                    >
+                      <Trash2 size={16} aria-hidden />
+                    </button>
+                    <input
+                      className="input"
+                      inputMode="numeric"
+                      placeholder="Qtd"
+                      aria-label="Estoque da variação"
+                      value={v.estoqueAtual || ""}
+                      onChange={(e) => setVar(i, { estoqueAtual: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                    <input
+                      className="input"
+                      inputMode="decimal"
+                      placeholder="±R$"
+                      aria-label="Ajuste de preço da variação (R$)"
+                      value={ajustesTxt[i] ?? ""}
+                      onChange={(e) => {
+                        const t = e.target.value;
+                        setAjustesTxt((a) => a.map((x, idx) => (idx === i ? t : x)));
+                        setVar(i, { precoAjuste: parseNumero(t) || 0 });
+                      }}
+                    />
+                  </div>
+                ))}
+                <button onClick={addVariacao} className="btn-ghost btn-sm">
+                  <Plus size={15} aria-hidden /> Adicionar variação
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!usaGrade && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label" htmlFor="prod-estoque">Estoque atual</label>
+                <input id="prod-estoque" className="input" inputMode="numeric" value={estoque} onChange={(e) => setEstoque(e.target.value)} />
+              </div>
+              <div>
+                <label className="label" htmlFor="prod-minimo">Estoque mínimo</label>
+                <input id="prod-minimo" className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+              </div>
             </div>
           )}
-        </div>
-
-        {!usaGrade && (
-          <div className="grid grid-cols-2 gap-3">
+          {usaGrade && (
             <div>
-              <label className="label" htmlFor="prod-estoque">Estoque atual</label>
-              <input id="prod-estoque" className="input" inputMode="numeric" value={estoque} onChange={(e) => setEstoque(e.target.value)} />
+              <label className="label" htmlFor="prod-minimo-grade">Estoque mínimo (alerta)</label>
+              <input id="prod-minimo-grade" className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
             </div>
-            <div>
-              <label className="label" htmlFor="prod-minimo">Estoque mínimo</label>
-              <input id="prod-minimo" className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-            </div>
-          </div>
-        )}
-        {usaGrade && (
-          <div>
-            <label className="label" htmlFor="prod-minimo-grade">Estoque mínimo (alerta)</label>
-            <input id="prod-minimo-grade" className="input" inputMode="numeric" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-          </div>
-        )}
+          )}
+        </fieldset>
 
         {editar && (
           <label className="flex items-start gap-2 text-sm rounded-xl surface-alt p-3">
@@ -784,7 +914,7 @@ function ProdutoForm({
           </label>
         )}
 
-        <button onClick={salvar} disabled={salvando || enviando} className="btn-primary w-full disabled:opacity-60">
+        <button onClick={salvar} disabled={salvando || enviando} className="btn-primary w-full">
           {salvando ? "Salvando…" : editar ? "Salvar alterações" : "Salvar produto"}
         </button>
     </Modal>
@@ -794,13 +924,4 @@ function ProdutoForm({
 // número gravado -> texto pt-BR para o campo ("12.5" -> "12,50")
 function numBR(n: number): string {
   return Number.isFinite(n) ? n.toFixed(2).replace(".", ",") : "";
-}
-
-function ResumoEstoque({ label, valor, cor }: { label: string; valor: number; cor: string }) {
-  return (
-    <div className="card py-3 text-center">
-      <div className={`text-2xl font-bold ${cor}`}>{valor}</div>
-      <div className="text-[11px] text-muted">{label}</div>
-    </div>
-  );
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
 import { brl } from "@/lib/analytics";
@@ -7,6 +8,7 @@ import type { EntradaPendente, OrigemRecebimento } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import { pedirPermissaoNotificacao } from "@/lib/useRecebimentos";
+import { EstadoVazio, PageHeader, Selo, Stat } from "@/components/ui";
 import {
   Inbox,
   Check,
@@ -17,6 +19,7 @@ import {
   Wallet,
   FlaskConical,
   Clock,
+  PlusCircle,
 } from "lucide-react";
 
 export default function RecebimentosPage() {
@@ -68,111 +71,122 @@ function Recebimentos() {
   const total = entradasPendentes.reduce((a, e) => a + e.valor, 0);
 
   return (
-    <div className="space-y-3">
-      <header className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <Inbox className="text-brand-600" />
-          <h1 className="text-2xl font-bold">Recebimentos</h1>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Recebimentos"
+        descricao="Pagamentos recebidos que ainda não viraram venda aparecem aqui. Confirme se foi venda da loja — aí ela entra no seu caixa. A importação automática de bancos e maquininhas ainda não está disponível."
+        acoes={
+          <>
+            {permissao !== "granted" && permissao !== "indisponivel" && (
+              <button
+                onClick={async () => setPermissao(await pedirPermissaoNotificacao())}
+                className="btn-ghost btn-sm"
+              >
+                <Bell size={15} aria-hidden /> Ativar avisos
+              </button>
+            )}
+            {permissao === "granted" && (
+              <Selo tom="ok" icone={BellRing}>
+                Avisos ligados
+              </Selo>
+            )}
+          </>
+        }
+      />
+
+      <div className="grid gap-4 md:gap-5 lg:grid-cols-3 items-start">
+        <div className="lg:col-span-2 min-w-0 order-2 lg:order-1">
+          {entradasPendentes.length === 0 ? (
+            <div className="card p-0">
+              <EstadoVazio
+                icone={Inbox}
+                titulo="Nenhum recebimento aguardando"
+                acao={
+                  <Link href="/vender" className="btn-primary">
+                    <PlusCircle size={17} aria-hidden /> Ir para Vender
+                  </Link>
+                }
+              >
+                Quando houver um pagamento aguardando confirmação, ele aparece aqui. Para registrar
+                uma venda agora, use a tela Vender.
+              </EstadoVazio>
+            </div>
+          ) : (
+            <div className="card-list stagger">
+              {entradasPendentes.map((e) => (
+                <EntradaCard
+                  key={e.id}
+                  e={e}
+                  ocupado={ocupado === e.id}
+                  onConfirmar={async () => {
+                    setOcupado(e.id);
+                    const v = await confirmarEntrada(e.id);
+                    setOcupado(null);
+                    if (!v) alerta({ titulo: "Não foi possível lançar agora", mensagem: "Tente de novo." });
+                  }}
+                  onRecusar={async () => {
+                    const ok = await confirm({
+                      titulo: "Não foi venda da loja?",
+                      mensagem: "Este recebimento sai da caixa de entrada e não entra no faturamento.",
+                      confirmar: "Sim, descartar",
+                      perigo: true,
+                    });
+                    if (!ok) return;
+                    setOcupado(e.id);
+                    const res = await recusarEntrada(e.id);
+                    setOcupado(null);
+                    if (!res.ok) alerta({ titulo: "Não foi possível descartar", mensagem: res.erro || "Tente novamente." });
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
-        {permissao !== "granted" && permissao !== "indisponivel" && (
-          <button
-            onClick={async () => setPermissao(await pedirPermissaoNotificacao())}
-            className="btn-ghost py-2 px-3 text-sm"
-          >
-            <Bell size={16} /> Ativar avisos
-          </button>
-        )}
-        {permissao === "granted" && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-500">
-            <BellRing size={14} /> Avisos ligados
-          </span>
-        )}
-      </header>
 
-      <p className="text-sm text-muted">
-        Pagamentos recebidos que ainda não viraram venda aparecem aqui. Confirme se foi venda da
-        loja — aí ela entra no seu caixa. A importação automática de bancos e maquininhas ainda não
-        está disponível.
-      </p>
+        <div className="min-w-0 space-y-4 order-1 lg:order-2">
+          {entradasPendentes.length > 0 && (
+            <Stat
+              rotulo="Aguardando confirmação"
+              icone={Wallet}
+              tom="warn"
+              valor={brl(total)}
+              apoio={`${entradasPendentes.length} recebimento(s)`}
+            />
+          )}
 
-      {entradasPendentes.length > 0 && (
-        <div className="card flex items-center justify-between">
-          <span className="text-sm text-muted flex items-center gap-1.5">
-            <Wallet size={15} /> Aguardando confirmação
-          </span>
-          <span className="font-bold">{brl(total)}</span>
+          {/* Dev only: simula um recebimento pra ver o fluxo sem banco conectado. */}
+          {DEV && (
+            <section className="card space-y-2 border-dashed">
+              <div className="flex items-center gap-2 text-sm font-semibold text-muted">
+                <FlaskConical size={15} aria-hidden /> Testar o fluxo
+              </div>
+              <p className="text-xs text-muted">
+                Simule um recebimento pra ver como fica (só em desenvolvimento).
+              </p>
+              <div className="flex gap-2">
+                <input
+                  className="input min-w-0"
+                  inputMode="decimal"
+                  placeholder="Valor (ex.: 50,00)"
+                  aria-label="Valor do recebimento simulado"
+                  value={valorTeste}
+                  onChange={(ev) => setValorTeste(ev.target.value)}
+                />
+                <button
+                  onClick={async () => {
+                    const v = parseNumero(valorTeste);
+                    const r = await simularRecebimento({ valor: v });
+                    if (r.ok) setValorTeste("");
+                  }}
+                  className="btn-ghost whitespace-nowrap"
+                >
+                  Simular
+                </button>
+              </div>
+            </section>
+          )}
         </div>
-      )}
-
-      {entradasPendentes.length === 0 && (
-        <div className="card text-center text-muted space-y-1">
-          <div className="font-medium text-default">Nenhum recebimento aguardando</div>
-          <p className="text-sm">
-            Quando houver um pagamento aguardando confirmação, ele aparece aqui. Para registrar
-            uma venda agora, use a tela Vender.
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-2 stagger">
-        {entradasPendentes.map((e) => (
-          <EntradaCard
-            key={e.id}
-            e={e}
-            ocupado={ocupado === e.id}
-            onConfirmar={async () => {
-              setOcupado(e.id);
-              const v = await confirmarEntrada(e.id);
-              setOcupado(null);
-              if (!v) alerta({ titulo: "Não foi possível lançar agora", mensagem: "Tente de novo." });
-            }}
-            onRecusar={async () => {
-              const ok = await confirm({
-                titulo: "Não foi venda da loja?",
-                mensagem: "Este recebimento sai da caixa de entrada e não entra no faturamento.",
-                confirmar: "Sim, descartar",
-                perigo: true,
-              });
-              if (!ok) return;
-              setOcupado(e.id);
-              const res = await recusarEntrada(e.id);
-              setOcupado(null);
-              if (!res.ok) alerta({ titulo: "Não foi possível descartar", mensagem: res.erro || "Tente novamente." });
-            }}
-          />
-        ))}
       </div>
-
-      {/* Dev only: simula um recebimento pra ver o fluxo sem banco conectado. */}
-      {DEV && (
-      <section className="card space-y-2 border-dashed">
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted">
-          <FlaskConical size={15} /> Testar o fluxo
-        </div>
-        <p className="text-xs text-muted">
-          Simule um recebimento pra ver como fica (só em desenvolvimento).
-        </p>
-        <div className="flex gap-2">
-          <input
-            className="input"
-            inputMode="decimal"
-            placeholder="Valor (ex.: 50,00)"
-            value={valorTeste}
-            onChange={(ev) => setValorTeste(ev.target.value)}
-          />
-          <button
-            onClick={async () => {
-              const v = parseNumero(valorTeste);
-              const r = await simularRecebimento({ valor: v });
-              if (r.ok) setValorTeste("");
-            }}
-            className="btn-ghost px-4 text-sm whitespace-nowrap"
-          >
-            Simular
-          </button>
-        </div>
-      </section>
-      )}
     </div>
   );
 }
@@ -189,41 +203,31 @@ function EntradaCard({
   onRecusar: () => void;
 }) {
   return (
-    <div className="card space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-xl font-bold">{brl(e.valor)}</div>
-          <div className="text-sm text-default truncate">
-            {e.descricao || "Pagamento recebido"}
-          </div>
-          <div className="text-xs text-muted flex items-center gap-2 mt-0.5">
-            <span className="inline-flex items-center gap-1">
-              <Store size={11} /> {ORIGEM_LABEL[e.origem]}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Clock size={11} /> {tempoRelativo(e.recebidoEm)}
-            </span>
-          </div>
-          {e.pagador && <div className="text-xs text-muted">de {e.pagador}</div>}
+    <div className="px-4 py-3.5 sm:flex sm:items-center sm:justify-between sm:gap-4 space-y-3 sm:space-y-0">
+      <div className="min-w-0">
+        <div className="figure">{brl(e.valor)}</div>
+        <div className="text-sm truncate mt-0.5">{e.descricao || "Pagamento recebido"}</div>
+        <div className="text-xs text-muted flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1">
+          <span className="inline-flex items-center gap-1">
+            <Store size={12} aria-hidden /> {ORIGEM_LABEL[e.origem]}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Clock size={12} aria-hidden /> {tempoRelativo(e.recebidoEm)}
+          </span>
+          {e.pagador && <span>de {e.pagador}</span>}
         </div>
       </div>
 
-      <div className="text-sm font-medium">Foi venda da sua loja?</div>
-      <div className="flex gap-2">
-        <button
-          disabled={ocupado}
-          onClick={onRecusar}
-          className="btn-ghost flex-1 py-2 text-sm disabled:opacity-60"
-        >
-          <X size={16} /> Não
-        </button>
-        <button
-          disabled={ocupado}
-          onClick={onConfirmar}
-          className="btn-primary flex-1 py-2 text-sm disabled:opacity-60"
-        >
-          <Check size={16} /> {ocupado ? "Lançando…" : "Sim, foi venda"}
-        </button>
+      <div className="shrink-0">
+        <div className="text-sm font-medium mb-1.5 sm:text-right">Foi venda da sua loja?</div>
+        <div className="flex gap-2">
+          <button disabled={ocupado} onClick={onRecusar} className="btn-ghost btn-sm !min-h-[40px] flex-1">
+            <X size={15} aria-hidden /> Não
+          </button>
+          <button disabled={ocupado} onClick={onConfirmar} className="btn-primary btn-sm !min-h-[40px] flex-1 whitespace-nowrap">
+            <Check size={15} aria-hidden /> {ocupado ? "Lançando…" : "Sim, foi venda"}
+          </button>
+        </div>
       </div>
     </div>
   );

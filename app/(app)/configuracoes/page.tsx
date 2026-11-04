@@ -13,6 +13,7 @@ import { brlPreco } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import MembrosManager from "@/components/MembrosManager";
+import { PageHeader, Painel, Selo } from "@/components/ui";
 import {
   Store,
   Palette,
@@ -25,7 +26,8 @@ import {
   Image as ImageIcon,
   X,
   Globe,
-  ExternalLink,
+  ChevronRight,
+  Pipette,
   Tags,
   Plus,
 } from "lucide-react";
@@ -179,275 +181,297 @@ function Configuracoes() {
   }
 
   return (
-    <div className="space-y-4 stagger">
-      <header className="pt-1 flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Configurações</h1>
-          <p className="text-sm text-muted">Gerencie as configurações da sua loja</p>
-        </div>
-        <button type="button" onClick={salvar} disabled={salvando} className="btn-primary py-2 px-4 text-sm disabled:opacity-60">
-          {salvando ? <Loader2 className="animate-spin" size={16} /> : salvo ? <Check size={16} /> : <Save size={16} />}
-          {salvo ? "Salvo" : "Salvar"}
-        </button>
-      </header>
+    <div className="space-y-4 md:space-y-5">
+      <PageHeader
+        titulo="Configurações"
+        descricao="Gerencie as configurações da sua loja"
+        acoes={
+          <button type="button" onClick={salvar} disabled={salvando} className="btn-primary btn-sm">
+            {salvando ? (
+              <Loader2 className="animate-spin" size={16} aria-hidden />
+            ) : salvo ? (
+              <Check size={16} aria-hidden />
+            ) : (
+              <Save size={16} aria-hidden />
+            )}
+            {salvo ? "Salvo" : "Salvar"}
+          </button>
+        }
+      />
 
       {/* Loja */}
-      <section className="card space-y-3">
-        <div className="flex items-center gap-2 font-semibold">
-          <Store size={18} className="text-brand-500" /> Loja
+      <Painel titulo="Loja" icone={Store}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="cfg-nome">Nome da loja</label>
+            <input id="cfg-nome" className="input" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} />
+          </div>
+          <div>
+            <label className="label" htmlFor="cfg-segmento">Segmento</label>
+            <select id="cfg-segmento" className="input" value={segmento} onChange={(e) => setSegmento(e.target.value)}>
+              {SEGMENTOS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="label" htmlFor="cfg-nome">Nome da loja</label>
-          <input id="cfg-nome" className="input" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} />
-        </div>
-        <div>
-          <label className="label" htmlFor="cfg-segmento">Segmento</label>
-          <select id="cfg-segmento" className="input" value={segmento} onChange={(e) => setSegmento(e.target.value)}>
-            {SEGMENTOS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+      </Painel>
 
       {/* Identidade */}
-      <section className="card space-y-4">
-        <div className="flex items-center gap-2 font-semibold">
-          <Palette size={18} className="text-brand-500" /> Identidade da loja
-        </div>
-
-        {/* logo */}
-        <div>
-          <label className="label">Logo</label>
-          <div className="flex items-center gap-3">
-            <div className="h-16 w-16 rounded-xl surface-alt grid place-items-center overflow-hidden border border-default">
-              {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt="Logo da loja" className="h-full w-full object-cover" />
-              ) : (
-                <ImageIcon size={22} className="text-muted" />
-              )}
+      <Painel titulo="Identidade da loja" icone={Palette}>
+        <div className="space-y-4">
+          {/* logo */}
+          <div>
+            <span className="label">Logo</span>
+            <div className="flex items-center gap-3">
+              <div
+                className="h-14 w-14 shrink-0 surface-alt grid place-items-center overflow-hidden border border-default"
+                style={{ borderRadius: "var(--r-input)" }}
+              >
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="Logo da loja" className="h-full w-full object-cover" />
+                ) : (
+                  <ImageIcon size={20} className="text-muted" aria-hidden />
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={onLogo} />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={enviandoLogo}
+                className="btn-ghost btn-sm"
+              >
+                {enviandoLogo ? <Loader2 className="animate-spin" size={16} aria-hidden /> : <Upload size={16} aria-hidden />}
+                {logoUrl ? "Trocar logo" : "Enviar logo"}
+              </button>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={onLogo} />
+            <p className="hint">Aparece no app e no painel. PNG/JPG.</p>
+          </div>
+
+          {/* cor */}
+          <div>
+            <span className="label" id="cfg-cor">Cor da marca</span>
+            <div className="flex flex-wrap items-center gap-0.5 -ml-1" role="group" aria-labelledby="cfg-cor">
+              {CORES.map((c) => {
+                const ativa = cor === c.hex;
+                return (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => escolherCor(c.hex)}
+                    className="grid place-items-center h-10 w-10 rounded-full"
+                    aria-label={`Cor ${c.nome}`}
+                    aria-pressed={ativa}
+                    title={c.nome}
+                  >
+                    <span
+                      className={`grid place-items-center h-7 w-7 rounded-full transition-transform active:scale-95 ${
+                        ativa
+                          ? "ring-2 ring-brand-500 ring-offset-2 ring-offset-[color:var(--surface)]"
+                          : "ring-1 ring-inset ring-[color:var(--border)]"
+                      }`}
+                      style={{ background: c.hex }}
+                    >
+                      {ativa && <Check size={14} className="text-white" aria-hidden />}
+                    </span>
+                  </button>
+                );
+              })}
+              <label className="relative grid place-items-center h-10 w-10 rounded-full cursor-pointer" title="Escolher outra cor">
+                <span
+                  className={`grid place-items-center h-7 w-7 rounded-full ${
+                    cor && !CORES.some((c) => c.hex === cor)
+                      ? "text-white ring-2 ring-brand-500 ring-offset-2 ring-offset-[color:var(--surface)]"
+                      : "text-muted border border-dashed border-[color:var(--text-muted)]"
+                  }`}
+                  style={cor && !CORES.some((c) => c.hex === cor) ? { background: cor } : undefined}
+                >
+                  <Pipette size={13} aria-hidden />
+                </span>
+                <input
+                  type="color"
+                  aria-label="Escolher outra cor"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  value={cor || "#db2777"}
+                  onChange={(e) => escolherCor(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => escolherCor(null)}
+                className="text-sm text-muted hover:text-strong ml-1 px-1 min-h-[40px] underline underline-offset-2"
+              >
+                padrão
+              </button>
+            </div>
+            <p className="hint">
+              O app inteiro adota a cor da sua loja. As mudanças de aparência são uma prévia até você tocar em Salvar.
+            </p>
+          </div>
+
+          {/* tema base (paleta de fundo) */}
+          <div>
+            <span className="label" id="cfg-tema">Tema do painel</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-labelledby="cfg-tema">
+              {TEMAS_BASE.map((t) => {
+                const ativo = (temaBase ?? "escuro") === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    aria-pressed={ativo}
+                    onClick={() => escolherTema(t.key)}
+                    className={`border p-2.5 text-left transition-shadow ${
+                      ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default hover:border-[color:var(--text-muted)]"
+                    }`}
+                    style={{ background: t.bg, borderRadius: "var(--r-btn)" }}
+                  >
+                    <span className="flex items-center gap-1">
+                      <span className="h-4 w-4 rounded-full" style={{ background: t.surface, border: `1px solid ${t.border}` }} />
+                      <span className="h-4 w-4 rounded-full" style={{ background: t.surfaceAlt }} />
+                      <span className="h-4 w-4 rounded-full bg-brand-500" />
+                      {ativo && <Check size={14} className="ml-auto" style={{ color: t.text }} aria-hidden />}
+                    </span>
+                    <span className="mt-2 block text-xs font-medium" style={{ color: t.text }}>
+                      {t.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="hint">Muda as cores de fundo do painel (admin) e da vitrine.</p>
+          </div>
+
+          {/* fonte do app */}
+          <div>
+            <label className="label" htmlFor="cfg-fonte">Fonte do app</label>
+            <select
+              id="cfg-fonte"
+              className="input"
+              value={appFonte ?? "padrao"}
+              onChange={(e) => escolherFonte(e.target.value === "padrao" ? null : e.target.value)}
+              style={{ fontFamily: FONTES.find((f) => f.key === (appFonte ?? "padrao"))?.stack || undefined }}
+            >
+              {FONTES.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+            <p className="hint">Aplica a fonte em todo o painel. (A vitrine tem fonte própria.)</p>
+          </div>
+
+          {/* arredondamento dos cantos */}
+          <div>
+            <span className="label" id="cfg-raio">Arredondamento dos cantos</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-labelledby="cfg-raio">
+              {RAIOS.map((r) => {
+                const ativo = (appRaio ?? "padrao") === r.key;
+                return (
+                  <button
+                    key={r.key}
+                    type="button"
+                    aria-pressed={ativo}
+                    onClick={() => escolherRaio(r.key === "padrao" ? null : r.key)}
+                    className={`border p-2.5 flex flex-col items-center gap-2 transition-shadow ${
+                      ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default hover:border-[color:var(--text-muted)]"
+                    }`}
+                    style={{ borderRadius: r.card }}
+                  >
+                    <span className="h-7 w-12 surface-alt border border-default" style={{ borderRadius: r.btn }} />
+                    <span className="text-xs font-medium text-center">{r.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="hint">Deixa os cards e botões do painel mais retos ou mais arredondados.</p>
+          </div>
+        </div>
+      </Painel>
+
+      {/* Vendas */}
+      <Painel titulo="Vendas" icone={ShoppingBag}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 min-h-[40px]">
+            <span className="text-sm font-medium" id="cfg-usa-rev">Trabalho com revendedoras</span>
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={enviandoLogo}
-              className="btn-ghost py-2 px-3 text-sm disabled:opacity-60"
+              role="switch"
+              aria-checked={usaRev}
+              aria-labelledby="cfg-usa-rev"
+              onClick={() => setUsaRev((v) => !v)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors before:absolute before:-inset-2 before:content-[''] ${
+                usaRev ? "bg-brand-600" : "bg-[var(--border)]"
+              }`}
             >
-              {enviandoLogo ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-              {logoUrl ? "Trocar logo" : "Enviar logo"}
-            </button>
-          </div>
-          <p className="text-xs text-muted mt-1">Aparece no app e no painel. PNG/JPG.</p>
-        </div>
-
-        {/* cor */}
-        <div>
-          <label className="label">Cor da marca</label>
-          <div className="flex flex-wrap items-center gap-2">
-            {CORES.map((c) => (
-              <button
-                key={c.hex}
-                type="button"
-                onClick={() => escolherCor(c.hex)}
-                className={`h-8 w-8 rounded-full border-2 ${
-                  cor === c.hex ? "border-white ring-2 ring-brand-500" : "border-transparent"
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${
+                  usaRev ? "left-[22px]" : "left-0.5"
                 }`}
-                style={{ background: c.hex }}
-                aria-label={`Cor ${c.nome}`}
-                aria-pressed={cor === c.hex}
-                title={c.nome}
               />
-            ))}
-            <label className="h-8 w-8 rounded-full border border-default grid place-items-center cursor-pointer overflow-hidden">
-              <input
-                type="color"
-                aria-label="Escolher outra cor"
-                className="h-10 w-10 cursor-pointer"
-                value={cor || "#db2777"}
-                onChange={(e) => escolherCor(e.target.value)}
-              />
-            </label>
-            <button type="button" onClick={() => escolherCor(null)} className="text-xs text-muted ml-1 underline">
-              padrão
             </button>
           </div>
-          <p className="text-xs text-muted mt-1">
-            O app inteiro adota a cor da sua loja. As mudanças de aparência são uma prévia até você tocar em Salvar.
-          </p>
-        </div>
-
-        {/* tema base (paleta de fundo) */}
-        <div>
-          <label className="label">Tema do painel</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {TEMAS_BASE.map((t) => {
-              const ativo = (temaBase ?? "escuro") === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  aria-pressed={ativo}
-                  onClick={() => escolherTema(t.key)}
-                  className={`rounded-xl border p-2 text-left transition ${
-                    ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default"
-                  }`}
-                  style={{ background: t.bg }}
-                >
-                  <div className="flex gap-1">
-                    <span className="h-4 w-4 rounded-full" style={{ background: t.surface, border: `1px solid ${t.border}` }} />
-                    <span className="h-4 w-4 rounded-full" style={{ background: t.surfaceAlt }} />
-                    <span className="h-4 w-4 rounded-full bg-brand-500" />
-                  </div>
-                  <span className="mt-2 block text-xs font-medium" style={{ color: t.text }}>
-                    {t.label}
-                  </span>
-                </button>
-              );
-            })}
+          <div>
+            <span className="label" id="cfg-canais">Canais de venda</span>
+            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="cfg-canais">
+              {CANAIS.map((c) => {
+                const on = canais.includes(c.id);
+                return (
+                  <button key={c.id} type="button" aria-pressed={on} onClick={() => toggleCanal(c.id)} className="chip">
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            {canais.length === 0 && <p className="hint">Nenhum canal marcado: ao salvar, fica só WhatsApp.</p>}
           </div>
-          <p className="text-xs text-muted mt-1">Muda as cores de fundo do painel (admin) e da vitrine.</p>
-        </div>
-
-        {/* fonte do app */}
-        <div>
-          <label className="label" htmlFor="cfg-fonte">Fonte do app</label>
-          <select
-            id="cfg-fonte"
-            className="input"
-            value={appFonte ?? "padrao"}
-            onChange={(e) => escolherFonte(e.target.value === "padrao" ? null : e.target.value)}
-            style={{ fontFamily: FONTES.find((f) => f.key === (appFonte ?? "padrao"))?.stack || undefined }}
-          >
-            {FONTES.map((f) => (
-              <option key={f.key} value={f.key}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted mt-1">Aplica a fonte em todo o painel. (A vitrine tem fonte própria.)</p>
-        </div>
-
-        {/* arredondamento dos cantos */}
-        <div>
-          <label className="label">Arredondamento dos cantos</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {RAIOS.map((r) => {
-              const ativo = (appRaio ?? "padrao") === r.key;
-              return (
-                <button
-                  key={r.key}
-                  type="button"
-                  aria-pressed={ativo}
-                  onClick={() => escolherRaio(r.key === "padrao" ? null : r.key)}
-                  className={`border p-2 transition flex flex-col items-center gap-2 ${
-                    ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-default"
-                  }`}
-                  style={{ borderRadius: r.card }}
-                >
-                  <span
-                    className="h-8 w-12 surface-alt border border-default"
-                    style={{ borderRadius: r.btn }}
-                  />
-                  <span className="text-xs font-medium">{r.label}</span>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label" htmlFor="cfg-margem">Margem padrão (%)</label>
+              <input
+                id="cfg-margem"
+                className="input tnum"
+                inputMode="decimal"
+                value={margem}
+                onChange={(e) => {
+                  setMargem(e.target.value);
+                  setErroNumeros(null);
+                }}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="cfg-comissao">Comissão padrão (%)</label>
+              <input
+                id="cfg-comissao"
+                className="input tnum"
+                inputMode="decimal"
+                value={comissao}
+                onChange={(e) => {
+                  setComissao(e.target.value);
+                  setErroNumeros(null);
+                }}
+              />
+            </div>
           </div>
-          <p className="text-xs text-muted mt-1">Deixa os cards e botões do painel mais retos ou mais arredondados.</p>
+          {erroNumeros && (
+            <p className="text-sm text-bad" role="alert">
+              {erroNumeros}
+            </p>
+          )}
         </div>
-      </section>
+      </Painel>
 
       {/* Categorias da loja */}
       <CategoriasSection />
 
-      {/* Mini-loja pública */}
-      <MiniLojaSection />
-
-      {/* Vendas */}
-      <section className="card space-y-3">
-        <div className="flex items-center gap-2 font-semibold">
-          <ShoppingBag size={18} className="text-brand-500" /> Vendas
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm" id="cfg-usa-rev">Trabalho com revendedoras</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={usaRev}
-            aria-labelledby="cfg-usa-rev"
-            onClick={() => setUsaRev((v) => !v)}
-            className={`h-6 w-11 shrink-0 rounded-full transition relative ${usaRev ? "bg-brand-600" : "surface-alt"}`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
-                usaRev ? "left-[22px]" : "left-0.5"
-              }`}
-            />
-          </button>
-        </div>
-        <div>
-          <span className="label" id="cfg-canais">Canais de venda</span>
-          <div className="flex flex-wrap gap-2" role="group" aria-labelledby="cfg-canais">
-            {CANAIS.map((c) => {
-              const on = canais.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleCanal(c.id)}
-                  className={`chip ${on ? "bg-brand-600 text-white border-brand-600" : "border-default"}`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-          {canais.length === 0 && (
-            <p className="text-xs text-muted mt-1">Nenhum canal marcado: ao salvar, fica só WhatsApp.</p>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label" htmlFor="cfg-margem">Margem padrão (%)</label>
-            <input
-              id="cfg-margem"
-              className="input"
-              inputMode="decimal"
-              value={margem}
-              onChange={(e) => {
-                setMargem(e.target.value);
-                setErroNumeros(null);
-              }}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="cfg-comissao">Comissão padrão (%)</label>
-            <input
-              id="cfg-comissao"
-              className="input"
-              inputMode="decimal"
-              value={comissao}
-              onChange={(e) => {
-                setComissao(e.target.value);
-                setErroNumeros(null);
-              }}
-            />
-          </div>
-        </div>
-        {erroNumeros && (
-          <p className="text-sm text-red-500" role="alert">
-            {erroNumeros}
-          </p>
-        )}
-      </section>
-
-      {/* Assinatura / plano */}
-      <PlanoPointer />
+      {/* Mini-loja pública + assinatura */}
+      <div className="card-list">
+        <MiniLojaSection />
+        <PlanoPointer />
+      </div>
 
       {/* Equipe de acesso (membros) */}
       <MembrosManager />
@@ -487,74 +511,71 @@ function CategoriasSection() {
   }
 
   return (
-    <section className="card space-y-3">
-      <div className="flex items-center gap-2 font-semibold">
-        <Tags size={18} className="text-brand-500" /> Categorias dos produtos
-      </div>
-      <p className="text-sm text-muted">
-        Cada loja tem as suas. Adicione ou remova quantas quiser - elas aparecem ao cadastrar produtos.
-      </p>
+    <Painel
+      titulo="Categorias dos produtos"
+      descricao="Cada loja tem as suas. Adicione ou remova quantas quiser - elas aparecem ao cadastrar produtos."
+      icone={Tags}
+    >
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {lista.map((c) => (
+            <span key={c} className="chip cursor-default pr-1">
+              {c}
+              <button
+                type="button"
+                onClick={() => persistir(lista.filter((x) => x !== c))}
+                disabled={salvandoCat}
+                className="grid place-items-center h-10 w-8 -my-2 rounded-full text-muted hover:text-bad disabled:opacity-50"
+                aria-label={`Remover categoria ${c}`}
+              >
+                <X size={14} aria-hidden />
+              </button>
+            </span>
+          ))}
+          {lista.length === 0 && <span className="text-sm text-muted">Nenhuma categoria ainda.</span>}
+        </div>
 
-      <div className="flex flex-wrap gap-2">
-        {lista.map((c) => (
-          <span key={c} className="chip border-default flex items-center gap-1.5">
-            {c}
-            <button
-              type="button"
-              onClick={() => persistir(lista.filter((x) => x !== c))}
-              disabled={salvandoCat}
-              className="grid place-items-center h-11 w-11 -my-3 -mr-3 rounded-full text-muted hover:text-red-500 disabled:opacity-50"
-              aria-label={`Remover categoria ${c}`}
-            >
-              <X size={14} />
-            </button>
-          </span>
-        ))}
-        {lista.length === 0 && <span className="text-sm text-muted">Nenhuma categoria ainda.</span>}
+        <div className="flex gap-2">
+          <input
+            className="input flex-1 min-w-0"
+            aria-label="Nova categoria"
+            maxLength={60}
+            placeholder="Nova categoria (ex.: Relógios)"
+            value={nova}
+            onChange={(e) => setNova(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                adicionar();
+              }
+            }}
+          />
+          <button type="button" onClick={adicionar} disabled={salvandoCat} className="btn-ghost shrink-0">
+            <Plus size={16} aria-hidden /> Adicionar
+          </button>
+        </div>
       </div>
-
-      <div className="flex gap-2">
-        <input
-          className="input flex-1 min-w-0"
-          aria-label="Nova categoria"
-          maxLength={60}
-          placeholder="Nova categoria (ex.: Relógios)"
-          value={nova}
-          onChange={(e) => setNova(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              adicionar();
-            }
-          }}
-        />
-        <button type="button" onClick={adicionar} disabled={salvandoCat} className="btn-primary px-4 shrink-0 disabled:opacity-60">
-          <Plus size={16} /> Adicionar
-        </button>
-      </div>
-    </section>
+    </Painel>
   );
 }
 
 function PlanoPointer() {
   const { defContratado, emTrial, diasTrial } = usePlano();
   return (
-    <Link href="/configuracoes/plano" className="card flex items-center gap-3 hover:surface-alt transition">
-      <div className="h-10 w-10 rounded-xl bg-brand-600/10 grid place-items-center shrink-0">
-        <CreditCard size={20} className="text-brand-500" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold flex items-center gap-2">
+    <Link href="/configuracoes/plano" className="row">
+      <span className="grid place-items-center h-10 w-10 shrink-0 rounded-lg tone-brand" aria-hidden>
+        <CreditCard size={19} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 font-semibold">
           Plano {defContratado.nome}
-          {emTrial && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-600 text-white">Trial · {diasTrial}d</span>
-          )}
-        </div>
-        <p className="text-sm text-muted">
+          {emTrial && <Selo tom="brand">Trial · {diasTrial}d</Selo>}
+        </span>
+        <span className="block text-sm text-muted">
           {brlPreco(defContratado.precoCentavos)}/mês · gerenciar assinatura e limites
-        </p>
-      </div>
-      <ExternalLink size={16} className="text-muted shrink-0" />
+        </span>
+      </span>
+      <ChevronRight size={17} className="text-muted shrink-0" aria-hidden />
     </Link>
   );
 }
@@ -562,25 +583,18 @@ function PlanoPointer() {
 function MiniLojaSection() {
   const { config } = useStore();
   return (
-    <Link href="/minha-loja" className="card flex items-center gap-3 hover:surface-alt transition">
-      <div className="h-10 w-10 rounded-xl bg-brand-600/10 grid place-items-center shrink-0">
-        <Globe size={20} className="text-brand-500" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold flex items-center gap-2">
+    <Link href="/minha-loja" className="row">
+      <span className="grid place-items-center h-10 w-10 shrink-0 rounded-lg tone-brand" aria-hidden>
+        <Globe size={19} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 font-semibold">
           Minha Loja online
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded-full ${
-              config.lojaAtiva ? "bg-brand-600 text-white" : "surface-alt text-muted"
-            }`}
-          >
-            {config.lojaAtiva ? "No ar" : "Fora do ar"}
-          </span>
-        </div>
-        <p className="text-sm text-muted">Link, identidade e vitrine dos produtos com chat.</p>
-      </div>
-      <ExternalLink size={16} className="text-muted shrink-0" />
+          <Selo tom={config.lojaAtiva ? "ok" : "neutral"}>{config.lojaAtiva ? "No ar" : "Fora do ar"}</Selo>
+        </span>
+        <span className="block text-sm text-muted">Link, identidade e vitrine dos produtos com chat.</span>
+      </span>
+      <ChevronRight size={17} className="text-muted shrink-0" aria-hidden />
     </Link>
   );
 }
-

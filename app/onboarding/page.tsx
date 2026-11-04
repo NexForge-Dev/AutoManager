@@ -28,16 +28,28 @@ import {
   type PlanoId,
 } from "@/lib/plans";
 import {
+  ArrowLeft,
+  BarChart3,
+  Bike,
   Check,
   ChevronRight,
-  Sparkles,
-  Loader2,
-  MessageCircle,
-  Instagram,
   Facebook,
-  Music2,
+  Gem,
+  Gift,
+  Instagram,
+  Loader2,
   Mail,
+  MessageCircle,
+  Music2,
+  Search,
+  Settings2,
+  Store,
+  Users,
+  Wallet,
+  AlertCircle,
+  type LucideIcon,
 } from "lucide-react";
+import { Aviso, Progresso, Selo } from "@/components/ui";
 
 // Quantidade de revendedoras oferecida no onboarding, limitada ao que o
 // plano escolhido permite (ambulante nem chega a perguntar).
@@ -49,7 +61,7 @@ const REV_BUCKETS: Record<string, string[]> = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-type Passo = { emoji: string; title: string; sub: string; ms: number };
+type Passo = { icone: LucideIcon; title: string; sub: string; ms: number };
 
 export default function Onboarding() {
   const router = useRouter();
@@ -217,18 +229,18 @@ export default function Onboarding() {
     const segLabel = (SEGMENTOS.find((s) => s.id === segmento)?.label || "loja").toLowerCase();
     const loja = nomeLoja.trim() || "sua loja";
     const passos: Passo[] = [
-      { emoji: "🔍", title: "Analisando seu perfil", sub: `Entendendo sua ${segLabel}`, ms: 1100 },
-      { emoji: "🏪", title: "Criando sua loja", sub: `Montando a vitrine de ${loja}`, ms: 1200 },
-      { emoji: "🎁", title: "Ativando seu mês grátis", sub: `Plano ${plano.nome} — 30 dias por nossa conta`, ms: 1100 },
+      { icone: Search, title: "Analisando seu perfil", sub: `Entendendo sua ${segLabel}`, ms: 1100 },
+      { icone: Store, title: "Criando sua loja", sub: `Montando a vitrine de ${loja}`, ms: 1200 },
+      { icone: Gift, title: "Ativando seu mês grátis", sub: `Plano ${plano.nome} — 30 dias por nossa conta`, ms: 1100 },
     ];
     if (usaRevendedoras)
-      passos.push({ emoji: "💸", title: "Configurando comissões", sub: "Cálculo automático das revendedoras", ms: 1050 });
+      passos.push({ icone: Wallet, title: "Configurando comissões", sub: "Cálculo automático das revendedoras", ms: 1050 });
     if (temEquipe)
-      passos.push({ emoji: "👥", title: "Preparando sua equipe", sub: "Acessos de vendedores e ranking", ms: 1000 });
+      passos.push({ icone: Users, title: "Preparando sua equipe", sub: "Acessos de vendedores e ranking", ms: 1000 });
     if (temEntregas)
-      passos.push({ emoji: "🛵", title: "Ativando as entregas", sub: "Rotas e acompanhamento de motoboys", ms: 1000 });
-    passos.push({ emoji: "⚙️", title: "Criando seu sistema admin", sub: "Ligando seu painel de controle", ms: 1200 });
-    passos.push({ emoji: "📊", title: "Preparando seus relatórios", sub: "Lucro, vendas e estoque em tempo real", ms: 1000 });
+      passos.push({ icone: Bike, title: "Ativando as entregas", sub: "Rotas e acompanhamento de motoboys", ms: 1000 });
+    passos.push({ icone: Settings2, title: "Criando seu sistema admin", sub: "Ligando seu painel de controle", ms: 1200 });
+    passos.push({ icone: BarChart3, title: "Preparando seus relatórios", sub: "Lucro, vendas e estoque em tempo real", ms: 1000 });
     return passos;
   }
 
@@ -245,7 +257,7 @@ export default function Onboarding() {
 
   if (!liberado && !gerando) {
     return (
-      <div className="min-h-screen grid place-items-center text-brand-500" role="status" aria-label="Carregando">
+      <div className="min-h-screen grid place-items-center text-accent" role="status" aria-label="Carregando">
         <Loader2 className="animate-spin" />
       </div>
     );
@@ -263,299 +275,313 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen max-w-md mx-auto px-5 py-6 flex flex-col">
-      {/* progresso */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between text-xs font-semibold text-muted mb-2">
-          <span>Passo {passoVisivel + 1} de {totalVisivel}</span>
-          <span>{Math.round(((passoVisivel + 1) / totalVisivel) * 100)}%</span>
-        </div>
-        <div className="flex gap-1.5">
-          {Array.from({ length: totalVisivel }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${
-                i <= passoVisivel ? "bg-brand-600" : "surface-alt"
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-x-clip">
-        <div key={step} className={dir === "fwd" ? "ob-in-right" : "ob-in-left"}>
-          {/* ---------- nome ---------- */}
-          {stepKey === "nome" && (
-            <div className="space-y-5">
-              <div className="inline-grid place-items-center h-14 w-14 rounded-2xl bg-brand-600/10 text-brand-500 ob-anim-bob">
-                <Sparkles size={28} />
-              </div>
-              <h1 className="text-2xl font-bold leading-tight">
-                Vamos dar vida ao seu negócio 🚀
-              </h1>
-              <p className="text-muted">
-                Em 2 minutos seu estoque, suas vendas e seu lucro ficam no controle —
-                do seu jeito, sem planilha.
-              </p>
-              <div>
-                <label htmlFor="ob-nome" className="label">Como o seu negócio se chama?</label>
-                <input
-                  id="ob-nome"
-                  className="input"
-                  placeholder="Ex.: Doces da Ana, Bijoux da Lu, Moda Bella…"
-                  value={nomeLoja}
-                  onChange={(e) => setNomeLoja(e.target.value)}
-                  autoFocus
-                />
-                <p className="text-xs text-muted mt-1.5">Pode trocar depois — esse nome é seu. ✨</p>
-              </div>
-            </div>
-          )}
-
-          {/* ---------- descrição ---------- */}
-          {stepKey === "descricao" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-xl font-bold">Resuma sua loja em uma frase ✍️</h2>
-                <p className="text-sm text-muted mt-1">
-                  Aparece logo abaixo do nome, pra cliente entender na hora o que você vende.
-                </p>
-              </div>
-              <textarea
-                aria-label="Descrição da loja"
-                className="input"
-                rows={3}
-                placeholder="Ex.: Semijoias folheadas com garantia e entrega rápida."
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                autoFocus
+    <div className="min-h-[100dvh] flex flex-col md:items-center md:justify-center md:px-5 md:py-10">
+      <div className="w-full flex-1 md:flex-none max-w-lg flex flex-col px-5 py-5 md:p-8 md:border md:border-default md:surface md:rounded-[var(--r-card)] md:shadow-[var(--shadow-md)]">
+        {/* progresso */}
+        <div className="mb-7">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <span className="inline-flex items-center gap-2 font-bold text-accent">
+              <Gem size={18} aria-hidden /> AutoManager
+            </span>
+            <span className="text-xs font-medium text-muted tnum">
+              Passo {passoVisivel + 1} de {totalVisivel}
+            </span>
+          </div>
+          <div
+            className="flex gap-1"
+            role="progressbar"
+            aria-label="Progresso da configuração"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(((passoVisivel + 1) / totalVisivel) * 100)}
+          >
+            {Array.from({ length: totalVisivel }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-1 flex-1 rounded-full transition-colors duration-500 ${
+                  i <= passoVisivel ? "bg-brand-500" : "surface-alt"
+                }`}
               />
-              <p className="text-xs text-muted">Pode deixar em branco e preencher depois.</p>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
 
-          {/* ---------- tipo de conteúdo / segmento ---------- */}
-          {stepKey === "conteudo" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-xl font-bold">Qual o tipo do seu negócio?</h2>
-                <p className="text-sm text-muted mt-1">Isso ajusta as categorias e os relatórios pra você.</p>
+        <div className="flex-1 overflow-x-clip">
+          <div key={step} className={dir === "fwd" ? "ob-in-right" : "ob-in-left"}>
+            {/* ---------- nome ---------- */}
+            {stepKey === "nome" && (
+              <div className="space-y-5">
+                <div>
+                  <h1 className="page-title">Vamos dar vida ao seu negócio</h1>
+                  <p className="text-muted mt-2">
+                    Em 2 minutos seu estoque, suas vendas e seu lucro ficam no controle,
+                    do seu jeito, sem planilha.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="ob-nome" className="label">Como o seu negócio se chama?</label>
+                  <input
+                    id="ob-nome"
+                    className="input"
+                    placeholder="Ex.: Doces da Ana, Bijoux da Lu, Moda Bella…"
+                    value={nomeLoja}
+                    onChange={(e) => setNomeLoja(e.target.value)}
+                    autoFocus
+                  />
+                  <p className="hint">Pode trocar depois: esse nome é seu.</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {SEGMENTOS.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setSegmento(s.id)}
-                    className={`card text-left transition active:scale-[.98] ${
-                      segmento === s.id ? "ring-2 ring-brand-500 bg-brand-500/5" : "hover:surface-alt"
-                    }`}
-                  >
-                    <span className="font-semibold">{s.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* ---------- plano (1 mês grátis) ---------- */}
-          {stepKey === "plano" && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-bold">Escolha seu plano 🎁</h2>
-                <p className="text-sm text-muted mt-1">
-                  O <b>1º mês é grátis</b>. Só depois começa a cobrar, e você cancela quando quiser.
-                </p>
+            {/* ---------- descrição ---------- */}
+            {stepKey === "descricao" && (
+              <div className="space-y-5">
+                <Cabecalho titulo="Resuma sua loja em uma frase">
+                  Aparece logo abaixo do nome, pra cliente entender na hora o que você vende.
+                </Cabecalho>
+                <div>
+                  <textarea
+                    aria-label="Descrição da loja"
+                    className="input"
+                    rows={3}
+                    placeholder="Ex.: Semijoias folheadas com garantia e entrega rápida."
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    autoFocus
+                  />
+                  <p className="hint">Pode deixar em branco e preencher depois.</p>
+                </div>
               </div>
-              <div className="space-y-2.5">
-                {ORDEM_PLANOS.map((id) => {
-                  const def = PLANOS[id];
-                  const sel = planoEscolhido === id;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => setPlanoEscolhido(id)}
-                      className={`card w-full text-left transition active:scale-[.99] ${
-                        sel ? "ring-2 ring-brand-500 bg-brand-500/5" : "hover:surface-alt"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">{def.nome}</span>
-                        {def.destaque && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-600 text-white">
-                            Mais vendido
-                          </span>
-                        )}
-                        {sel && <Check size={18} className="text-brand-600 ml-auto" />}
-                      </div>
-                      <div className="text-sm mt-0.5">
-                        <span className="text-brand-500 font-bold">1º mês grátis</span>
-                        <span className="text-muted"> · depois {brlPreco(def.precoCentavos)}/mês</span>
-                      </div>
-                      <p className="text-xs text-muted mt-1">{def.publico}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* ---------- revendedoras ---------- */}
-          {stepKey === "revendedoras" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-xl font-bold">Quem vende junto com você?</h2>
-                <p className="text-sm text-muted mt-1">
-                  Sua rede de revendedoras — o plano {plano.nome} inclui até{" "}
-                  <b>{fmtLimite(plano.maxRevendedoras)}</b>.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {revBuckets.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => setQtdRev(q)}
-                    className={`card text-left transition active:scale-[.98] ${
-                      qtdRev === q ? "ring-2 ring-brand-500 bg-brand-500/5" : "hover:surface-alt"
-                    }`}
-                  >
-                    <span className="font-semibold">
-                      {q === "0" ? "Só eu por enquanto" : q} {q === "0" ? "" : "revendedoras"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-sm text-muted">
-                {usaRevendedoras
-                  ? "Combinado! Eu calculo a comissão e quanto cada uma te deve, no automático. ✨"
-                  : "Tranquilo — você toca tudo, e dá pra adicionar sua equipe quando quiser. 💪"}
-              </p>
-            </div>
-          )}
-
-          {/* ---------- lucro ---------- */}
-          {stepKey === "lucro" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold mb-1">Quanto você quer lucrar?</h2>
-                <p className="text-sm text-muted mb-3">Uso isso pra sugerir o preço de venda certinho pra você.</p>
-                <div className="flex flex-wrap gap-2">
-                  {[50, 100, 200].map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      aria-pressed={margem === m}
-                      onClick={() => setMargem(m)}
-                      className={`chip transition active:scale-95 ${
-                        margem === m ? "bg-brand-600 text-white border-brand-600" : "border-default"
-                      }`}
-                    >
-                      {m}%
-                    </button>
+            {/* ---------- tipo de conteúdo / segmento ---------- */}
+            {stepKey === "conteudo" && (
+              <div className="space-y-5">
+                <Cabecalho titulo="Qual o tipo do seu negócio?">
+                  Isso ajusta as categorias e os relatórios pra você.
+                </Cabecalho>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {SEGMENTOS.map((s) => (
+                    <Opcao key={s.id} sel={segmento === s.id} onClick={() => setSegmento(s.id)}>
+                      {s.label}
+                    </Opcao>
                   ))}
                 </div>
               </div>
-              {usaRevendedoras && (
-                <div>
-                  <h2 className="text-xl font-bold mb-1">Quanto sua equipe ganha por venda?</h2>
-                  <p className="text-sm text-muted mb-3">A comissão padrão de cada revendedora.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {[20, 30, 40].map((c) => (
+            )}
+
+            {/* ---------- plano (1 mês grátis) ---------- */}
+            {stepKey === "plano" && (
+              <div className="space-y-4">
+                <Cabecalho titulo="Escolha seu plano">
+                  O <b>1º mês é grátis</b>. Só depois começa a cobrar, e você cancela quando quiser.
+                </Cabecalho>
+                <div className="card-list">
+                  {ORDEM_PLANOS.map((id) => {
+                    const def = PLANOS[id];
+                    const sel = planoEscolhido === id;
+                    return (
                       <button
                         type="button"
-                        key={c}
-                        aria-pressed={comissao === c}
-                        onClick={() => setComissao(c)}
-                        className={`chip transition active:scale-95 ${
-                          comissao === c
-                            ? "bg-brand-600 text-white border-brand-600"
-                            : "border-default"
-                        }`}
+                        key={id}
+                        aria-pressed={sel}
+                        onClick={() => setPlanoEscolhido(id)}
+                        className={`row ${sel ? "bg-brand-500/10" : ""}`}
                       >
-                        {c}%
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="font-bold">{def.nome}</span>
+                            {def.destaque && <Selo tom="brand">Mais vendido</Selo>}
+                          </span>
+                          <span className="block text-sm mt-0.5">
+                            <span className="text-accent font-semibold">1º mês grátis</span>
+                            <span className="text-muted tnum"> · depois {brlPreco(def.precoCentavos)}/mês</span>
+                          </span>
+                          <span className="block text-xs text-muted mt-0.5">{def.publico}</span>
+                        </span>
+                        <Marcador sel={sel} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ---------- revendedoras ---------- */}
+            {stepKey === "revendedoras" && (
+              <div className="space-y-5">
+                <Cabecalho titulo="Quem vende junto com você?">
+                  Sua rede de revendedoras: o plano {plano.nome} inclui até{" "}
+                  <b>{fmtLimite(plano.maxRevendedoras)}</b>.
+                </Cabecalho>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {revBuckets.map((q) => (
+                    <Opcao key={q} sel={qtdRev === q} onClick={() => setQtdRev(q)}>
+                      {q === "0" ? "Só eu por enquanto" : q} {q === "0" ? "" : "revendedoras"}
+                    </Opcao>
+                  ))}
+                </div>
+                <p className="text-sm text-muted">
+                  {usaRevendedoras
+                    ? "Combinado! Eu calculo a comissão e quanto cada uma te deve, no automático."
+                    : "Tranquilo: você toca tudo, e dá pra adicionar sua equipe quando quiser."}
+                </p>
+              </div>
+            )}
+
+            {/* ---------- lucro ---------- */}
+            {stepKey === "lucro" && (
+              <div className="space-y-7">
+                <div>
+                  <Cabecalho titulo="Quanto você quer lucrar?">
+                    Uso isso pra sugerir o preço de venda certinho pra você.
+                  </Cabecalho>
+                  <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Margem de lucro">
+                    {[50, 100, 200].map((m) => (
+                      <button
+                        type="button"
+                        key={m}
+                        aria-pressed={margem === m}
+                        onClick={() => setMargem(m)}
+                        className="chip min-h-[44px] px-5 tnum"
+                      >
+                        {m}%
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+                {usaRevendedoras && (
+                  <div>
+                    <Cabecalho titulo="Quanto sua equipe ganha por venda?">
+                      A comissão padrão de cada revendedora.
+                    </Cabecalho>
+                    <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Comissão padrão">
+                      {[20, 30, 40].map((c) => (
+                        <button
+                          type="button"
+                          key={c}
+                          aria-pressed={comissao === c}
+                          onClick={() => setComissao(c)}
+                          className="chip min-h-[44px] px-5 tnum"
+                        >
+                          {c}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* ---------- contato + redes ---------- */}
-          {stepKey === "contato" && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-bold">Como te encontram? 📲</h2>
-                <p className="text-sm text-muted mt-1">
+            {/* ---------- contato + redes ---------- */}
+            {stepKey === "contato" && (
+              <div className="space-y-4">
+                <Cabecalho titulo="Como te encontram?">
                   Suas redes e contato aparecem na sua loja online. Tudo opcional.
-                </p>
+                </Cabecalho>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="ob-whatsapp" className="label flex items-center gap-1.5"><MessageCircle size={14} aria-hidden /> WhatsApp</label>
+                    <input
+                      id="ob-whatsapp"
+                      className="input"
+                      inputMode="tel"
+                      placeholder="Ex.: 11 99999-9999"
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ob-instagram" className="label flex items-center gap-1.5"><Instagram size={14} aria-hidden /> Instagram</label>
+                    <input id="ob-instagram" className="input" placeholder="@sualoja" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+                  </div>
+                  <div>
+                    <label htmlFor="ob-facebook" className="label flex items-center gap-1.5"><Facebook size={14} aria-hidden /> Facebook</label>
+                    <input id="ob-facebook" className="input" placeholder="sualoja" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+                  </div>
+                  <div>
+                    <label htmlFor="ob-tiktok" className="label flex items-center gap-1.5"><Music2 size={14} aria-hidden /> TikTok</label>
+                    <input id="ob-tiktok" className="input" placeholder="@sualoja" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="ob-email" className="label flex items-center gap-1.5"><Mail size={14} aria-hidden /> E-mail da loja <span className="text-muted font-normal">(opcional)</span></label>
+                    <input
+                      id="ob-email"
+                      className="input"
+                      type="email"
+                      placeholder="contato@sualoja.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label htmlFor="ob-whatsapp" className="label flex items-center gap-1"><MessageCircle size={13} /> WhatsApp</label>
-                <input
-                  id="ob-whatsapp"
-                  className="input"
-                  inputMode="tel"
-                  placeholder="Ex.: 11 99999-9999"
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="ob-instagram" className="label flex items-center gap-1"><Instagram size={13} /> Instagram</label>
-                <input id="ob-instagram" className="input" placeholder="@sualoja" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-              </div>
-              <div>
-                <label htmlFor="ob-facebook" className="label flex items-center gap-1"><Facebook size={13} /> Facebook</label>
-                <input id="ob-facebook" className="input" placeholder="sualoja" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
-              </div>
-              <div>
-                <label htmlFor="ob-tiktok" className="label flex items-center gap-1"><Music2 size={13} /> TikTok</label>
-                <input id="ob-tiktok" className="input" placeholder="@sualoja" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
-              </div>
-              <div>
-                <label htmlFor="ob-email" className="label flex items-center gap-1"><Mail size={13} /> E-mail da loja <span className="text-muted font-normal">(opcional)</span></label>
-                <input
-                  id="ob-email"
-                  className="input"
-                  type="email"
-                  placeholder="contato@sualoja.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-6 flex gap-2">
+          {step > 0 && (
+            <button type="button" onClick={back} className="btn-ghost">
+              <ArrowLeft size={17} aria-hidden /> Voltar
+            </button>
+          )}
+          {step < totalSteps - 1 ? (
+            <button type="button" onClick={next} className="btn-primary flex-1">
+              Continuar <ChevronRight size={19} aria-hidden />
+            </button>
+          ) : (
+            <button type="button" onClick={() => setGerando(true)} disabled={!ready} className="btn-primary flex-1">
+              Concluir e criar minha loja
+            </button>
           )}
         </div>
-      </div>
-
-      <div className="pt-6">
-        {step < totalSteps - 1 ? (
-          <button type="button" onClick={next} className="btn-primary w-full">
-            Continuar <ChevronRight size={20} />
-          </button>
-        ) : (
-          <button
-            onClick={() => setGerando(true)}
-            disabled={!ready}
-            className="btn-primary w-full disabled:opacity-60"
-          >
-            Concluir e criar minha loja <Sparkles size={18} />
-          </button>
-        )}
-        {step > 0 && (
-          <button onClick={back} className="w-full text-center text-sm text-muted mt-3">
-            Voltar
-          </button>
-        )}
       </div>
     </div>
   );
 }
 
+function Cabecalho({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-xl font-bold leading-tight">{titulo}</h2>
+      <p className="text-sm text-muted mt-1">{children}</p>
+    </div>
+  );
+}
+
+function Marcador({ sel }: { sel: boolean }) {
+  return (
+    <span
+      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
+        sel ? "border-brand-600 bg-brand-600 text-white" : "border-default"
+      }`}
+      aria-hidden
+    >
+      {sel && <Check size={13} strokeWidth={3} />}
+    </span>
+  );
+}
+
+function Opcao({ sel, onClick, children }: { sel: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={sel}
+      onClick={onClick}
+      className={`card flex items-center justify-between gap-2 p-3 min-h-[56px] text-left ${
+        sel ? "!border-brand-500 bg-brand-500/10" : ""
+      }`}
+    >
+      <span className="font-semibold text-sm">{children}</span>
+      <Marcador sel={sel} />
+    </button>
+  );
+}
+
 // ============================================================================
-// Tela de carregamento — toca após "Concluir". Minimalista e mobile-first:
-// um ícone de carregamento girando + uma barra de progresso, com o texto do
-// passo atual trocando enquanto o store grava de verdade.
+// Tela de carregamento: toca após "Concluir". Lista os passos personalizados
+// e marca cada um enquanto o store grava de verdade.
 // ============================================================================
 function GeneratingScreen({
   passos,
@@ -575,22 +601,6 @@ function GeneratingScreen({
   const iniciado = useRef(false); // evita rodar 2x (StrictMode em dev)
   const [erro, setErro] = useState<string | null>(null);
   const [tentando, setTentando] = useState(false);
-
-  // confete da comemoração final (gerado uma vez, renderizado só quando pronto).
-  // Delay NEGATIVO faz cada peça já começar no meio da queda → a tela inteira
-  // (de cima a baixo) fica coberta de confete no instante em que conclui.
-  const [confete] = useState(() =>
-    Array.from({ length: 90 }).map((_, i) => {
-      const dur = 2.6 + Math.random() * 2.6;
-      return {
-        e: ["🎉", "✨", "🎊", "⭐", "💫", "🥳", "🎈", "🌟"][i % 8],
-        left: Math.round(Math.random() * 100),
-        size: 12 + Math.round(Math.random() * 18),
-        dur,
-        delay: -Math.random() * dur,
-      };
-    })
-  );
 
   useEffect(() => {
     if (iniciado.current) return; // roda exatamente uma vez
@@ -613,7 +623,7 @@ function GeneratingScreen({
         return;
       }
       setPronto(true);
-      await sleep(2200); // deixa o confete aparecer antes de ir pro painel
+      await sleep(2200); // deixa a confirmação visível antes de ir pro painel
       onConcluir();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -635,71 +645,62 @@ function GeneratingScreen({
   }
 
   const pct = pronto ? 100 : Math.round((feitos / total) * 100);
-  const passoAtual = passos[Math.min(atual, total - 1)];
 
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--bg)] text-[var(--text)] flex items-center justify-center px-6 overflow-hidden">
-      {/* confete na comemoração final */}
-      {pronto && (
-        <div className="pointer-events-none absolute inset-0">
-          {confete.map((c, i) => (
-            <span
-              key={i}
-              className="absolute top-0 ob-anim-fall select-none"
-              style={{
-                left: `${c.left}%`,
-                fontSize: c.size,
-                animationDuration: `${c.dur}s`,
-                animationDelay: `${c.delay}s`,
-                animationIterationCount: "infinite",
-              }}
-            >
-              {c.e}
-            </span>
-          ))}
-        </div>
-      )}
+    <div className="fixed inset-0 z-50 bg-[var(--bg)] text-[var(--text)] overflow-auto">
+      <div className="min-h-full flex items-center justify-center px-6 py-8">
+        <div className="w-full max-w-sm">
+          <div key={pronto ? "done" : "gerando"} className="ob-anim-rise" role="status" aria-live="polite">
+            <h1 className="page-title">{pronto ? "Tudo pronto!" : `Criando ${loja}`}</h1>
+            <p className="text-sm text-muted mt-1">
+              {pronto
+                ? `${loja} foi criada. Para publicar a loja online, use "Minha Loja" no painel.`
+                : passos[Math.min(atual, total - 1)].title}
+            </p>
+          </div>
 
-      <div className="relative w-full max-w-xs flex flex-col items-center text-center">
-        {/* ícone de carregamento */}
-        <div className="relative grid place-items-center h-16 w-16 mb-6">
-          {pronto ? (
-            <Check size={40} className="text-brand-500 ob-anim-pop" strokeWidth={3} />
-          ) : (
-            <Loader2 size={44} className="text-brand-500 animate-spin" />
+          <div className="mt-5">
+            <Progresso pct={pct} rotulo="Progresso da criação da loja" />
+          </div>
+
+          <ol className="mt-5 space-y-1">
+            {passos.map((p, i) => {
+              const feito = pronto || i < feitos;
+              const emAndamento = !pronto && !erro && i === atual && !feito;
+              const Icone = p.icone;
+              return (
+                <li key={p.title} className="flex items-center gap-3 min-h-[44px]">
+                  <span
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+                      feito ? "tone-ok" : emAndamento ? "tone-brand" : "tone-neutral"
+                    }`}
+                    aria-hidden
+                  >
+                    {feito ? (
+                      <Check size={16} strokeWidth={3} />
+                    ) : emAndamento ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Icone size={16} />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={`block text-sm font-medium ${feito || emAndamento ? "" : "text-muted"}`}>{p.title}</span>
+                    {emAndamento && <span className="block text-xs text-muted">{p.sub}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
+          {erro && (
+            <div className="mt-4 space-y-3" role="alert">
+              <Aviso tom="bad" icone={AlertCircle}>{erro}</Aviso>
+              <button onClick={tentarDeNovo} disabled={tentando} className="btn-primary w-full">
+                {tentando ? <Loader2 className="animate-spin" size={18} aria-hidden /> : "Tentar de novo"}
+              </button>
+            </div>
           )}
-        </div>
-
-        {/* texto do passo atual */}
-        <div key={pronto ? "done" : atual} className="ob-anim-rise min-h-[3.5rem]">
-          <p className="text-lg font-bold leading-tight">
-            {pronto ? "Tudo pronto! 🎉" : passoAtual.title}
-          </p>
-          <p className="text-sm text-muted mt-1">
-            {pronto
-              ? `${loja} foi criada. Para publicar a loja online, use "Minha Loja" no painel.`
-              : passoAtual.sub}
-          </p>
-        </div>
-
-        {erro && (
-          <div className="w-full mt-4 space-y-3" role="alert">
-            <p className="text-sm text-red-500">{erro}</p>
-            <button onClick={tentarDeNovo} disabled={tentando} className="btn-primary w-full disabled:opacity-60">
-              {tentando ? <Loader2 className="animate-spin" size={18} /> : "Tentar de novo"}
-            </button>
-          </div>
-        )}
-
-        {/* barra de carregamento */}
-        <div className="w-full mt-6">
-          <div className="h-2 w-full rounded-full surface-alt overflow-hidden">
-            <div
-              className="h-full rounded-full bg-brand-600 transition-all duration-500 ease-out"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="mt-2 text-xs font-semibold text-muted">{pct}%</div>
         </div>
       </div>
     </div>
