@@ -3,7 +3,7 @@ import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { ehSuperadminUser } from "@/lib/admin";
 import { registrarAdminLog } from "@/lib/adminAudit";
-import { assinaturaVivaDaOrg, stripe } from "@/lib/stripe";
+import { assinaturaVivaDaOrg, objetoStripeAusente, stripe } from "@/lib/stripe";
 import { erroInterno } from "@/lib/erroApi";
 import { uuidValido } from "@/lib/validacao";
 
@@ -90,12 +90,17 @@ export async function POST(req: Request) {
     // Cobrança no Stripe acompanha a moderação, para não cobrar loja sem acesso:
     //   deletar/banir -> cancela a assinatura; desativar -> pausa a cobrança;
     //   reativar -> retoma a cobrança pausada. Falha aqui aborta a ação (melhor
-    //   não deletar do que deixar o cartão sendo cobrado sem a loja existir).
+    //   não deletar do que deixar o cartão sendo cobrado sem a loja existir), a
+    //   não ser que o objeto não exista no Stripe: aí não há cobrança a interromper.
     const viva = await assinaturaVivaDaOrg(a, orgId);
     if (viva) {
-      if (acao === "deletar" || acao === "banir") await stripe().subscriptions.cancel(viva.id);
-      else if (acao === "desativar") await stripe().subscriptions.update(viva.id, { pause_collection: { behavior: "void" } });
-      else if (acao === "reativar" && viva.pause_collection) await stripe().subscriptions.update(viva.id, { pause_collection: null });
+      try {
+        if (acao === "deletar" || acao === "banir") await stripe().subscriptions.cancel(viva.id);
+        else if (acao === "desativar") await stripe().subscriptions.update(viva.id, { pause_collection: { behavior: "void" } });
+        else if (acao === "reativar" && viva.pause_collection) await stripe().subscriptions.update(viva.id, { pause_collection: null });
+      } catch (e) {
+        if (!objetoStripeAusente(e)) throw e;
+      }
     }
 
     if (acao === "deletar") {

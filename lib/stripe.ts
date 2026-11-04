@@ -52,6 +52,39 @@ export async function precoDoPlano(plano: PlanoId): Promise<Stripe.Price> {
 
 const VIVA: Stripe.Subscription.Status[] = ["active", "trialing", "past_due", "unpaid", "paused"];
 
+// O objeto não existe para esta chave: foi apagado no Stripe ou nasceu no outro modo
+// (id de teste gravado no banco e chave live em uso). Não é falha do Stripe: quem chama
+// trata como "não há nada lá"; qualquer outro erro continua subindo.
+export function objetoStripeAusente(e: unknown): boolean {
+  return (e as { code?: string } | null)?.code === "resource_missing";
+}
+
+// Tira do banco um id que o Stripe não reconhece. Só toca a linha se ela ainda aponta
+// para esse id (não apaga o que um webhook acabou de gravar) e nunca muda plano/status.
+// Falhar aqui não muda o resultado de quem chamou: a próxima chamada tenta de novo.
+async function limparIdsStripe(
+  admin: SupabaseClient,
+  orgId: string,
+  coluna: "provider_assinatura_id" | "provider_cliente_id",
+  id: string,
+  patch: Record<string, null>
+): Promise<void> {
+  const { error } = await admin
+    .from("assinatura")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("org_id", orgId)
+    .eq(coluna, id);
+  if (error) console.error("Falha ao limpar id do Stripe que não existe mais", orgId, error.message);
+}
+
+// Cliente que não existe mais: a assinatura dele também não (apagar o cliente as encerra).
+export function limparClienteStripe(admin: SupabaseClient, orgId: string, clienteId: string): Promise<void> {
+  return limparIdsStripe(admin, orgId, "provider_cliente_id", clienteId, {
+    provider_cliente_id: null,
+    provider_assinatura_id: null,
+  });
+}
+
 // Assinatura Stripe ainda cobrável da org (para trocar de plano ou cancelar).
 export async function assinaturaVivaDaOrg(admin: SupabaseClient, orgId: string): Promise<Stripe.Subscription | null> {
   const { data, error } = await admin
@@ -61,11 +94,28 @@ export async function assinaturaVivaDaOrg(admin: SupabaseClient, orgId: string):
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (data?.provider !== "stripe" || !data.provider_assinatura_id) return null;
-  const sub = await stripe().subscriptions.retrieve(data.provider_assinatura_id);
-  return VIVA.includes(sub.status) ? sub : null;
+  try {
+    const sub = await stripe().subscriptions.retrieve(data.provider_assinatura_id);
+    return VIVA.includes(sub.status) ? sub : null;
+  } catch (e) {
+    if (!objetoStripeAusente(e)) throw e;
+    const id = data.provider_assinatura_id;
+    await limparIdsStripe(admin, orgId, "provider_assinatura_id", id, { provider_assinatura_id: null });
+    return null;
+  }
 }
 
-// Cliente Stripe da org: reaproveita o já gravado, senão cria e grava.
+async function clienteExiste(id: string): Promise<boolean> {
+  try {
+    const c = await stripe().customers.retrieve(id);
+    return !c.deleted;
+  } catch (e) {
+    if (objetoStripeAusente(e)) return false;
+    throw e;
+  }
+}
+
+// Cliente Stripe da org: reaproveita o já gravado se ele ainda existir, senão cria e grava.
 export async function clienteDaOrg(admin: SupabaseClient, orgId: string, email: string): Promise<string> {
   const { data, error } = await admin
     .from("assinatura")
@@ -74,12 +124,15 @@ export async function clienteDaOrg(admin: SupabaseClient, orgId: string, email: 
     .maybeSingle();
   if (error) throw new Error(error.message);
   const salvo = data?.provider_cliente_id;
-  if (salvo?.startsWith("cus_")) return salvo;
+  const temSalvo = !!salvo?.startsWith("cus_");
+  if (temSalvo && (await clienteExiste(salvo))) return salvo;
 
   const { data: org } = await admin.from("org").select("nome").eq("id", orgId).maybeSingle();
   const c = await stripe().customers.create(
     { email, name: org?.nome ?? undefined, metadata: { org_id: orgId } },
-    { idempotencyKey: `cliente-org-${orgId}` }
+    // substituindo um cliente morto, a chave é outra: a de sempre poderia devolver
+    // justamente esse cliente (o Stripe guarda a resposta por pelo menos 24 h)
+    { idempotencyKey: temSalvo ? `cliente-org-${orgId}-substitui-${salvo}` : `cliente-org-${orgId}` }
   );
   const { error: e2 } = await admin
     .from("assinatura")
@@ -113,8 +166,14 @@ export async function posSincronizar(r: ResultadoEvento, chave: string, estrito 
       }
       for (const id of alvo) {
         if (id === r.assinaturaId) continue;
-        const antiga = await stripe().subscriptions.retrieve(id);
-        if (VIVA.includes(antiga.status) || antiga.status === "incomplete") await stripe().subscriptions.cancel(id);
+        try {
+          const antiga = await stripe().subscriptions.retrieve(id);
+          if (VIVA.includes(antiga.status) || antiga.status === "incomplete") await stripe().subscriptions.cancel(id);
+        } catch (e) {
+          // a anterior nem existe nesta chave: não há o que cancelar (senão o webhook
+          // responderia 500 para sempre e o Stripe reenviaria o evento sem fim)
+          if (!objetoStripeAusente(e)) throw e;
+        }
       }
     } catch (e) {
       console.error("Falha ao cancelar assinatura Stripe anterior", r.cancelarAnterior ?? "", e);

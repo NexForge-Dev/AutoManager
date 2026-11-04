@@ -9,6 +9,11 @@ const h = vi.hoisted(() => ({
   updateUserById: vi.fn(async (_id: string, _attrs: unknown) => ({ error: null })),
   rpc: vi.fn(async (_fn: string, _args: unknown) => ({ data: 1, error: null })),
   orgUpdates: [] as unknown[],
+  orgDeletes: 0,
+  viva: null as any,
+  erroViva: null as Error | null,
+  subCancel: vi.fn(async (_id: string) => ({})),
+  subUpdate: vi.fn(async (_id: string, _attrs: unknown) => ({})),
 }));
 
 function consulta(tabela: string) {
@@ -22,12 +27,17 @@ function consulta(tabela: string) {
             if (tabela === "usuario") return ok({ data: [{ id: DONO, email: "dono@loja.com" }], error: null });
             if (tabela === "revendedora") return ok({ data: [{ user_id: REV }], error: null });
             if (tabela === "org" && op === "update") return ok({ data: null, error: h.erroOrgUpdate });
+            if (tabela === "org" && op === "delete") return ok({ data: null, error: null });
             return ok({ data: { nome: "Loja X" }, error: null });
           };
         return (...args: unknown[]) => {
           if (p === "update") {
             op = "update";
             if (tabela === "org") h.orgUpdates.push(args[0]);
+          }
+          if (p === "delete") {
+            op = "delete";
+            if (tabela === "org") h.orgDeletes++;
           }
           return b;
         };
@@ -43,7 +53,14 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 vi.mock("@/lib/adminAudit", () => ({ registrarAdminLog: vi.fn(async () => {}) }));
-vi.mock("@/lib/stripe", () => ({ assinaturaVivaDaOrg: async () => null, stripe: vi.fn() }));
+vi.mock("@/lib/stripe", () => ({
+  assinaturaVivaDaOrg: async () => {
+    if (h.erroViva) throw h.erroViva;
+    return h.viva;
+  },
+  objetoStripeAusente: (e: { code?: string }) => e?.code === "resource_missing",
+  stripe: () => ({ subscriptions: { cancel: h.subCancel, update: h.subUpdate } }),
+}));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     from: (t: string) => consulta(t),
@@ -67,6 +84,11 @@ describe("POST /api/admin/usuario", () => {
   beforeEach(() => {
     h.erroOrgUpdate = null;
     h.orgUpdates = [];
+    h.orgDeletes = 0;
+    h.viva = null;
+    h.erroViva = null;
+    h.subCancel.mockReset();
+    h.subUpdate.mockReset();
     h.updateUserById.mockClear();
     h.rpc.mockClear();
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -89,6 +111,58 @@ describe("POST /api/admin/usuario", () => {
     expect(h.updateUserById).toHaveBeenCalledWith(DONO, { ban_duration: "none" });
     expect(h.rpc).not.toHaveBeenCalled();
     expect(h.orgUpdates).toContainEqual({ acesso: "ativo" });
+  });
+
+  describe("cobrança no Stripe ao moderar", () => {
+    const ausente = () => Object.assign(new Error("No such subscription"), { code: "resource_missing" });
+    const outro = () => Object.assign(new Error("Stripe fora do ar"), { code: "api_error" });
+
+    it("deletar cancela a assinatura viva antes de apagar a loja", async () => {
+      h.viva = { id: "sub_1" };
+      const res = await POST(req({ orgId: ORG, acao: "deletar" }));
+      expect(res.status).toBe(200);
+      expect(h.subCancel).toHaveBeenCalledWith("sub_1");
+      expect(h.orgDeletes).toBe(1);
+    });
+
+    it("assinatura que sumiu do Stripe não impede deletar a loja", async () => {
+      h.viva = { id: "sub_1" };
+      h.subCancel.mockRejectedValue(ausente());
+      const res = await POST(req({ orgId: ORG, acao: "deletar" }));
+      expect(res.status).toBe(200);
+      expect(h.orgDeletes).toBe(1);
+    });
+
+    it("assinatura que sumiu do Stripe não impede banir a loja", async () => {
+      h.viva = { id: "sub_1" };
+      h.subCancel.mockRejectedValue(ausente());
+      const res = await POST(req({ orgId: ORG, acao: "banir" }));
+      expect(res.status).toBe(200);
+      expect(h.orgUpdates).toContainEqual({ acesso: "banido" });
+    });
+
+    it("assinatura que sumiu do Stripe não impede desativar a loja", async () => {
+      h.viva = { id: "sub_1" };
+      h.subUpdate.mockRejectedValue(ausente());
+      const res = await POST(req({ orgId: ORG, acao: "desativar" }));
+      expect(res.status).toBe(200);
+      expect(h.orgUpdates).toContainEqual({ acesso: "desativado" });
+    });
+
+    it("outro erro ao cancelar aborta: a loja não é apagada com o cartão ainda cobrando", async () => {
+      h.viva = { id: "sub_1" };
+      h.subCancel.mockRejectedValue(outro());
+      const res = await POST(req({ orgId: ORG, acao: "deletar" }));
+      expect(res.status).toBe(500);
+      expect(h.orgDeletes).toBe(0);
+    });
+
+    it("outro erro ao consultar a assinatura também aborta", async () => {
+      h.erroViva = outro();
+      const res = await POST(req({ orgId: ORG, acao: "deletar" }));
+      expect(res.status).toBe(500);
+      expect(h.orgDeletes).toBe(0);
+    });
   });
 
   it("orgId que não é uuid volta 400 (antes: 500 com o erro cru do Postgres)", async () => {
