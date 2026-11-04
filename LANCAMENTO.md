@@ -29,6 +29,27 @@ Edite **`lib/empresa.ts`** e preencha: `razaoSocial`, `cnpj`, `emailSuporte`, `c
 `/cancelamento` e no rodapé. Campo vazio fica oculto — **não venda com eles vazios**.
 Revise também o texto jurídico das três páginas (de preferência com um advogado).
 
+Em 04/11/2026 o `emailSuporte` foi preenchido e as páginas legais foram reescritas a partir do
+código. Pendências que dependem de você ou de um advogado:
+
+- **Identificação do fornecedor:** o Decreto 7.962/2013 pede nome, CPF/CNPJ e endereço. Preencher
+  `lib/empresa.ts` basta para tudo aparecer, inclusive o foro e o encarregado.
+- **Portal do Stripe:** configure o cancelamento para o fim do período pago. Se for imediato, a loja
+  cai no Ambulante na hora e o mês em curso, que não é devolvido, fica sem o plano.
+- **Exclusão de conta:** é feita em `/admin` e não apaga as imagens dos buckets `lojas` e `produtos`.
+  A Privacidade promete removê-las no atendimento do pedido: faça isso à mão em cada exclusão.
+- **Marco Civil, art. 15:** registros de acesso por 6 meses. O código não guarda esses registros;
+  confira a retenção da Vercel e do Supabase.
+- **Transferência internacional:** confira com advogado as cláusulas-padrão da ANPD (Resolução 19/2024).
+  A Privacidade cita só o art. 33, IX.
+- **Encarregado:** confira se a loja se enquadra como agente de pequeno porte.
+- **Reembolso:** o art. 49 fala em devolução imediata; a página de Cancelamento diz até 5 dias úteis.
+- **SMTP:** se configurar um provedor de e-mail no Supabase, cite-o na seção 5 da Privacidade.
+- **Painel NexForge:** defina por quanto tempo os eventos ficam guardados e onde ele é hospedado.
+- **Landing:** "backup automático" e "dados criptografados" não foram confirmados pelo código.
+- **Plano Ambulante:** o piso grátis tem os mesmos recursos do plano de R$ 20 (`lib/plans.ts`), e os
+  Termos agora dizem isso. É uma decisão comercial sua.
+
 ## 3. Stripe
 
 1. Conta Stripe **Brasil** (cobra em BRL; Pix/boleto só aparecem para contas BR). Ative os

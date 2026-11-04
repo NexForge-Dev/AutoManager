@@ -8,6 +8,7 @@ export function IdentificacaoEmpresa() {
     ["Razão social", EMPRESA.razaoSocial],
     ["CNPJ", EMPRESA.cnpj],
     ["Sede", EMPRESA.cidadeUf],
+    ["Contato", EMPRESA.emailSuporte],
   ];
   return (
     <ul>

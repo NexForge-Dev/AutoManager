@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  // o tsconfig usa jsx "preserve" (é o Next quem compila): nos testes, compila aqui
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: { "@": fileURLToPath(new URL("./", import.meta.url)) },
   },

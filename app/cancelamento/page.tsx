@@ -28,12 +28,15 @@ export default function CancelamentoPage() {
             (seção 2), o valor do mês em curso não é fracionado nem devolvido.
           </li>
           <li>
-            Após o cancelamento, a conta continua existindo, com os recursos do plano básico.{" "}
+            Quando a assinatura termina, a conta continua existindo, sem cobrança, com os recursos do
+            plano <strong>Ambulante</strong> (veja a seção 4 dos{" "}
+            <Link href="/termos">Termos de Uso</Link>).{" "}
             <strong>Seus dados não são apagados</strong> por causa do cancelamento: você pode consultar
             e exportar seus relatórios, e reativar um plano quando quiser.
           </li>
           <li>
-            Se preferir que tudo seja apagado, peça a exclusão da conta (veja a{" "}
+            Se preferir que os dados sejam apagados, peça a exclusão da conta pelos canais da seção 3
+            (veja o que é apagado e o que fica na{" "}
             <Link href="/privacidade">Política de Privacidade</Link>).
           </li>
           <li>
@@ -46,8 +49,8 @@ export default function CancelamentoPage() {
       <Secao n={2} titulo="Direito de arrependimento (7 dias)">
         <p>
           Como a contratação é feita pela internet, você tem o direito de desistir em até{" "}
-          <strong>7 (sete) dias corridos</strong> contados da <strong>primeira cobrança</strong> da
-          assinatura, conforme o <strong>art. 49 do Código de Defesa do Consumidor</strong>, sem
+          <strong>7 (sete) dias corridos</strong> contados da <strong>primeira cobrança</strong> de
+          cada nova assinatura, conforme o <strong>art. 49 do Código de Defesa do Consumidor</strong>, sem
           precisar explicar o motivo.
         </p>
         <ul>
@@ -57,8 +60,8 @@ export default function CancelamentoPage() {
           </li>
           <li>
             Processamos o pedido em até <strong>5 dias úteis</strong>. O prazo para o valor aparecer
-            depende do meio de pagamento: no Pix costuma ser imediato após o estorno; no cartão de
-            crédito, o estorno pode aparecer em até duas faturas, conforme o emissor.
+            depende do meio de pagamento: no cartão de crédito, o estorno pode aparecer em até duas
+            faturas, conforme o emissor.
           </li>
           <li>Junto com o reembolso, a assinatura é cancelada e não há novas cobranças.</li>
         </ul>

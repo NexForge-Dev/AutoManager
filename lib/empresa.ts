@@ -31,7 +31,7 @@ export const EMPRESA: DadosEmpresa = {
   nomeFantasia: "AutoManager",
   razaoSocial: "",
   cnpj: "",
-  emailSuporte: "",
+  emailSuporte: "nexforge.d4v29@gmail.com",
   whatsappSuporte: "5583993826429",
   cidadeUf: "",
   encarregadoLgpd: "",

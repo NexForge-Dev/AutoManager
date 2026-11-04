@@ -6,35 +6,36 @@ import { EMPRESA } from "@/lib/empresa";
 
 export const metadata: Metadata = {
   title: "Política de Privacidade · AutoManager",
-  description: "Como o AutoManager trata dados pessoais, em conformidade com a LGPD (Lei 13.709/2018).",
+  description: "Como o AutoManager trata dados pessoais, nos termos da LGPD (Lei 13.709/2018).",
   alternates: { canonical: "/privacidade" },
 };
 
 export default function PrivacidadePage() {
   const fornecedor = EMPRESA.razaoSocial || EMPRESA.nomeFantasia;
+  const email = EMPRESA.emailSuporte;
   return (
     <LegalLayout
       titulo="Política de Privacidade"
-      atualizadoEm="02/11/2026"
-      resumo="Em resumo: usamos seus dados só para fazer o AutoManager funcionar e para cobrar a assinatura. Não vendemos dados. Os dados dos clientes da sua loja pertencem à sua loja — nós apenas os guardamos e processamos em seu nome. Você pode pedir acesso, correção ou exclusão a qualquer momento."
+      atualizadoEm="04/11/2026"
+      resumo="Em resumo: usamos dados para fazer o AutoManager funcionar, cobrar a assinatura, dar suporte e proteger o serviço. Não vendemos dados pessoais. Os dados que a loja registra sobre clientes e equipe são da loja: ela decide o que fazer com eles e nós tratamos esses dados em nome dela. Os dados ficam em servidores nos Estados Unidos. Pedidos sobre seus dados, inclusive de exclusão da conta, são feitos pelo nosso e-mail."
     >
-      <Secao n={1} titulo="A quem se aplica">
+      <Secao n={1} titulo="A quem esta Política se aplica">
         <p>
-          Esta Política explica como {fornecedor} trata dados pessoais no AutoManager, em
-          conformidade com a Lei Geral de Proteção de Dados (<strong>LGPD</strong>, Lei 13.709/2018).
-          Ela vale para:
+          Esta Política explica como <strong>{fornecedor}</strong> trata dados pessoais no AutoManager,
+          sistema de gestão para micronegócios e revendedoras no Brasil, com base na Lei Geral de
+          Proteção de Dados (<strong>LGPD</strong>, Lei 13.709/2018). Ela vale para:
         </p>
         <ul>
           <li>
             <strong>Lojistas</strong>: quem cria a conta e assina o AutoManager;
           </li>
           <li>
-            <strong>Membros da equipe</strong>: revendedoras, vendedores e motoboys convidados por uma
+            <strong>Equipe da loja</strong>: vendedores, motoboys e revendedoras cadastrados por uma
             loja;
           </li>
           <li>
-            <strong>Clientes das lojas</strong> e <strong>visitantes da vitrine</strong>, inclusive
-            quem conversa com a loja pelo chat sem criar conta.
+            <strong>Clientes das lojas e visitantes da vitrine</strong>, inclusive quem conversa com a
+            loja pelo chat sem criar conta.
           </li>
         </ul>
         <IdentificacaoEmpresa />
@@ -43,208 +44,301 @@ export default function PrivacidadePage() {
       <Secao n={2} titulo="Controlador e operador: quem responde por cada dado">
         <ul>
           <li>
-            <strong>Dados do lojista</strong> (conta, assinatura, uso do sistema): o AutoManager é o{" "}
-            <strong>controlador</strong>.
+            <strong>Dados da conta do lojista</strong> (cadastro, assinatura, suporte, uso do sistema):
+            o AutoManager é o <strong>controlador</strong>.
           </li>
           <li>
-            <strong>Dados que a loja cadastra ou recebe</strong> — clientes, pedidos, fiado, mensagens
-            do chat da vitrine, dados de revendedoras, vendedores e motoboys: a{" "}
-            <strong>loja (lojista) é a controladora</strong> e o AutoManager atua como{" "}
-            <strong>operador</strong>, tratando esses dados apenas para prestar o serviço, conforme as
-            instruções da loja e esta Política.
+            <strong>Dados que a loja cadastra ou recebe</strong> (entregas, mensagens do chat da
+            vitrine, dados de vendedores, motoboys e revendedoras, e o que ela escrever em campos
+            livres): a <strong>loja é a controladora</strong> e o AutoManager atua como{" "}
+            <strong>operador</strong>, tratando esses dados para prestar o serviço à loja.
           </li>
         </ul>
         <p>
-          Se você é cliente ou membro da equipe de uma loja e quer exercer seus direitos sobre esses
-          dados, fale primeiro com a própria loja. Se não conseguir, fale com a gente (seção 9) que
-          encaminharemos o pedido à loja e ajudaremos no que couber.
+          Se você é cliente, visitante ou membro da equipe de uma loja, fale primeiro com ela sobre os
+          seus dados. Se não conseguir, escreva para o e-mail da seção 9: encaminhamos o pedido à loja
+          e ajudamos no que couber a nós.
         </p>
       </Secao>
 
       <Secao n={3} titulo="Quais dados tratamos">
         <p>
-          <strong>Do lojista e da equipe:</strong> e-mail, senha (armazenada de forma criptografada
-          pelo provedor de autenticação, nunca em texto puro), nome, telefone/WhatsApp, nome e dados
-          da loja (logo, cores, redes sociais, endereço se você informar), papel de cada membro e
-          registros de uso (por exemplo, quem registrou uma venda e quando).
+          <strong>Conta de acesso:</strong> nome, e-mail, senha (guardada em forma de hash pelo serviço
+          de autenticação, nunca em texto puro), papel na loja e loja vinculada. Vendedores e motoboys
+          têm a conta criada pelo lojista; revendedoras ativam o acesso com um código enviado pela loja
+          e têm ainda WhatsApp e percentual de comissão cadastrados.
         </p>
         <p>
-          <strong>Da assinatura:</strong> plano, status, datas e identificadores do cliente e da
-          assinatura no Stripe. Os dados do cartão são digitados diretamente no Stripe e{" "}
-          <strong>não</strong> chegam ao AutoManager.
+          <strong>Dados da loja:</strong> nome, segmento, canais de venda, margem e comissão padrão,
+          logo, capa, cores, descrição e os contatos que a loja decidir publicar (e-mail, WhatsApp,
+          telefone, Instagram, Facebook e TikTok).
+        </p>
+        <p>
+          <strong>Assinatura:</strong> plano, status, valor, datas e os identificadores de cliente e de
+          assinatura no Stripe. O Stripe recebe de nós o e-mail da conta, o nome da loja e o
+          identificador interno da loja. Os dados do cartão são digitados diretamente na página do
+          Stripe e <strong>não</strong> chegam ao AutoManager.
         </p>
         <p>
           <strong>Dados operacionais da loja:</strong> produtos, estoque, vendas, recebimentos,
-          comissões, entregas e os dados de clientes que a loja decidir cadastrar (por exemplo, nome e
-          telefone para fiado ou entrega).
+          comissões e contas a pagar (que podem citar o nome de um fornecedor). O AutoManager não tem
+          cadastro de clientes: dados de clientes da loja aparecem nas <strong>entregas</strong> (nome,
+          telefone, endereço e observações), no chat e no que a loja escrever em campos livres.
         </p>
         <p>
-          <strong>Da vitrine e do chat:</strong> visitantes podem conversar com a loja sem criar
-          conta. Guardamos as mensagens enviadas, o nome/contato que o visitante decidir informar e um
-          identificador técnico da conversa no próprio navegador, para que ele continue o mesmo
-          atendimento. Não pedimos documento nem senha ao visitante.
+          <strong>Vitrine e chat:</strong> a vitrine pode ser visitada sem cadastro. Quem usa o chat
+          recebe uma sessão anônima e um identificador guardado no próprio navegador, que permite
+          retomar a conversa. Guardamos as mensagens, as datas e o nome, se a pessoa quiser informar.
+          Não pedimos documento nem senha. Evite enviar dados sensíveis ou de pagamento pelo chat.
         </p>
         <p>
-          <strong>Dados técnicos:</strong> endereço IP, tipo de navegador e registros de acesso
-          mantidos pelos nossos provedores de hospedagem para segurança e diagnóstico de erros, e os
-          chamados de suporte que você abrir.
+          <strong>Suporte:</strong> o que você enviar por e-mail, WhatsApp ou pelo botão de suporte do
+          Painel, que registra nome da loja, e-mail e WhatsApp de contato, assunto e mensagem.
+        </p>
+        <p>
+          <strong>Dados técnicos:</strong> endereço IP, navegador, data e hora de acesso e registros de
+          erro, mantidos pelos provedores de hospedagem e banco de dados. Na ativação de revendedora, IP
+          e e-mail são guardados apenas como hash, por tempo curto, para limitar tentativas.
+        </p>
+        <p>
+          <strong>Estatísticas de uso:</strong> eventos sobre o uso do produto, descritos na seção 5.
         </p>
       </Secao>
 
       <Secao n={4} titulo="Para que usamos e com qual base legal">
+        <p>Quando somos controladores, as bases legais do art. 7º da LGPD são estas:</p>
         <ul>
           <li>
-            <strong>Prestar o serviço</strong> (criar a conta, salvar e exibir os dados da loja, operar
-            a vitrine e o chat, permitir o acesso da equipe): execução de contrato (art. 7º, V).
+            <strong>Prestar o serviço</strong> (criar a conta, guardar e exibir os dados da loja,
+            operar a vitrine e o chat, dar acesso à equipe, enviar e-mails de confirmação e de
+            redefinição de senha): execução de contrato (art. 7º, V).
           </li>
           <li>
             <strong>Cobrar a assinatura</strong> e manter registros fiscais e contábeis: execução de
-            contrato e cumprimento de obrigação legal (art. 7º, II e V).
+            contrato e cumprimento de obrigação legal (art. 7º, V e II).
           </li>
           <li>
-            <strong>Segurança, prevenção a fraudes e registros de acesso</strong> (o Marco Civil da
-            Internet exige guardar registros de acesso a aplicações por 6 meses): obrigação legal e
-            legítimo interesse (art. 7º, II e IX).
+            <strong>Atender ao suporte e avisar sobre o serviço</strong> (cobrança, mudanças,
+            incidentes): execução de contrato e legítimo interesse (art. 7º, V e IX).
           </li>
           <li>
-            <strong>Suporte e comunicações sobre o serviço</strong> (avisos de cobrança, mudanças nos
-            termos, respostas a chamados): execução de contrato e legítimo interesse.
+            <strong>Proteger o serviço</strong> (limitar tentativas, investigar erros e abusos, moderar
+            contas e registrar essas ações): legítimo interesse, cumprimento de obrigação legal e
+            exercício regular de direitos (art. 7º, IX, II e VI).
           </li>
           <li>
-            <strong>Melhorar o produto</strong> com estatísticas agregadas de uso, sem identificar
-            clientes das lojas: legítimo interesse.
+            <strong>Entender o uso do produto</strong> com estatísticas pseudônimas: legítimo interesse
+            (art. 7º, IX). Você pode se opor pelo e-mail da seção 9.
           </li>
         </ul>
         <p>
-          Não vendemos dados pessoais, não os usamos para publicidade de terceiros e não acessamos o
-          conteúdo das lojas para outros fins, exceto quando necessário para suporte solicitado,
-          segurança ou cumprimento de ordem legal.
+          Quando atuamos como operador, é a loja que define a finalidade e a base legal do tratamento.
+        </p>
+        <p>
+          Não vendemos dados pessoais e não os usamos para publicidade de terceiros. O banco de dados é
+          administrado por nós, e esse acesso técnico é reservado a suporte solicitado, segurança e
+          cumprimento da lei. O painel de administração mostra, por loja, nome, endereço da vitrine,
+          e-mail do dono, plano, status, valor da assinatura e número de membros.
         </p>
       </Secao>
 
       <Secao n={5} titulo="Com quem compartilhamos">
-        <p>Só com os fornecedores necessários para o serviço funcionar:</p>
+        <p>Só com quem é necessário para o serviço funcionar:</p>
         <ul>
           <li>
-            <strong>Supabase</strong> — banco de dados, autenticação, armazenamento de imagens e
-            mensagens em tempo real. É onde os dados ficam guardados, em servidores da AWS nos{" "}
-            <strong>Estados Unidos</strong> (região us-east-1, Virgínia).
+            <strong>Supabase</strong>: banco de dados, autenticação, armazenamento de imagens e
+            mensagens em tempo real. É onde os dados ficam guardados, em servidores nos{" "}
+            <strong>Estados Unidos</strong> (região us-east-1). Os e-mails de confirmação de cadastro e
+            de redefinição de senha saem pelo serviço de autenticação do Supabase, que pode usar um
+            provedor de envio de e-mail.
           </li>
           <li>
-            <strong>Stripe</strong> — processamento das assinaturas e pagamentos. O Stripe trata os
-            dados de pagamento como controlador próprio, conforme a política de privacidade dele, e pode
-            processá-los fora do Brasil (art. 33 da LGPD).
+            <strong>Stripe</strong>: checkout, cobrança das assinaturas e portal de pagamento. O Stripe
+            trata dados de pagamento também segundo a política de privacidade dele.
           </li>
           <li>
-            <strong>Vercel</strong> — hospedagem do site e das APIs: entrega das páginas e registros
-            técnicos de acesso (IP, navegador, data e hora). Pode processar as requisições em servidores
-            fora do Brasil.
+            <strong>Vercel</strong>: hospedagem do site e das APIs. Recebe os dados das requisições
+            (como IP, navegador, data e hora) e os registros técnicos.
           </li>
           <li>
-            <strong>Painel interno NexForge</strong> — ferramenta de gestão da própria empresa que
-            recebe estatísticas de uso do produto (por exemplo, &quot;uma loja concluiu o
-            onboarding&quot; ou &quot;mudou de plano&quot;). Recebe só um identificador pseudônimo da
-            loja e códigos fixos de evento — nunca nomes, e-mails, telefones, produtos, clientes ou
-            valores de vendas.
+            <strong>Google</strong>: quando uma loja escolhe uma fonte do Google Fonts para a vitrine ou
+            para o app, o navegador de quem abre a página busca essa fonte no Google, que recebe o IP e
+            os dados do navegador. A caixa de e-mail do suporte também é hospedada no Google (Gmail).
+          </li>
+          <li>
+            <strong>Painel NexForge</strong>: nossa ferramenta interna de estatísticas de produto, que
+            funciona quando está configurada. Recebe eventos como &quot;cadastro concluído&quot;,
+            &quot;recurso usado&quot; ou &quot;plano alterado&quot;, com data, plano, etapa, recurso,
+            quantidade e o valor da assinatura. A loja é identificada só por um{" "}
+            <strong>código pseudônimo</strong>, gerado no servidor do AutoManager. O painel não recebe
+            nomes, e-mails, telefones, produtos, clientes nem valores das vendas da loja. Dado
+            pseudônimo continua sendo dado pessoal quando se refere a uma pessoa identificável, e por
+            isso o tratamos conforme esta Política.
           </li>
           <li>
             <strong>Autoridades</strong>, quando houver obrigação legal ou ordem judicial.
           </li>
         </ul>
         <p>
-          <strong>Transferência internacional:</strong> como o banco de dados (Supabase) e a
-          hospedagem (Vercel) ficam nos Estados Unidos, os dados pessoais tratados pelo AutoManager são
-          transferidos para fora do Brasil. Essa transferência ocorre para cumprir o contrato com você
-          e se apoia nas cláusulas contratuais e nas garantias de segurança desses provedores
-          (art. 33, II e IX, da LGPD).
+          <strong>Dentro da loja:</strong> o lojista vê os dados da própria loja; vendedores, motoboys e
+          revendedoras veem o que o papel de cada um permite. O lojista escolhe quem faz parte da
+          equipe.
         </p>
         <p>
-          Dentro de uma loja, <strong>revendedoras, vendedores e motoboys</strong> acessam dados da
-          loja conforme o papel de cada um (por exemplo, a revendedora vê as próprias vendas e
-          comissões; o motoboy vê as entregas dele). O lojista controla quem faz parte da equipe.
+          <strong>Conteúdo público:</strong> o que a loja publica na vitrine ativa (nome, fotos,
+          produtos, contatos) fica visível para qualquer pessoa e pode aparecer em buscadores.
+        </p>
+        <p>
+          <strong>Serviços externos:</strong> links de WhatsApp, Instagram, Facebook e TikTok levam a
+          esses serviços, que seguem políticas próprias.
         </p>
       </Secao>
 
-      <Secao n={6} titulo="Por quanto tempo guardamos">
+      <Secao n={6} titulo="Transferência internacional">
+        <p>
+          O banco de dados fica nos Estados Unidos, e os demais fornecedores da seção 5 podem processar
+          dados fora do Brasil. Por isso, os dados pessoais tratados no AutoManager são transferidos
+          para outros países. Essa transferência é necessária para executar o contrato com você (art.
+          33, IX, combinado com o art. 7º, V, da LGPD).
+        </p>
+      </Secao>
+
+      <Secao n={7} titulo="Por quanto tempo guardamos e como excluir">
         <ul>
           <li>
-            Enquanto a conta existir, os dados da loja ficam guardados para você usar o sistema. Ao
-            cancelar a assinatura, <strong>não apagamos seus dados automaticamente</strong>: eles
-            continuam disponíveis para consulta e exportação.
+            <strong>Enquanto a conta existir</strong>, os dados da loja ficam guardados. Não há exclusão
+            automática por inatividade, pelo fim do teste grátis ou pelo cancelamento da assinatura: a
+            loja continua acessível, e você pode consultar e exportar seus relatórios.
           </li>
           <li>
-            Se você pedir a <strong>exclusão da conta</strong>, apagamos os dados da loja em até 30
-            dias, salvo o que precisarmos manter por obrigação legal (por exemplo, registros de
-            cobrança pelo prazo fiscal e registros de acesso por 6 meses). Cópias de segurança são
-            sobrescritas no ciclo normal do provedor.
+            <strong>Registros da loja:</strong> o lojista pode alterar ou excluir no próprio app itens
+            como produtos, entregas, contas a pagar e membros da equipe.
           </li>
           <li>
-            Mensagens do chat da vitrine ficam guardadas enquanto a loja mantiver a conversa ou a
-            conta, e podem ser excluídas a pedido da loja ou do próprio visitante.
+            <strong>Mensagens do chat</strong> ficam guardadas enquanto a loja existir. Não há botão
+            para excluí-las: a loja ou o visitante pode pedir pelo e-mail da seção 9.
           </li>
+          <li>
+            <strong>Exclusão da conta:</strong> não há exclusão pelo próprio app. Peça pelo e-mail da
+            seção 9, a partir do e-mail da conta, informando o nome da loja. A exclusão é{" "}
+            <strong>definitiva</strong>: cancela a assinatura e apaga a loja, os dados vinculados a ela
+            (produtos, vendas, entregas, equipe, chat) e as contas de acesso. Exporte antes o que quiser
+            manter. As imagens enviadas (logo, capa, produtos) ficam em armazenamento à parte e são
+            removidas no atendimento do pedido.
+          </li>
+        </ul>
+        <p>Depois da exclusão, podem permanecer:</p>
+        <ul>
+          <li>registros de cobrança no Stripe e o que a lei fiscal, contábil ou civil exigir guardar;</li>
+          <li>
+            a trilha de auditoria das ações administrativas, com o nome da loja e o e-mail do dono, para
+            comprovar o que foi feito;
+          </li>
+          <li>chamados e conversas de suporte, que podem conter e-mail, WhatsApp e mensagens;</li>
+          <li>eventos pseudônimos no Painel NexForge, sem ligação com a conta apagada;</li>
+          <li>identificadores técnicos de sessões anônimas do chat, sem nome nem mensagens;</li>
+          <li>registros técnicos e cópias de segurança dos provedores, conforme o ciclo de cada um.</li>
         </ul>
       </Secao>
 
-      <Secao n={7} titulo="Segurança">
-        <ul>
-          <li>Toda comunicação é criptografada (HTTPS/TLS).</li>
-          <li>
-            Cada loja é isolada no banco de dados por regras de segurança em nível de linha (RLS):
-            usuários de uma loja não conseguem ler dados de outra.
-          </li>
-          <li>Senhas são armazenadas com hash pelo provedor de autenticação.</li>
-          <li>Chaves de acesso administrativas ficam apenas no servidor, nunca no navegador.</li>
-        </ul>
-        <p>
-          Nenhum sistema é 100% invulnerável. Se ocorrer um incidente de segurança que possa causar
-          risco ou dano relevante, avisaremos os afetados e a ANPD, conforme o art. 48 da LGPD.
-        </p>
-      </Secao>
-
-      <Secao n={8} titulo="Cookies e armazenamento no navegador">
-        <p>
-          Usamos <strong>apenas cookies e armazenamento local essenciais</strong>: para manter você
-          logado (cookies de sessão do Supabase), lembrar preferências como tema claro/escuro e
-          manter a conversa do visitante no chat da vitrine. Não usamos cookies de publicidade nem de
-          rastreamento de terceiros. Se você bloquear esses cookies, o login e o chat podem não
-          funcionar.
-        </p>
-      </Secao>
-
-      <Secao n={9} titulo="Seus direitos (art. 18 da LGPD) e o encarregado">
-        <p>Você, como titular, pode pedir a qualquer momento:</p>
+      <Secao n={8} titulo="Seus direitos (art. 18 da LGPD)">
+        <p>Como titular, você pode pedir:</p>
         <ul>
           <li>confirmação de que tratamos seus dados e acesso a eles;</li>
           <li>correção de dados incompletos, inexatos ou desatualizados;</li>
-          <li>anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade;</li>
+          <li>anonimização, bloqueio ou eliminação de dados desnecessários, excessivos ou tratados em desconformidade com a LGPD;</li>
           <li>portabilidade dos dados a outro fornecedor;</li>
           <li>eliminação dos dados tratados com base no consentimento;</li>
           <li>informação sobre com quem compartilhamos seus dados;</li>
           <li>informação sobre a possibilidade de não dar consentimento e suas consequências;</li>
           <li>revogação do consentimento, quando ele for a base legal;</li>
+          <li>oposição a tratamento feito em desconformidade com a lei;</li>
           <li>revisão de decisões tomadas unicamente com base em tratamento automatizado.</li>
         </ul>
         <p>
-          <strong>Encarregado pelo tratamento de dados (DPO):</strong>{" "}
-          {EMPRESA.encarregadoLgpd || "atendimento de privacidade do AutoManager"}, pelos canais
-          abaixo. Respondemos em até 15 dias. Você também pode apresentar reclamação à Autoridade
-          Nacional de Proteção de Dados (ANPD).
+          Para exercer esses direitos, escreva para{" "}
+          {email ? <a href={`mailto:${email}?subject=${encodeURIComponent("LGPD - Pedido do titular")}`}>{email}</a> : "os canais abaixo"}
+          . Podemos pedir informações para confirmar que o pedido é seu. Nos pedidos de acesso, a
+          declaração completa é dada em até 15 dias, como prevê o art. 19 da LGPD. Alguns dados podem
+          ser mantidos quando a lei permitir (seção 7). Você também pode apresentar reclamação à
+          Autoridade Nacional de Proteção de Dados (ANPD).
         </p>
+      </Secao>
+
+      <Secao n={9} titulo="Encarregado pelo tratamento de dados (DPO)">
+        <p>
+          <strong>Encarregado:</strong> {EMPRESA.encarregadoLgpd || "atendimento de privacidade do AutoManager"}
+          {email ? (
+            <>
+              {" "}
+              · <strong>E-mail:</strong> <a href={`mailto:${email}`}>{email}</a>
+            </>
+          ) : null}
+        </p>
+        <p>Outros canais de atendimento:</p>
         <CanaisContato assunto="LGPD - Pedido do titular" />
       </Secao>
 
-      <Secao n={10} titulo="Crianças e adolescentes">
+      <Secao n={10} titulo="Cookies e armazenamento no navegador">
         <p>
-          O AutoManager é destinado a maiores de 18 anos e não é direcionado a crianças. A loja não
-          deve cadastrar dados de crianças sem o consentimento de um responsável.
+          Usamos apenas recursos necessários ao funcionamento do serviço. Não usamos cookies de
+          publicidade nem ferramentas de rastreamento de terceiros no navegador.
+        </p>
+        <ul>
+          <li>
+            <strong>Cookies de sessão do Supabase:</strong> mantêm você conectado e guardam a sessão
+            anônima de quem usa o chat.
+          </li>
+          <li>
+            <strong>Armazenamento local (localStorage):</strong> tema claro ou escuro, aparência da
+            loja, identificador da conversa no chat da vitrine e marcação de conversas já vistas no
+            app.
+          </li>
+          <li>
+            <strong>Armazenamento de sessão (sessionStorage):</strong> plano escolhido na página inicial
+            antes do cadastro e controle para contar uma sessão de uso por vez.
+          </li>
+        </ul>
+        <p>
+          Se você bloquear esses recursos, o login deixa de funcionar e o chat pode não retomar a
+          conversa anterior. As fontes do Google citadas na seção 5 são carregadas do Google quando a
+          loja as escolhe.
         </p>
       </Secao>
 
-      <Secao n={11} titulo="Mudanças nesta Política">
+      <Secao n={11} titulo="Crianças e adolescentes">
         <p>
-          Podemos atualizar esta Política. Mudanças relevantes serão avisadas no app ou por e-mail. A
-          data no topo indica a versão vigente. Veja também os{" "}
-          <Link href="/termos">Termos de Uso</Link> e a{" "}
+          A conta no AutoManager é destinada a maiores de 18 anos (ou emancipados), e o serviço não é
+          direcionado a crianças. A vitrine e o chat são abertos e não verificam idade. A loja não deve
+          cadastrar dados de crianças e adolescentes fora das condições do art. 14 da LGPD. Se
+          identificar um caso assim, escreva para o e-mail da seção 9.
+        </p>
+      </Secao>
+
+      <Secao n={12} titulo="Segurança e incidentes">
+        <ul>
+          <li>O site e as APIs são servidos por HTTPS.</li>
+          <li>
+            As regras de segurança em nível de linha (RLS) do banco de dados limitam cada usuário aos
+            dados da própria loja.
+          </li>
+          <li>Senhas são guardadas em forma de hash pelo serviço de autenticação.</li>
+          <li>Chaves administrativas ficam apenas no servidor, nunca no navegador.</li>
+          <li>Ações administrativas de moderação ficam registradas em uma trilha de auditoria.</li>
+        </ul>
+        <p>
+          Nenhum sistema é totalmente seguro, e estas medidas reduzem riscos, mas não os eliminam. Se
+          ocorrer um incidente de segurança que possa causar risco ou dano relevante, comunicaremos a
+          ANPD e os titulares afetados, como prevê o art. 48 da LGPD. Nos dados em que atuamos como
+          operador, avisaremos a loja controladora.
+        </p>
+      </Secao>
+
+      <Secao n={13} titulo="Mudanças nesta Política">
+        <p>
+          Podemos atualizar esta Política para refletir mudanças no serviço ou na lei. A nova versão é
+          publicada nesta página, com a data no topo, e mudanças relevantes serão avisadas no app ou por
+          e-mail. Veja também os <Link href="/termos">Termos de Uso</Link> e a{" "}
           <Link href="/cancelamento">Política de Cancelamento</Link>.
         </p>
       </Secao>

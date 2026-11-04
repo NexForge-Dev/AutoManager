@@ -16,13 +16,19 @@ export default function TermosPage() {
   return (
     <LegalLayout
       titulo="Termos de Uso"
-      resumo="Em resumo: o AutoManager é um sistema online de gestão para a sua loja. O 1º mês é grátis; depois, a assinatura é mensal, cobrada pelo Stripe, e você pode cancelar quando quiser. Os dados da sua loja são seus. Leia abaixo as regras completas."
+      resumo="Em resumo: o AutoManager é um sistema online de gestão para a sua loja. O 1º mês é grátis; depois, a assinatura é mensal, cobrada pelo Stripe, e você pode cancelar quando quiser. Sem assinatura, a loja não é cobrada e fica com os recursos do plano Ambulante. Os dados da sua loja são seus. Leia abaixo as regras completas."
     >
       <Secao n={1} titulo="Quem somos e o que é este documento">
         <p>
           Estes Termos de Uso regulam o acesso e o uso do <strong>AutoManager</strong>, software
-          oferecido como serviço (SaaS) por <strong>{fornecedor}</strong> (&quot;AutoManager&quot;,
-          &quot;nós&quot;).
+          oferecido como serviço (SaaS)
+          {EMPRESA.razaoSocial ? (
+            <>
+              {" "}
+              por <strong>{EMPRESA.razaoSocial}</strong>
+            </>
+          ) : null}{" "}
+          (&quot;AutoManager&quot;, &quot;nós&quot;).
         </p>
         <IdentificacaoEmpresa />
         <p>
@@ -69,19 +75,23 @@ export default function TermosPage() {
             sistema dá a cada papel. Cabe ao lojista escolher a quem dá acesso e remover quem não deve
             mais acessar.
           </li>
-          <li>Cada loja é isolada das demais: usuários de uma loja não acessam dados de outra.</li>
+          <li>
+            O sistema é construído para separar as lojas: as regras do banco de dados limitam cada
+            usuário aos dados da própria loja.
+          </li>
         </ul>
       </Secao>
 
       <Secao n={4} titulo="Planos, teste grátis e pagamento">
         <p>
           <strong>Teste grátis:</strong> toda nova loja tem <strong>1 (um) mês grátis</strong>, sem
-          necessidade de cartão, com acesso aos recursos do plano mais completo. Ao fim do teste, para
-          continuar usando os recursos pagos é preciso assinar um plano. Se você assinar durante o
-          teste, a primeira cobrança só acontece quando ele terminar.
+          necessidade de cartão, com acesso aos recursos do plano {PLANOS.expansao.nome}, o mais
+          completo. Se você assinar durante o teste, a primeira cobrança acontece quando ele terminar;
+          se faltarem menos de 48 horas para o fim do teste, a cobrança acontece no ato da assinatura.
         </p>
         <p>
-          <strong>Planos atuais</strong> (valores mensais, em reais):
+          <strong>Planos atuais</strong> (valores mensais, em reais; o que cada um inclui aparece na
+          tela de planos antes da contratação):
         </p>
         <ul>
           {ORDEM_PLANOS.map((id) => (
@@ -99,18 +109,27 @@ export default function TermosPage() {
           proporcional é cobrada na hora (no upgrade) ou vira crédito para as próximas faturas (no
           downgrade), e o novo plano passa a valer assim que a cobrança é aprovada.
         </p>
+        <p>
+          <strong>Sem assinatura ativa:</strong> se o teste terminar sem assinatura, se a assinatura
+          for cancelada ou se o pagamento ficar em aberto, a loja não é cobrada por isso e continua
+          acessível com os recursos do plano <strong>{PLANOS.ambulante.nome}</strong> (
+          {PLANOS.ambulante.beneficios.join(", ").toLowerCase()}). Os demais recursos, como
+          revendedoras, vendedores internos, motoboys, entregas, analytics e ranking, ficam
+          bloqueados ou limitados até você assinar um plano que os inclua. Seus dados não são apagados
+          por isso.
+        </p>
         <ul>
           <li>
-            Se um pagamento não for aprovado, a conta pode passar ao status de inadimplente e os
-            recursos pagos ficam limitados até a regularização. Seus dados não são apagados por isso.
+            Se um pagamento não for aprovado, o Stripe pode tentar a cobrança novamente. O plano é
+            mantido por até 3 dias depois do vencimento; sem a regularização, a loja passa à situação
+            descrita acima.
           </li>
-          <li>
-            A troca de plano é feita na mesma assinatura: não há duas cobranças em paralelo.
-          </li>
+          <li>A troca de plano é feita na mesma assinatura, sem criar uma segunda assinatura.</li>
           <li>
             Podemos reajustar preços ou alterar a composição dos planos, avisando com pelo menos{" "}
             <strong>30 dias</strong> de antecedência. O novo valor só vale a partir do ciclo seguinte ao
-            aviso, e você pode cancelar antes dele sem custo.
+            aviso, e você pode cancelar antes dele sem custo. O mesmo vale para mudanças nos recursos
+            disponíveis sem assinatura.
           </li>
         </ul>
       </Secao>
@@ -118,9 +137,12 @@ export default function TermosPage() {
       <Secao n={5} titulo="Cancelamento e arrependimento">
         <p>
           Você pode cancelar a assinatura <strong>a qualquer momento</strong>, sem multa e sem
-          fidelidade; a cobrança recorrente é interrompida e a conta passa a ter os recursos do plano
-          básico, sem perda de dados. Na primeira contratação paga, vale o <strong>direito de arrependimento de 7
-          dias</strong> (art. 49 do Código de Defesa do Consumidor), com reembolso integral. As regras
+          fidelidade. A cobrança recorrente é interrompida e, quando a assinatura termina, a conta fica
+          como descrito na seção 4, sem perda de dados. Como a contratação é feita pela internet, vale
+          o <strong>direito de arrependimento de 7 dias</strong> (art. 49 do Código de Defesa do
+          Consumidor), contados da primeira cobrança de cada nova assinatura, com reembolso integral.
+          Fora desse prazo, os valores já pagos não são devolvidos, salvo cobrança indevida ou falha
+          nossa. As regras
           completas e o passo a passo estão na{" "}
           <Link href="/cancelamento">Política de Cancelamento e Reembolso</Link>.
         </p>
@@ -141,7 +163,12 @@ export default function TermosPage() {
           <li>
             Tudo o que você publica na vitrine (fotos, descrições, preços, contatos) fica visível para
             qualquer pessoa com o link. Publique só o que pode ser público e de que você tenha os
-            direitos.
+            direitos. A vitrine ativa pode aparecer em buscadores.
+          </li>
+          <li>
+            Não há botão para excluir a conta no app: a exclusão é feita a pedido, pelos canais da
+            seção 8. Ela é definitiva e está descrita na{" "}
+            <Link href="/privacidade">Política de Privacidade</Link>.
           </li>
         </ul>
       </Secao>
@@ -158,8 +185,10 @@ export default function TermosPage() {
           <li>revender ou sublicenciar o acesso ao sistema sem autorização por escrito.</li>
         </ul>
         <p>
-          Em caso de violação, podemos remover conteúdo, suspender ou encerrar a conta, avisando o
-          motivo sempre que possível, sem prejuízo de responsabilização.
+          Em caso de violação, podemos remover conteúdo, suspender ou encerrar a conta, o que também
+          pode pausar ou cancelar a assinatura. Informamos o motivo pelos canais cadastrados; o aviso
+          só deixa de ser prévio quando houver risco a terceiros, à segurança do serviço ou ordem de
+          autoridade. Você pode contestar a medida pelos canais da seção 8.
         </p>
       </Secao>
 
@@ -168,10 +197,14 @@ export default function TermosPage() {
           Trabalhamos para manter o AutoManager disponível 24h por dia, mas podem ocorrer
           interrupções para manutenção, atualizações ou por falhas de terceiros (provedores de
           internet, hospedagem, banco de dados, meios de pagamento). Não garantimos funcionamento
-          ininterrupto nem livre de erros. Podemos melhorar, alterar ou descontinuar funcionalidades,
-          preservando o núcleo do serviço contratado.
+          ininterrupto nem livre de erros. Podemos melhorar ou alterar funcionalidades, preservando o
+          núcleo do serviço contratado; se uma mudança retirar algo relevante do seu plano, avisamos
+          antes e você pode cancelar sem multa.
         </p>
-        <p>O suporte é prestado pelos canais abaixo, em dias úteis:</p>
+        <p>
+          O suporte é prestado pelos canais abaixo, em dias úteis, e as manifestações são respondidas
+          no prazo do Decreto 7.962/2013:
+        </p>
         <CanaisContato assunto="Suporte AutoManager" />
       </Secao>
 
@@ -183,14 +216,19 @@ export default function TermosPage() {
             fiscais ou de pagamento de comissão.
           </li>
           <li>
-            Não respondemos por perdas decorrentes de dados informados incorretamente, de acessos
-            feitos com a sua senha, das relações entre a sua loja e seus clientes ou equipe, nem por
-            lucros cessantes ou danos indiretos.
+            O AutoManager não participa das relações entre a sua loja e seus clientes ou equipe, e
+            não responde por dados informados incorretamente por você ou sua equipe nem por acessos
+            feitos com a sua senha por falta de cuidado com ela.
           </li>
           <li>
-            Quando houver responsabilidade nossa, ela fica limitada ao valor pago por você nos 12
-            meses anteriores ao fato, salvo nos casos em que a lei não permita essa limitação
-            (inclusive direitos do consumidor previstos no CDC).
+            Nada nestes Termos exclui ou reduz direitos que a lei garante a você. Se você contrata
+            como consumidor, valem integralmente as regras de responsabilidade do Código de Defesa do
+            Consumidor.
+          </li>
+          <li>
+            Quando a contratação for entre empresas e não houver relação de consumo, a responsabilidade
+            do AutoManager fica limitada ao valor pago nos 12 meses anteriores ao fato, salvo dolo,
+            culpa grave ou hipótese em que a lei não admita a limitação.
           </li>
         </ul>
       </Secao>
@@ -206,24 +244,25 @@ export default function TermosPage() {
 
       <Secao n={11} titulo="Alterações destes Termos">
         <p>
-          Podemos atualizar estes Termos. Mudanças relevantes serão avisadas no app ou por e-mail com
-          antecedência razoável. A data no topo indica a versão vigente. Continuar usando o serviço
-          depois da vigência significa concordar com a nova versão.
+          Podemos atualizar estes Termos. Mudanças relevantes serão avisadas no app ou por e-mail antes
+          de valer, e a data no topo indica a versão vigente. Se não concordar com uma mudança, você
+          pode cancelar a assinatura sem multa antes que ela entre em vigor. Mudanças não alcançam o
+          período que você já pagou.
         </p>
       </Secao>
 
       <Secao n={12} titulo="Lei aplicável e foro">
         <p>
-          Estes Termos seguem as leis do Brasil. Fica eleito o foro da comarca{" "}
+          Estes Termos seguem as leis do Brasil.{" "}
           {EMPRESA.cidadeUf ? (
             <>
-              de <strong>{EMPRESA.cidadeUf}</strong>
+              Fica eleito o foro da comarca de <strong>{EMPRESA.cidadeUf}</strong> para resolver
+              eventuais conflitos, ressalvado ao consumidor o direito de propor a ação no foro do seu
+              domicílio, nos termos do CDC.
             </>
           ) : (
-            "da sede do fornecedor"
-          )}{" "}
-          para resolver eventuais conflitos, ressalvado ao consumidor o direito de propor a ação no
-          foro do seu domicílio, nos termos do CDC.
+            "Eventuais conflitos serão resolvidos no foro competente pela lei brasileira, e o consumidor pode propor a ação no foro do seu domicílio, nos termos do CDC."
+          )}
         </p>
       </Secao>
     </LegalLayout>
