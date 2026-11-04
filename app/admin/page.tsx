@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { waLink } from "@/lib/contato";
 import { useStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { brlPreco, ORDEM_PLANOS, PLANOS, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -11,6 +13,7 @@ import type { Chamado } from "@/lib/types";
 import {
   AlertTriangle,
   Lock,
+  LogOut,
   RefreshCw,
   CheckCircle2,
   RotateCcw,
@@ -119,6 +122,8 @@ function dataCurta(iso: string | null) {
 }
 
 function Admin() {
+  const router = useRouter();
+  const { confirm } = useDialog();
   const listarChamados = useStore((s) => s.listarChamados);
   const resolverChamado = useStore((s) => s.resolverChamado);
 
@@ -173,6 +178,20 @@ function Admin() {
     }
   }
 
+  async function sair() {
+    const ok = await confirm({
+      titulo: "Sair da conta?",
+      mensagem: "Você precisará entrar de novo com seu e-mail e senha.",
+      confirmar: "Sair",
+      perigo: true,
+    });
+    if (!ok) return;
+    await createClient().auth.signOut();
+    // não deixa os dados da conta na memória para o próximo login neste navegador
+    useStore.getState().limpar();
+    router.replace("/login");
+  }
+
   if (!autorizado) {
     return (
       <div className="grid place-items-center py-20 text-center">
@@ -197,9 +216,14 @@ function Admin() {
         titulo="Admin"
         descricao="Painel da plataforma AutoManager"
         acoes={
-          <button onClick={carregar} className="btn-ghost btn-sm" disabled={carregando}>
-            <RefreshCw size={16} className={carregando ? "animate-spin" : ""} aria-hidden /> Atualizar
-          </button>
+          <>
+            <button onClick={carregar} className="btn-ghost btn-sm" disabled={carregando}>
+              <RefreshCw size={16} className={carregando ? "animate-spin" : ""} aria-hidden /> Atualizar
+            </button>
+            <button onClick={sair} className="btn-ghost btn-sm">
+              <LogOut size={16} aria-hidden /> Sair
+            </button>
+          </>
         }
       />
 
