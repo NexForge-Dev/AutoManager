@@ -1,69 +1,108 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Plus, Minus } from "lucide-react";
 import { PLANOS, brlPreco } from "@/lib/plans";
 
 // preços vêm de lib/plans.ts (fonte única): o FAQ não fica desatualizado quando o preço muda
 const preco = (id: keyof typeof PLANOS) => brlPreco(PLANOS[id].precoCentavos);
 
-// Cada resposta foi conferida com DOCUMENTACAO.md, lib/plans.ts e /cancelamento.
 const PERGUNTAS: { q: string; a: string }[] = [
   {
-    q: "Preciso colocar cartão para testar?",
-    a: "Não. O 1º mês é grátis e começa sem cartão. Você só informa um meio de pagamento se decidir assinar.",
+    q: "Preciso instalar algum programa?",
+    a: "Não. O AutoManager funciona direto no navegador do celular ou do computador. Você abre o link, entra com seu e-mail e já começa a usar. Nada para baixar, nada para atualizar.",
   },
   {
-    q: "Quanto custa depois do mês grátis?",
-    a: `São quatro planos: Ambulante por ${preco("ambulante")}, Solo por ${preco("solo")}, Equipe por ${preco("equipe")} e Expansão por ${preco("expansao")} por mês. O preço é fechado, sem taxa por venda.`,
+    q: "Funciona no celular?",
+    a: "Funciona - e foi feito pensando primeiro no celular. Você pode adicionar à tela inicial e ele abre como se fosse um aplicativo, inclusive para registrar venda no balcão ou na mão da revendedora.",
   },
   {
     q: "Posso cancelar quando quiser?",
-    a: "Sim, sem fidelidade e sem multa. Seus dados não são apagados por causa do cancelamento. E se desistir em até 7 dias depois da primeira cobrança, devolvemos 100% do valor.",
+    a: "Sim. Sem fidelidade, sem multa e sem ligação para 'segurar' você. Cancelou, parou de cobrar no fim do período. Seus dados continuam disponíveis para exportar.",
   },
   {
-    q: "E se eu não assinar depois do teste?",
-    a: "Sua conta continua existindo, com os recursos do plano básico, e seus dados ficam guardados. Você pode assinar quando quiser.",
-  },
-  {
-    q: "Preciso instalar algum programa?",
-    a: "Não. Abre no navegador do celular ou do computador. Se quiser, adicione à tela inicial do celular para abrir como um aplicativo.",
-  },
-  {
-    q: "Funciona sem internet?",
-    a: "Não. O AutoManager é online, então registrar e consultar precisa de conexão. Pode ser a internet do próprio celular.",
-  },
-  {
-    q: "Preciso entender de tecnologia?",
-    a: "Não. O cadastro é guiado por poucas perguntas e, em poucos minutos, você já registra a primeira venda.",
-  },
-  {
-    q: "Serve para quem tem revendedoras?",
-    a: "Sim, a partir do plano Solo. Cada revendedora tem acesso próprio, vê o catálogo e registra a venda pelo celular dela. A comissão sai calculada e ela não vê seu custo nem seu lucro.",
-  },
-  {
-    q: "E se eu vendo sozinha ou na rua?",
-    a: `Funciona igual. O plano Ambulante (${preco("ambulante")}/mês) tem controle de estoque, vendas, lojinha virtual, chat e relatórios básicos, sem revendedoras nem entregas.`,
-  },
-  {
-    q: "Tenho meus produtos em uma planilha. Posso aproveitar?",
-    a: "Pode. No Estoque, você importa uma planilha em CSV, que dá para salvar direto do Excel. Fotos e variações você completa depois em cada produto.",
-  },
-  {
-    q: "A vitrine vende sozinha, com pagamento online?",
-    a: "Não. A vitrine mostra seus produtos e o cliente fala com você pelo chat ou pelos seus contatos. A venda e o pagamento você combina e registra no sistema.",
-  },
-  {
-    q: "O sistema se conecta com a minha conta do banco ou com o WhatsApp?",
-    a: "Não. Hoje as vendas e os recebimentos são registrados por você ou pela sua equipe. O chat é o da vitrine, e o WhatsApp entra como canal para você marcar de onde veio a venda.",
-  },
-  {
-    q: "Consigo ver quanto lucro em cada produto?",
-    a: "Consegue. Com o custo e o preço cadastrados, você vê a margem de cada produto, e os relatórios mostram o lucro do período, já descontando custo e comissões.",
+    q: "Preciso entender de tecnologia para usar?",
+    a: "Não. Se você usa WhatsApp, você usa o AutoManager. O cadastro inicial é guiado passo a passo e o sistema monta sua loja sozinho. Dá pra registrar a primeira venda em poucos minutos.",
   },
   {
     q: "Meus dados ficam seguros?",
-    a: "Cada loja é isolada das outras no banco de dados: ninguém de outra loja enxerga seus números, e cada pessoa da equipe vê só o que faz parte do papel dela.",
+    a: "Ficam. Cada loja é isolada das outras por segurança no banco de dados (RLS), tudo trafega criptografado e o backup é automático. Ninguém de outra loja - nem outra revendedora - enxerga seus números.",
+  },
+  {
+    q: "Posso importar meus produtos que já estão na planilha?",
+    a: "Pode. Em Estoque › Importar você envia a planilha (CSV, pode salvar direto do Excel) com nome, categoria, custo, preço, estoque, SKU e marca. Fotos e variações (cor, tamanho, grade) você completa depois na tela de cada produto.",
+  },
+  {
+    q: "E se eu vendo no caderno hoje, perco meu histórico?",
+    a: "Não. Você lança o estoque atual e segue daqui pra frente. O que já vendeu fica no caderno; o que importa - o que você ainda tem e o que vai vender - passa a ficar organizado no sistema.",
+  },
+  {
+    q: "Serve para quem tem revendedoras?",
+    a: "Esse é justamente o diferencial. Cada revendedora ganha um acesso próprio, vê o catálogo, registra a própria venda pelo celular e a comissão é calculada automaticamente. Você acompanha quem vende, quanto deve e o ranking.",
+  },
+  {
+    q: "E se eu não tenho revendedora, só vendo sozinha ou na rua?",
+    a: `Funciona igual. Quem vende na rua usa o plano AMBULANTE (${preco("ambulante")}/mês): controle de estoque, lojinha virtual, chat e relatórios, sem revendedoras nem entregas. Quer crescer com equipe? Sobe para SOLO ou EQUIPE em um clique.`,
+  },
+  {
+    q: "A comissão é calculada sozinha mesmo?",
+    a: "Sim. Você define o percentual (ou meta) de cada revendedora uma vez. A cada venda registrada, o sistema calcula a comissão e mostra quanto você deve pagar no fechamento. Acabou a calculadora e o 'achismo'.",
+  },
+  {
+    q: "Consigo ver quanto realmente lucro em cada produto?",
+    a: "Consegue. Como você cadastra o preço de custo e o de venda, o estoque mostra a margem de cada produto e os relatórios mostram o lucro real do período (já descontando custo e comissões). Você descobre o que dá lucro e o que só ocupa espaço.",
+  },
+  {
+    q: "Tem loja online / vitrine para os clientes?",
+    a: "Tem. Cada loja ganha uma vitrine pública com link próprio para mandar no WhatsApp e no Instagram. O cliente navega, vê os produtos e fala com você pelo chat integrado.",
+  },
+  {
+    q: "O controle de estoque atualiza sozinho quando eu vendo?",
+    a: "Sim. Cada venda baixa o estoque automaticamente. Você define o estoque mínimo e o sistema avisa o que está acabando, para você não perder venda por falta de reposição.",
+  },
+  {
+    q: "Quantos produtos posso cadastrar?",
+    a: "Você cadastra o seu catálogo completo em qualquer plano. A diferença entre os planos está na equipe (vendedores, motoboys e revendedoras), não no tamanho do estoque.",
+  },
+  {
+    q: "Funciona para mais de uma pessoa usando ao mesmo tempo?",
+    a: "Funciona. Cada pessoa tem o próprio login e o próprio papel: dono vê tudo, vendedor registra venda, motoboy vê só as entregas dele, revendedora vê só o que é dela. Tudo ao mesmo tempo, sem se atrapalhar.",
+  },
+  {
+    q: "Preciso de internet o tempo todo?",
+    a: "Para registrar e sincronizar, sim - é online. Mas é leve e funciona bem até em 3G/4G de loja. Você não precisa de computador potente nem de internet rápida.",
+  },
+  {
+    q: "Quanto custa? Tem taxa escondida?",
+    a: `Os planos são AMBULANTE ${preco("ambulante")}, SOLO ${preco("solo")}, EQUIPE ${preco("equipe")} e EXPANSÃO ${preco("expansao")} por mês. Preço fechado, sem taxa por venda e sem surpresa na fatura. Você começa com teste grátis antes de pagar qualquer coisa.`,
+  },
+  {
+    q: "Preciso colocar cartão para testar?",
+    a: "Não. O teste grátis começa sem cartão. Você só decide pagar se gostar - e aí escolhe o plano que faz sentido para o tamanho da sua loja.",
+  },
+  {
+    q: "E se eu travar ou tiver dúvida no começo?",
+    a: "Você tem suporte pelo WhatsApp. A ideia é simples: você não fica sozinha. Qualquer dúvida no cadastro ou no dia a dia, a gente responde rápido.",
+  },
+  {
+    q: "Vou conseguir controlar entregas / motoboy?",
+    a: "Sim. Você cria a entrega, atribui ao motoboy e ele atualiza o status pelo celular. Você acompanha o que saiu, o que foi entregue e o que está pendente, sem ligar para ninguém.",
+  },
+  {
+    q: "Serve para qualquer tipo de micronegócio?",
+    a: "Sim. O AutoManager foi feito para micronegócios em geral: doces e comida caseira, bijuterias, semijoias, cosméticos, perfumaria, roupas, papelaria, pet shop, artesanato, loja de festa e por aí vai. Você cria as suas próprias categorias e configura o sistema com a cara do seu negócio - não é fechado para um único ramo.",
+  },
+  {
+    q: "Dá para deixar o sistema com a cara da minha loja?",
+    a: "Dá. Você define o nome, a logo, as cores da marca, as categorias dos produtos, as comissões e os canais de venda. Quase tudo é editável - o AutoManager se adapta a você, e não o contrário.",
+  },
+  {
+    q: "É caro? Cabe no bolso de quem está começando?",
+    a: `Foi pensado justamente para quem não pode pagar caro por um sistema. Começa grátis e o plano de entrada é ${preco("ambulante")}/mês (AMBULANTE) - bem menos do que você perde por mês com produto parado e venda esquecida.`,
+  },
+  {
+    q: "E se eu crescer? O sistema acompanha?",
+    a: "Acompanha. Começou vendendo na rua no AMBULANTE? Sobe para SOLO. Contratou ajuda e revendedoras? EQUIPE. Virou várias revendedoras e entregas? EXPANSÃO. Você muda de plano em um clique, sem perder nada do que já cadastrou.",
   },
 ];
 
@@ -72,32 +111,24 @@ export default function Faq({ itens }: { itens?: { q: string; a: string }[] } = 
   const [aberta, setAberta] = useState<number | null>(0);
 
   return (
-    <div className="divide-y divide-[color:var(--border)] border-y border-default">
+    <div className="mx-auto mt-10 max-w-3xl divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-default surface">
       {lista.map((item, i) => {
         const open = aberta === i;
-        const idResposta = `faq-resposta-${i}`;
         return (
           <div key={item.q}>
-            <h3>
-              <button
-                type="button"
-                onClick={() => setAberta(open ? null : i)}
-                aria-expanded={open}
-                aria-controls={idResposta}
-                className="flex min-h-[56px] w-full items-center justify-between gap-4 py-3 text-left font-semibold"
-              >
-                {item.q}
-                <ChevronDown
-                  size={18}
-                  className={`shrink-0 text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-                  aria-hidden
-                />
-              </button>
-            </h3>
+            <button
+              type="button"
+              onClick={() => setAberta(open ? null : i)}
+              aria-expanded={open}
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+            >
+              <span className="font-semibold text-strong">{item.q}</span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500/10 text-brand-600">
+                {open ? <Minus size={16} /> : <Plus size={16} />}
+              </span>
+            </button>
             {open && (
-              <p id={idResposta} className="max-w-2xl pb-5 leading-relaxed text-muted">
-                {item.a}
-              </p>
+              <p className="px-5 pb-5 -mt-1 text-sm leading-relaxed text-muted">{item.a}</p>
             )}
           </div>
         );

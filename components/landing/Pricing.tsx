@@ -1,142 +1,156 @@
-import Link from "next/link";
-import { ArrowRight, Check, Minus, Star } from "lucide-react";
-import {
-  ORDEM_PLANOS,
-  PLANOS,
-  brlPreco,
-  fmtLimite,
-  limiteDoRecurso,
-  type PlanoDef,
-  type PlanoId,
-} from "@/lib/plans";
+"use client";
 
-// nome, preço, limites e benefícios vêm de lib/plans.ts (fonte única)
-const RESUMO: Record<PlanoId, string> = {
-  ambulante: "Para quem vende na rua e quer controlar estoque e vendas no bolso.",
-  solo: "Para quem vende sozinha e quer parar com o caderno.",
-  equipe: "Para quem tem revendedoras e precisa de comissão no automático.",
-  expansao: "Para quem está crescendo e quer escalar sem perder o controle.",
+import Link from "next/link";
+import { Check, X, ArrowRight, Star } from "lucide-react";
+import { ORDEM_PLANOS, PLANOS as PLANOS_DEF, type PlanoId } from "@/lib/plans";
+
+type Plano = {
+  id: PlanoId;
+  nome: string;
+  preco: number;
+  resumo: string;
+  para: string;
+  destaque?: boolean;
+  badge?: string;
+  cta: string;
 };
 
-type Cel = boolean | string;
-const limite = (n: number): Cel => (n === 0 ? false : n === Infinity ? "Ilimitado" : `Até ${fmtLimite(n)}`);
+// textos de marketing por plano; nome, preço e destaque vêm de lib/plans.ts (fonte única)
+const TEXTOS: Record<PlanoId, { resumo: string; para: string }> = {
+  ambulante: { resumo: "Para quem vende na rua e quer controlar estoque e vendas no bolso.", para: "Vendedor ambulante" },
+  solo: { resumo: "Para quem vende sozinha e quer parar com o caderno.", para: "Loja de 1 pessoa" },
+  equipe: { resumo: "Para quem tem revendedoras e precisa de comissão no automático.", para: "Loja com equipe e revendedoras" },
+  expansao: { resumo: "Para quem está crescendo e quer escalar sem perder o controle.", para: "Várias revendedoras + entregas" },
+};
 
-// linhas da comparação, calculadas a partir das capacidades de cada plano
-const COMPARACAO: [string, (p: PlanoDef) => Cel][] = [
-  ["Estoque em tempo real", () => true],
-  ["Venda rápida (balcão e WhatsApp)", () => true],
-  ["Relatórios de vendas e lucro", () => true],
-  ["Vitrine online com link próprio", () => true],
-  ["Chat com o cliente final", (p) => p.allowChat],
-  ["Revendedoras com login próprio", (p) => limite(p.maxRevendedoras)],
-  ["Vendedores internos", (p) => limite(limiteDoRecurso(p, "vendedores"))],
-  ["Comissão automática", (p) => p.maxRevendedoras > 0],
-  ["Ranking de revendedoras", (p) => p.allowRanking],
-  ["Analytics de vendas (canal e produto)", (p) => p.allowAnalytics],
-  ["Tendência e ruptura de estoque", (p) => p.allowAdvancedAnalytics],
-  ["Controle de entregas e motoboy", (p) => p.allowEntregas],
-  ["Suporte prioritário", (p) => p.beneficios.includes("Suporte prioritário")],
+const PLANOS: Plano[] = ORDEM_PLANOS.map((id) => {
+  const def = PLANOS_DEF[id];
+  const nome = def.nome.toUpperCase();
+  return {
+    id,
+    nome,
+    preco: def.precoCentavos / 100,
+    ...TEXTOS[id],
+    destaque: def.destaque,
+    badge: def.destaque ? "⭐ RECOMENDADO" : undefined,
+    cta: `Começar no ${nome}`,
+  };
+});
+
+// linha de comparação: [recurso, ambulante, solo, equipe, expansao]
+type Cel = boolean | string;
+const COMPARACAO: [string, Cel, Cel, Cel, Cel][] = [
+  ["Estoque em tempo real", true, true, true, true],
+  ["Venda rápida (balcão + WhatsApp)", true, true, true, true],
+  ["Relatórios de vendas e lucro", true, true, true, true],
+  ["Vitrine online com link próprio", true, true, true, true],
+  ["Chat com o cliente final", true, true, true, true],
+  ["Revendedoras com login próprio", "-", "Até 3", "Até 15", "Ilimitado"],
+  ["Vendedores internos", "-", "-", "Até 3", "Ilimitado"],
+  ["Comissão automática", "-", true, true, true],
+  ["Ranking de revendedoras", "-", "-", true, true],
+  ["Analytics de vendas (canal/produto)", "-", "-", true, true],
+  ["Tendência e ruptura de estoque", "-", "-", "-", true],
+  ["Controle de entregas / motoboy", "-", "-", "-", true],
+  ["Suporte prioritário", "-", "-", "-", true],
 ];
 
-function Celula({ v }: { v: Cel }) {
-  if (v === true) {
-    return (
-      <>
-        <Check size={17} className="mx-auto text-accent" aria-hidden />
-        <span className="sr-only">Incluso</span>
-      </>
-    );
-  }
-  if (v === false) {
-    return (
-      <>
-        <Minus size={15} className="mx-auto text-muted opacity-50" aria-hidden />
-        <span className="sr-only">Não incluso</span>
-      </>
-    );
-  }
-  return <span className="text-sm font-medium whitespace-nowrap">{v}</span>;
+function Celula({ v }: { v: boolean | string }) {
+  if (v === true) return <Check size={17} className="mx-auto text-brand-600" />;
+  if (v === false || v === "-") return <X size={15} className="mx-auto text-muted opacity-40" />;
+  return <span className="text-sm font-medium text-strong">{v}</span>;
 }
 
 export default function Pricing() {
-  const planos = ORDEM_PLANOS.map((id) => PLANOS[id]);
   return (
     <div>
-      <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {planos.map((p) => (
-          <li
-            key={p.id}
-            className={`flex flex-col rounded-2xl border bg-[var(--surface)] p-5 ${
-              p.destaque ? "border-brand-500" : "border-default"
-            }`}
-          >
-            <div className="flex min-h-[1.75rem] items-center justify-between gap-2">
-              <h3 className="text-lg font-bold">{p.nome}</h3>
-              {p.destaque && (
-                <span className="badge tone-brand">
-                  <Star size={12} aria-hidden /> Recomendado
+      {/* cards de plano */}
+      <div className="mt-10 grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {PLANOS.map((p) => {
+          const mensal = p.preco.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+          return (
+            <div
+              key={p.nome}
+              className={`card relative flex flex-col transition-all duration-200 hover:-translate-y-1.5 ${
+                p.destaque
+                  ? "border-brand-500 ring-2 ring-brand-500/40 shadow-pop lg:-mt-3 lg:mb-3 lg:scale-[1.03]"
+                  : "hover:border-brand-500/30"
+              }`}
+            >
+              {p.badge && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-brand-600 px-3 py-1 text-xs font-bold text-white">
+                  {p.badge}
                 </span>
               )}
-            </div>
-            <p className="mt-3">
-              <span className="text-[2rem] font-bold leading-none tracking-tight tnum">{brlPreco(p.precoCentavos)}</span>
-              <span className="text-sm text-muted">/mês</span>
-            </p>
-            <p className="mt-3 text-sm leading-relaxed text-muted">{RESUMO[p.id]}</p>
-            <ul className="mt-4 flex-1 space-y-2 border-t border-default pt-4 text-sm">
-              {p.beneficios.map((b) => (
-                <li key={b} className="flex gap-2">
-                  <Check size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden /> {b}
-                </li>
-              ))}
-            </ul>
-            <Link href={`/login?plano=${p.id}`} className={`mt-5 ${p.destaque ? "btn-primary" : "btn-ghost"}`}>
-              Começar no {p.nome} <ArrowRight size={16} aria-hidden />
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-4 text-sm text-muted">Em todos os planos: 1º mês grátis, sem cartão, cancela quando quiser.</p>
+              <h3 className="mt-1 text-lg font-bold text-strong">{p.nome}</h3>
+              <p className="text-sm text-muted">{p.para}</p>
 
-      <h3 className="mt-14 text-xl font-bold">Compare os planos</h3>
-      <div className="relative mt-4 overflow-x-auto rounded-2xl border border-default">
-        <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
-          <caption className="sr-only">Recursos incluídos em cada plano</caption>
+              <div className="mt-4 flex items-end gap-1">
+                <span className="text-sm text-muted">R$</span>
+                <span className="text-4xl font-extrabold text-strong">{mensal}</span>
+                <span className="mb-1 text-sm text-muted">/mês</span>
+              </div>
+
+              <p className="mt-4 text-sm text-muted">{p.resumo}</p>
+
+              <Link
+                href={`/login?plano=${p.id}`}
+                className={`mt-6 px-5 py-3 text-sm ${p.destaque ? "btn-primary" : "btn-ghost"}`}
+              >
+                {p.cta} <ArrowRight size={16} />
+              </Link>
+              <p className="mt-3 text-center text-xs text-muted">
+                Teste grátis · sem cartão · cancela quando quiser
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* tabela de comparação */}
+      <div className="mt-12 overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
-            <tr className="bg-[var(--surface)]">
-              <th scope="col" className="sticky left-0 z-10 bg-[var(--surface)] px-4 py-3 font-medium text-muted">
-                O que está incluso
+            <tr className="border-b border-default">
+              <th className="py-3 pr-4 text-sm font-semibold text-muted">O que está incluso</th>
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[0].nome}</th>
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[1].nome}</th>
+              <th className="px-4 py-3 text-center text-sm font-bold text-brand-600">
+                <span className="inline-flex items-center gap-1">
+                  <Star size={13} className="fill-brand-500 text-brand-500" /> {PLANOS[2].nome}
+                </span>
               </th>
-              {planos.map((p) => (
-                <th
-                  key={p.id}
-                  scope="col"
-                  className={`px-3 py-3 text-center font-semibold ${p.destaque ? "text-accent" : ""}`}
-                >
-                  {p.nome}
-                </th>
-              ))}
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[3].nome}</th>
             </tr>
           </thead>
           <tbody>
-            {COMPARACAO.map(([rotulo, valor]) => (
-              <tr key={rotulo} className="border-t border-default">
-                <th
-                  scope="row"
-                  className="sticky left-0 z-10 max-w-[11rem] bg-[var(--bg)] px-4 py-2.5 font-normal sm:max-w-none"
-                >
-                  {rotulo}
-                </th>
-                {planos.map((p) => (
-                  <td key={p.id} className="px-3 py-2.5 text-center">
-                    <Celula v={valor(p)} />
-                  </td>
-                ))}
+            {COMPARACAO.map((linha) => (
+              <tr key={linha[0]} className="border-b border-default/60">
+                <td className="py-3 pr-4 text-sm text-strong">{linha[0]}</td>
+                <td className="px-4 py-3 text-center">
+                  <Celula v={linha[1]} />
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <Celula v={linha[2]} />
+                </td>
+                <td className="bg-brand-500/[0.04] px-4 py-3 text-center">
+                  <Celula v={linha[3]} />
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <Celula v={linha[4]} />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* empurrão psicológico para o upgrade */}
+      <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted">
+        Tem revendedoras? O <strong className="text-strong">EQUIPE</strong> calcula a comissão de
+        cada venda sozinho — <strong className="text-strong">uma comissão paga errada</strong> por
+        mês já pode custar mais que a mensalidade.
+      </p>
     </div>
   );
 }

@@ -18,13 +18,16 @@ export default function StickyCta() {
 
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-40 border-t border-default bg-[var(--bg)] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 transition-transform duration-300 sm:hidden ${
-        visivel ? "translate-y-0" : "invisible translate-y-full"
+      className={`fixed inset-x-0 bottom-0 z-40 border-t border-default bg-[var(--bg)]/95 p-3 backdrop-blur transition-transform duration-300 sm:hidden ${
+        visivel ? "translate-y-0" : "translate-y-full"
       }`}
     >
-      <Link href={COMECAR} className="btn-primary w-full">
-        Criar minha loja grátis <ArrowRight size={18} aria-hidden />
+      <Link href={COMECAR} className="btn-primary w-full px-5 py-3.5 text-base">
+        Começar Teste Grátis <ArrowRight size={18} />
       </Link>
+      <p className="mt-1.5 text-center text-xs text-muted">
+        Sem cartão · configuração em 2 minutos
+      </p>
     </div>
   );
 }
