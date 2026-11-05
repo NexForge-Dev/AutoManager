@@ -312,7 +312,7 @@ export default function LojaPage() {
             )}
             <h1 className="mt-2 text-2xl md:text-[2rem] font-bold leading-tight tracking-tight break-words">{loja.nome}</h1>
             {loja.descricao && abaAtual === "inicio" && (
-              <p className="mt-1 text-muted max-w-2xl">{loja.descricao}</p>
+              <p className="mt-1 text-muted max-w-2xl [overflow-wrap:anywhere]">{loja.descricao}</p>
             )}
           </div>
 
@@ -387,7 +387,7 @@ export default function LojaPage() {
       {abaAtual === "sobre" && temSobre && (
         <main className="max-w-2xl mx-auto px-4 md:px-6 pt-6 pb-28">
           <h2 className="text-xl font-bold">Sobre {loja.nome}</h2>
-          <p className="mt-2 leading-relaxed text-muted whitespace-pre-line">{loja.sobre}</p>
+          <p className="mt-2 leading-relaxed text-muted whitespace-pre-line [overflow-wrap:anywhere]">{loja.sobre}</p>
         </main>
       )}
 

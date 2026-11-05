@@ -189,7 +189,7 @@ function Admin() {
     await createClient().auth.signOut();
     // não deixa os dados da conta na memória para o próximo login neste navegador
     useStore.getState().limpar();
-    router.replace("/login");
+    router.replace("/login?modo=entrar");
   }
 
   if (!autorizado) {

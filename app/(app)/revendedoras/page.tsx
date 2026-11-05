@@ -452,6 +452,7 @@ function Revendedoras() {
               <label className="label" htmlFor="rev-whats">WhatsApp (opcional)</label>
               <input
                 id="rev-whats"
+                maxLength={30}
                 className="input"
                 placeholder="DDD + número"
                 inputMode="tel"

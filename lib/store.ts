@@ -1725,6 +1725,8 @@ export const useStore = create<State>()((set, get) => {
       if (!c.descricao.trim()) return { ok: false, erro: "Informe a descrição da conta." };
       if (!c.valor || c.valor <= 0) return { ok: false, erro: "Informe um valor válido." };
       if (!c.vencimento) return { ok: false, erro: "Informe a data de vencimento." };
+      if (c.vencimento < "2000-01-01" || c.vencimento > "2100-12-31")
+        return { ok: false, erro: "Confira o ano do vencimento." };
       const id = uid();
       const nova: ContaPagar = {
         id,

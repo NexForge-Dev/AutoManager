@@ -452,16 +452,21 @@ function MinhaLoja() {
                 <label className="label" htmlFor="loja-nome">Nome da loja</label>
                 <input
                   id="loja-nome"
+                  maxLength={120}
                   className="input"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  onBlur={() => persistir({ nomeLoja: nome || "Minha Loja" })}
+                  // apagou o nome e saiu: volta o salvo, em vez de virar "Minha Loja" sem avisar
+                  onBlur={() =>
+                    nome.trim() ? persistir({ nomeLoja: nome.trim() }) : setNome(useStore.getState().config.nomeLoja)
+                  }
                 />
               </div>
               <div>
                 <label className="label" htmlFor="loja-descricao">Chamada curta (subtítulo)</label>
                 <textarea
                   id="loja-descricao"
+                  maxLength={300}
                   className="input"
                   rows={2}
                   value={descricao}
@@ -617,6 +622,7 @@ function MinhaLoja() {
               className="input"
               rows={4}
               aria-label="Sobre a loja"
+              maxLength={2000}
               value={sobre}
               onChange={(e) => setSobre(e.target.value)}
               onBlur={() => persistir({ lojaSobre: sobre || null })}
@@ -631,19 +637,19 @@ function MinhaLoja() {
                 <label className="label flex items-center gap-1.5" htmlFor="loja-whatsapp">
                   <MessageCircle size={13} className="text-muted" aria-hidden /> WhatsApp
                 </label>
-                <input id="loja-whatsapp" className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} onBlur={() => salvar("lojaWhatsapp", whatsapp)} placeholder="Ex.: 11 99999-9999" />
+                <input id="loja-whatsapp" maxLength={30} className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} onBlur={() => salvar("lojaWhatsapp", whatsapp)} placeholder="Ex.: 11 99999-9999" />
               </div>
               <div>
                 <label className="label flex items-center gap-1.5" htmlFor="loja-telefone">
                   <Phone size={13} className="text-muted" aria-hidden /> Telefone
                 </label>
-                <input id="loja-telefone" className="input" value={telefone} onChange={(e) => setTelefone(e.target.value)} onBlur={() => salvar("lojaTelefone", telefone)} placeholder="Ex.: (11) 3333-3333" />
+                <input id="loja-telefone" maxLength={30} className="input" value={telefone} onChange={(e) => setTelefone(e.target.value)} onBlur={() => salvar("lojaTelefone", telefone)} placeholder="Ex.: (11) 3333-3333" />
               </div>
               <div className="sm:col-span-2 xl:col-span-1">
                 <label className="label flex items-center gap-1.5" htmlFor="loja-email">
                   <Mail size={13} className="text-muted" aria-hidden /> E-mail
                 </label>
-                <input id="loja-email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => salvar("lojaEmail", email)} placeholder="contato@sualoja.com" />
+                <input id="loja-email" maxLength={254} className="input" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => salvar("lojaEmail", email)} placeholder="contato@sualoja.com" />
               </div>
             </div>
           </Painel>
@@ -655,19 +661,19 @@ function MinhaLoja() {
                 <label className="label flex items-center gap-1.5" htmlFor="loja-instagram">
                   <Instagram size={13} className="text-muted" aria-hidden /> Instagram
                 </label>
-                <input id="loja-instagram" className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} onBlur={() => salvar("lojaInstagram", instagram)} placeholder="@sualoja" />
+                <input id="loja-instagram" maxLength={200} className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} onBlur={() => salvar("lojaInstagram", instagram)} placeholder="@sualoja" />
               </div>
               <div>
                 <label className="label flex items-center gap-1.5" htmlFor="loja-facebook">
                   <Facebook size={13} className="text-muted" aria-hidden /> Facebook
                 </label>
-                <input id="loja-facebook" className="input" value={facebook} onChange={(e) => setFacebook(e.target.value)} onBlur={() => salvar("lojaFacebook", facebook)} placeholder="sualoja ou link completo" />
+                <input id="loja-facebook" maxLength={200} className="input" value={facebook} onChange={(e) => setFacebook(e.target.value)} onBlur={() => salvar("lojaFacebook", facebook)} placeholder="sualoja ou link completo" />
               </div>
               <div className="sm:col-span-2 xl:col-span-1">
                 <label className="label flex items-center gap-1.5" htmlFor="loja-tiktok">
                   <Music2 size={13} className="text-muted" aria-hidden /> TikTok
                 </label>
-                <input id="loja-tiktok" className="input" value={tiktok} onChange={(e) => setTiktok(e.target.value)} onBlur={() => salvar("lojaTiktok", tiktok)} placeholder="@sualoja" />
+                <input id="loja-tiktok" maxLength={200} className="input" value={tiktok} onChange={(e) => setTiktok(e.target.value)} onBlur={() => salvar("lojaTiktok", tiktok)} placeholder="@sualoja" />
               </div>
             </div>
           </Painel>

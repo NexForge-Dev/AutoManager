@@ -146,6 +146,11 @@ function Configuracoes() {
 
   async function salvar() {
     if (salvando) return;
+    // nome apagado sem querer não vira "Minha Loja" em silêncio
+    if (!nomeLoja.trim()) {
+      setErroNumeros("Informe o nome da loja.");
+      return;
+    }
     // número inválido não vira 0 em silêncio
     const margemNum = parseNumero(margem);
     const comissaoNum = parseNumero(comissao);
@@ -160,7 +165,7 @@ function Configuracoes() {
     setErroNumeros(null);
     setSalvando(true);
     const res = await setConfig({
-      nomeLoja: nomeLoja.trim() || "Minha Loja",
+      nomeLoja: nomeLoja.trim(),
       segmento,
       canais: canais.length ? canais : ["whatsapp"],
       usaRevendedoras: usaRev,
@@ -204,7 +209,7 @@ function Configuracoes() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="cfg-nome">Nome da loja</label>
-            <input id="cfg-nome" className="input" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} />
+            <input id="cfg-nome" maxLength={120} className="input" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} />
           </div>
           <div>
             <label className="label" htmlFor="cfg-segmento">Segmento</label>

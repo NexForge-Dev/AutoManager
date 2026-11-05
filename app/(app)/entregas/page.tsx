@@ -660,7 +660,7 @@ function NovaEntrega({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label" htmlFor="ent-telefone">Telefone</label>
-            <input id="ent-telefone" className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+            <input id="ent-telefone" maxLength={30} className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
           </div>
           <div>
             <label className="label" htmlFor="ent-taxa">Taxa (R$)</label>
@@ -685,9 +685,9 @@ function NovaEntrega({
           <input id="ent-obs" maxLength={300} className="input" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: ponto de referência" />
         </div>
         {erro && (
-          <Aviso tom="bad" className="!py-2">
+          <div role="alert"><Aviso tom="bad" className="!py-2">
             <span className="text-bad">{erro}</span>
-          </Aviso>
+          </Aviso></div>
         )}
         <button
           disabled={salvando}
