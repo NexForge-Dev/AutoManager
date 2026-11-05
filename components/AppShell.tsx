@@ -300,6 +300,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onClose={() => setMaisAberto(false)}
           titulo="Menu"
           fecharLabel="Fechar menu"
+          voltarFecha={false}
           backdropClassName="md:hidden"
           className="space-y-4"
         >

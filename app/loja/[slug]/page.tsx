@@ -10,6 +10,8 @@ import { waLink, igLink, fbLink, ttLink } from "@/lib/contato";
 import { brl } from "@/lib/analytics";
 import { Skeleton } from "@/components/Skeleton";
 import { Aviso, EstadoVazio, iniciais } from "@/components/ui";
+import Modal from "@/components/Modal";
+import { linkPedido, loginAnonimoLigado, precoDaVariacao } from "@/lib/vitrine";
 import {
   AlertCircle,
   ChevronRight,
@@ -116,6 +118,11 @@ export default function LojaPage() {
   const [fontStack, setFontStack] = useState("");
   const [filtroCat, setFiltroCat] = useState<string | null>(null);
   const [naoLidas, setNaoLidas] = useState(0);
+  const [detalhe, setDetalhe] = useState<ProdutoPub | null>(null);
+  // sem login anônimo no Supabase o chat não funciona para visitante: em vez de um
+  // botão que só falha depois de preencher o nome, ele nem aparece.
+  // undefined = ainda verificando; a dúvida (rede) mantém o botão, e o chat explica
+  const [chatLigado, setChatLigado] = useState<boolean | undefined>(undefined);
   const [aba, setAba] = useState<"inicio" | "sobre" | "contato">("inicio");
   const [falhaRede, setFalhaRede] = useState(false);
   const [tentativa, setTentativa] = useState(0);
@@ -138,13 +145,29 @@ export default function LojaPage() {
     });
   }, [slug, tentativa]);
 
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      const ligado = await loginAnonimoLigado(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      );
+      // quem já tem sessão (conversa anterior, dono testando a loja) continua conversando
+      const { data } = await sb.current.auth.getSession();
+      if (ativo) setChatLigado(ligado !== false || !!data.session);
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   // badge de não lidas: se o cliente já conversou aqui, conta mensagens da LOJA
   // chegadas depois da última vez que ele abriu o chat (mesmo com o chat fechado).
   useEffect(() => {
     if (!loja) return;
     const orgId = loja.org_id;
     const token = lsLer("amchat_" + orgId);
-    if (!token) return;
+    if (!token || !chatLigado) return;
     const client = sb.current;
     let canceled = false;
     let canal: ReturnType<typeof client.channel> | null = null;
@@ -187,7 +210,7 @@ export default function LojaPage() {
       canceled = true;
       if (canal) client.removeChannel(canal);
     };
-  }, [loja]);
+  }, [loja, chatLigado]);
 
   function abrirChat() {
     if (loja) lsGravar("amchat_visto_" + loja.org_id, String(Date.now()));
@@ -349,7 +372,7 @@ export default function LojaPage() {
                   )}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 md:gap-x-5 gap-y-6">
                     {lista.map((p) => (
-                      <ProdutoCard key={p.id} p={p} />
+                      <ProdutoCard key={p.id} p={p} onAbrir={() => setDetalhe(p)} />
                     ))}
                   </div>
                 </>
@@ -374,30 +397,54 @@ export default function LojaPage() {
         </main>
       )}
 
-      {/* botão de chat */}
-      <button
-        onClick={abrirChat}
-        className="btn-primary fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 md:right-6 z-40 rounded-full px-5 min-h-[48px] shadow-pop"
-      >
-        <MessageCircle size={20} aria-hidden /> Falar com a loja
-        {naoLidas > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1.5 rounded-full bg-bad text-white text-xs font-bold grid place-items-center border-2 border-[var(--bg)]">
-            {naoLidas > 9 ? "9+" : naoLidas}
-          </span>
-        )}
-      </button>
+      {/* botão de chat; sem chat, o WhatsApp da loja ocupa o lugar */}
+      {chatLigado ? (
+        <button
+          onClick={abrirChat}
+          className="btn-primary fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 md:right-6 z-40 rounded-full px-5 min-h-[48px] shadow-pop"
+        >
+          <MessageCircle size={20} aria-hidden /> Falar com a loja
+          {naoLidas > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1.5 rounded-full bg-bad text-white text-xs font-bold grid place-items-center border-2 border-[var(--bg)]">
+              {naoLidas > 9 ? "9+" : naoLidas}
+            </span>
+          )}
+        </button>
+      ) : (
+        chatLigado === false &&
+        loja.whatsapp && (
+          <a
+            href={waLink(loja.whatsapp)}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 md:right-6 z-40 rounded-full px-5 min-h-[48px] shadow-pop"
+          >
+            <MessageCircle size={20} aria-hidden /> Falar no WhatsApp
+          </a>
+        )
+      )}
 
-      {chat && <ChatWidget orgId={loja.org_id} sb={sb.current} nomeLoja={loja.nome} onClose={fecharChat} />}
+      {chat && (
+        <ChatWidget
+          orgId={loja.org_id}
+          sb={sb.current}
+          nomeLoja={loja.nome}
+          onClose={fecharChat}
+          onIndisponivel={() => setChatLigado(false)}
+        />
+      )}
+      {detalhe && <ProdutoDetalhe p={detalhe} whatsapp={loja.whatsapp} onClose={() => setDetalhe(null)} />}
     </Vitrine>
   );
 }
 
-function ProdutoCard({ p }: { p: ProdutoPub }) {
+function ProdutoCard({ p, onAbrir }: { p: ProdutoPub; onAbrir: () => void }) {
   const temDesconto = p.preco_comparativo != null && p.preco_comparativo > p.preco_venda;
   const esgotado = p.esgotado;
   return (
     <article className="min-w-0 flex flex-col">
-      <div className={`aspect-square relative overflow-hidden ${p.imagens[0] ? "surface-alt" : "bg-brand-500/10"}`} style={{ borderRadius: "var(--r-card)" }}>
+      <button type="button" onClick={onAbrir} aria-label={`Ver detalhes de ${p.nome}`} className="min-w-0 flex-1 flex flex-col text-left">
+      <div className={`w-full aspect-square relative overflow-hidden ${p.imagens[0] ? "surface-alt" : "bg-brand-500/10"}`} style={{ borderRadius: "var(--r-card)" }}>
         {p.imagens[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -416,7 +463,7 @@ function ProdutoCard({ p }: { p: ProdutoPub }) {
           <span className="absolute top-2 left-2 badge bg-black/75 text-white">Esgotado</span>
         )}
       </div>
-      <div className="pt-2.5 flex-1 flex flex-col">
+      <div className="pt-2.5 w-full min-w-0 flex-1 flex flex-col [overflow-wrap:anywhere]">
         <h2 className={`text-[0.9375rem] font-semibold leading-snug ${esgotado ? "text-muted" : ""}`}>{p.nome}</h2>
         {p.marca && <div className="text-xs text-muted mt-0.5">{p.marca}</div>}
         {p.descricao && <p className="text-xs text-muted mt-1 line-clamp-2 whitespace-pre-line">{p.descricao}</p>}
@@ -426,11 +473,77 @@ function ProdutoCard({ p }: { p: ProdutoPub }) {
           )}
           <div className="font-bold tnum">{brl(p.preco_venda)}</div>
           {p.variacoes.length > 0 && (
-            <div className="text-xs text-muted">{p.variacoes.length} {p.variacoes.length === 1 ? "opção" : "opções"}</div>
+            <div className="text-xs text-muted line-clamp-1">{p.variacoes.map((v) => v.nome).join(", ")}</div>
           )}
         </div>
       </div>
+      </button>
     </article>
+  );
+}
+
+// Detalhe do produto: fotos, opções com preço e estoque, e como pedir.
+function ProdutoDetalhe({ p, whatsapp, onClose }: { p: ProdutoPub; whatsapp: string | null; onClose: () => void }) {
+  const disponiveis = p.variacoes.filter((v) => !v.esgotado);
+  const [varId, setVarId] = useState<string | null>(disponiveis.length === 1 ? disponiveis[0].id : null);
+  const variacao = p.variacoes.find((v) => v.id === varId) ?? null;
+  const precisaEscolher = p.variacoes.length > 0 && !variacao;
+  const esgotado = p.esgotado || (p.variacoes.length > 0 && disponiveis.length === 0);
+  const pedido = linkPedido(whatsapp, p, variacao);
+  return (
+    <Modal onClose={onClose} titulo={<span className="[overflow-wrap:anywhere]">{p.nome}</span>} style={TEMA_VITRINE} className="space-y-4">
+      {p.imagens.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-5 px-5 [scrollbar-width:none]">
+          {p.imagens.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={src}
+              src={src}
+              alt={p.imagens.length > 1 ? `${p.nome}, foto ${i + 1}` : p.nome}
+              loading="lazy"
+              className="snap-center shrink-0 h-64 w-64 max-w-full rounded-xl object-cover surface-alt"
+            />
+          ))}
+        </div>
+      )}
+      <div>
+        <div className="text-xl font-bold tnum">{brl(precoDaVariacao(p, variacao))}</div>
+        {p.marca && <div className="text-sm text-muted [overflow-wrap:anywhere]">{p.marca}</div>}
+      </div>
+      {p.descricao && <p className="text-sm text-muted whitespace-pre-line [overflow-wrap:anywhere]">{p.descricao}</p>}
+      {p.variacoes.length > 0 && (
+        <div>
+          <div className="text-sm font-medium mb-1.5">Opções</div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Escolha uma opção">
+            {p.variacoes.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                disabled={v.esgotado}
+                aria-pressed={varId === v.id}
+                onClick={() => setVarId(v.id)}
+                className="chip whitespace-normal [overflow-wrap:anywhere] disabled:opacity-50 disabled:line-through disabled:cursor-not-allowed"
+              >
+                {v.nome}
+                {Number(v.preco_ajuste) !== 0 && <span className="tnum">{brl(precoDaVariacao(p, v))}</span>}
+                {v.esgotado && <span>(esgotado)</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {esgotado ? (
+        <Aviso tom="warn" icone={AlertCircle}>Este produto está esgotado no momento.</Aviso>
+      ) : !whatsapp ? (
+        <p className="text-sm text-muted">Para comprar, fale com a loja pelos contatos da página.</p>
+      ) : precisaEscolher ? (
+        <p className="text-sm text-muted">Escolha uma opção para pedir pelo WhatsApp.</p>
+      ) : (
+        <a href={pedido} target="_blank" rel="noreferrer" className="btn-primary w-full">
+          <MessageCircle size={18} aria-hidden /> Pedir pelo WhatsApp
+        </a>
+      )}
+    </Modal>
   );
 }
 
@@ -469,11 +582,13 @@ function ChatWidget({
   sb,
   nomeLoja,
   onClose,
+  onIndisponivel,
 }: {
   orgId: string;
   sb: ReturnType<typeof createClient>;
   nomeLoja: string;
   onClose: () => void;
+  onIndisponivel: () => void;
 }) {
   const [nome, setNome] = useState("");
   const [iniciado, setIniciado] = useState(false);
@@ -587,6 +702,8 @@ function ChatWidget({
       setIniciado(true);
     } catch (e: any) {
       const msg = String(e?.message || e);
+      // a checagem inicial não conseguiu saber: o botão sai ao fechar, sem insistir
+      if (/anonymous sign-ins are disabled/i.test(msg)) onIndisponivel();
       setErro(
         /anonymous sign-ins are disabled/i.test(msg)
           ? "O chat desta loja está indisponível no momento. Tente pelo WhatsApp ou mais tarde."
