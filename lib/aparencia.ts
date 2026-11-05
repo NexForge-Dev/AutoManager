@@ -31,7 +31,7 @@ export const TEMAS_BASE: TemaBase[] = [
     surface: "#1d1726",
     surfaceAlt: "#2a2235",
     text: "#f5f3f7",
-    textMuted: "#a79fb4",
+    textMuted: "#b5adc1",
     border: "#322a3e",
   },
   {
@@ -75,7 +75,7 @@ export const TEMAS_BASE: TemaBase[] = [
     surface: "#ffffff",
     surfaceAlt: "#f3f4f6",
     text: "#1f2937",
-    textMuted: "#6b7280",
+    textMuted: "#565e6c",
     border: "#ececf1",
   },
   {

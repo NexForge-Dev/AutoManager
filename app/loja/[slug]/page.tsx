@@ -318,7 +318,7 @@ export default function LojaPage() {
 
           {/* navegação */}
           {abas.length > 1 ? (
-            <nav aria-label="Seções da loja" className="flex gap-6 mt-3 -mb-px">
+            <nav aria-label="Seções da loja" className="flex flex-wrap gap-x-6 mt-3 -mb-px">
               {abas.map((a) => (
                 <button
                   key={a.key}

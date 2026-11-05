@@ -288,7 +288,7 @@ function Relatorios() {
       {/* lucro */}
       <div className="grid-kpi lg:grid-cols-3 gap-3">
         <Stat
-          className="col-span-2 lg:col-span-1"
+          className="col-full lg:col-span-1"
           rotulo="Lucro projetado"
           icone={TrendingUp}
           tom="ok"
@@ -408,7 +408,7 @@ function Relatorios() {
               ? revendedoras.find((x) => x.id === v.revendedoraId)?.nome ?? "-"
               : "Loja";
             return (
-              <div key={v.id} className="row py-2.5">
+              <div key={v.id} className="row flex-wrap py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className={`text-sm font-medium truncate ${cancelada ? "line-through text-muted" : ""}`}>
                     {v.itens.length > 0

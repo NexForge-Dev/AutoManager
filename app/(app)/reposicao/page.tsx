@@ -76,7 +76,7 @@ function Reposicao() {
             <Stat rotulo="Sem estoque" icone={PackageX} tom="bad" valor={contar("sem_estoque")} apoio="produtos zerados" />
             <Stat rotulo="Estoque baixo" icone={CircleAlert} tom="warn" valor={contar("estoque_baixo")} apoio="abaixo do mínimo" />
             <Stat
-              className="col-span-2 lg:col-span-1"
+              className="col-full lg:col-span-1"
               rotulo="Vai acabar logo"
               icone={Hourglass}
               tom="info"

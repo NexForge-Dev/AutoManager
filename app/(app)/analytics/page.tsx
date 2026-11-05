@@ -92,10 +92,10 @@ function Analytics() {
               {caps.allowAdvancedAnalytics &&
                 (a.tendenciaMes === null ? (
                   // mês anterior sem vendas: não há base para comparar (nada de "+0%" verde)
-                  <Stat className="col-span-2 lg:col-span-1" rotulo="Mês vs anterior" icone={CalendarRange} valor="—" />
+                  <Stat className="col-full lg:col-span-1" rotulo="Mês vs anterior" icone={CalendarRange} valor="—" />
                 ) : (
                   <Stat
-                    className="col-span-2 lg:col-span-1"
+                    className="col-full lg:col-span-1"
                     rotulo="Mês vs anterior"
                     icone={a.tendenciaMes >= 0 ? TrendingUp : TrendingDown}
                     tom={a.tendenciaMes >= 0 ? "ok" : "bad"}

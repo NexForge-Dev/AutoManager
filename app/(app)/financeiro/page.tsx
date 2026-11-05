@@ -146,7 +146,7 @@ function Financeiro() {
           apoio={`${resumo.qtdPendentes} conta(s) pendente(s)`}
         />
         <Stat
-          className="col-span-2 lg:col-span-1"
+          className="col-full lg:col-span-1"
           rotulo="Saldo projetado"
           icone={Scale}
           tom={saldoProjetado >= 0 ? "ok" : "bad"}

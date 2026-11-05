@@ -32,7 +32,7 @@ export function PageHeader({
         <h1 className="page-title">{titulo}</h1>
         {descricao && <p className="mt-1 text-sm text-muted max-w-2xl">{descricao}</p>}
       </div>
-      {acoes && <div className="flex items-center gap-2 shrink-0 print-hidden">{acoes}</div>}
+      {acoes && <div className="flex flex-wrap items-center gap-2 max-w-full print-hidden">{acoes}</div>}
     </header>
   );
 }
@@ -196,15 +196,15 @@ export function Aviso({
   };
   return (
     <div
-      className={`flex items-start gap-3 border px-3.5 py-3 ${borda[tom]} ${fundo[tom]} ${className}`}
+      className={`flex flex-wrap items-start gap-3 border px-3.5 py-3 ${borda[tom]} ${fundo[tom]} ${className}`}
       style={{ borderRadius: "var(--r-card)" }}
     >
       {Icone && <Icone size={18} className={`shrink-0 mt-0.5 ${TEXTO_TOM[tom]}`} aria-hidden />}
-      <div className="min-w-0 flex-1 text-sm">
+      <div className="min-w-0 flex-1 basis-40 text-sm">
         {titulo && <div className="font-semibold">{titulo}</div>}
         {children && <div className={`text-muted ${titulo ? "mt-0.5" : ""}`}>{children}</div>}
       </div>
-      {acao && <div className="shrink-0 self-center">{acao}</div>}
+      {acao && <div className="max-w-full self-center">{acao}</div>}
     </div>
   );
 }

@@ -169,7 +169,7 @@ function Entregas() {
             <Stat rotulo="Pendentes" icone={CircleDashed} tom="warn" valor={qtdPendentes} apoio="aguardando saída" />
             <Stat rotulo="A caminho" icone={Bike} tom="info" valor={qtdACaminho} apoio="na rua agora" />
             <Stat
-              className="col-span-2 lg:col-span-1"
+              className="col-full lg:col-span-1"
               rotulo="Entregues"
               icone={Check}
               tom="ok"

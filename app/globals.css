@@ -172,6 +172,9 @@ input[type="radio"] {
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere; /* valor enorme quebra dentro do cartão */
   }
+  .col-full {
+    grid-column: 1 / -1;
+  }
   /* KPIs: 2 colunas no celular; texto ampliado (200%) empilha em vez de estourar a tela */
   .grid-kpi {
     display: grid;
@@ -376,7 +379,8 @@ input[type="radio"] {
 
   /* ---- tabelas ---- */
   .table-wrap {
-    @apply overflow-x-auto;
+    /* relative: senão o .sr-only (absoluto) do cabeçalho escapa do scroll e alarga a página */
+    @apply relative overflow-x-auto;
   }
   .table {
     @apply w-full text-sm border-collapse;
