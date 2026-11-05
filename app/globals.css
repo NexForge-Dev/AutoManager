@@ -168,9 +168,15 @@ input[type="radio"] {
   }
   /* valor monetário de destaque (KPI) */
   .figure {
-    @apply text-2xl font-bold leading-tight tracking-tight;
+    @apply font-bold leading-tight tracking-tight;
+    /* acompanha a largura do cartão (.kpi): "R$ 1.476,60" cabe inteiro em 2 colunas no
+       celular; só valor enorme chega a quebrar, e dentro do cartão */
+    font-size: clamp(0.9375rem, 13.5cqi, 1.5rem);
     font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere; /* valor enorme quebra dentro do cartão */
+    overflow-wrap: anywhere;
+  }
+  .kpi {
+    container-type: inline-size;
   }
   .col-full {
     grid-column: 1 / -1;

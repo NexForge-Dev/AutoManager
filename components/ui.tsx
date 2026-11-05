@@ -74,12 +74,12 @@ export function Stat({
   );
   if (href) {
     return (
-      <Link href={href} className={`card block min-w-0 ${className}`}>
+      <Link href={href} className={`card kpi block min-w-0 ${className}`}>
         {conteudo}
       </Link>
     );
   }
-  return <div className={`card min-w-0 ${className}`}>{conteudo}</div>;
+  return <div className={`card kpi min-w-0 ${className}`}>{conteudo}</div>;
 }
 
 /** Variação percentual com seta; `null` = sem base de comparação. */
