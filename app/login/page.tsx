@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
 import { registrarMetrica, registrarSessao } from "@/lib/metricas/cliente";
 import { planoValido } from "@/lib/plans";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2, ShieldCheck, Smartphone, Timer, Wallet } from "lucide-react";
@@ -34,6 +35,7 @@ export default function LoginPage() {
     if (q.get("modo") === "entrar") {
       setModo("entrar");
     }
+    if (q.get("expirada")) setAviso("Sua sessão expirou. Entre de novo para continuar de onde parou.");
     // plano clicado na landing (/login?plano=...): o onboarding já abre com ele marcado
     const plano = q.get("plano");
     if (planoValido(plano)) {
@@ -47,8 +49,16 @@ export default function LoginPage() {
     let ativo = true;
     createClient()
       .auth.getUser()
-      .then(async ({ data }) => {
-        if (!ativo || !data.user || data.user.is_anonymous) return;
+      .then(async ({ data, error }) => {
+        if (!ativo) return;
+        // backend fora com sessão guardada: é alguém de volta, não um cadastro novo
+        if (falhaDeRedeAuth(error)) {
+          setModo("entrar");
+          return;
+        }
+        if (!data.user || data.user.is_anonymous) return;
+        // já tem conta: se a leitura falhar abaixo, o formulário abre no "Entrar"
+        setModo("entrar");
         const destino = await destinoPosLogin();
         if (ativo) router.replace(destino);
       })
@@ -180,7 +190,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={esqueciSenha}
                   disabled={enviandoReset}
-                  className="mb-1 min-h-[32px] text-sm font-medium text-accent hover:underline disabled:opacity-60"
+                  className="mb-1 min-h-[44px] text-sm font-medium text-accent hover:underline disabled:opacity-60"
                 >
                   {enviandoReset ? "Enviando…" : "Esqueci minha senha"}
                 </button>

@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl, centavos, resumoContas } from "@/lib/analytics";
+import { brl, brlKpi, centavos, resumoContas } from "@/lib/analytics";
 import { ymdSP } from "@/lib/fuso";
 import type { ContaPagar } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -130,28 +130,28 @@ function Financeiro() {
       />
 
       {/* fluxo: o que entra, o que sai e o que sobra */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid-kpi lg:grid-cols-3 gap-3">
         <Stat
           rotulo="A receber"
           icone={TrendingUp}
           tom="ok"
-          valor={brl(aReceber)}
+          valor={brlKpi(aReceber)}
           apoio="vendas fiado em aberto"
         />
         <Stat
           rotulo="A pagar"
           icone={TrendingDown}
           tom="bad"
-          valor={brl(resumo.aPagar)}
+          valor={brlKpi(resumo.aPagar)}
           apoio={`${resumo.qtdPendentes} conta(s) pendente(s)`}
         />
         <Stat
-          className="col-span-2 lg:col-span-1"
+          className="col-full lg:col-span-1"
           rotulo="Saldo projetado"
           icone={Scale}
           tom={saldoProjetado >= 0 ? "ok" : "bad"}
           valorTom={saldoProjetado >= 0 ? "ok" : "bad"}
-          valor={brl(saldoProjetado)}
+          valor={brlKpi(saldoProjetado)}
           apoio="Se tudo a receber entrar e tudo a pagar sair."
         />
       </div>
@@ -252,7 +252,7 @@ function Financeiro() {
                         type="button"
                         onClick={() => remover(c)}
                         disabled={ocupada}
-                        className="icon-btn h-9 w-9 hover:!text-bad"
+                        className="icon-btn hover:!text-bad"
                         aria-label={`Excluir conta ${c.descricao}`}
                       >
                         <Trash2 size={16} aria-hidden />
@@ -365,7 +365,7 @@ function ContaForm({ onClose }: { onClose: () => void }) {
             <input id="conta-fornecedor" className="input" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm min-h-[32px]">
+        <label className="flex items-center gap-2 text-sm min-h-[44px]">
           <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} />
           <Repeat size={14} className="text-muted" aria-hidden /> Marcar como despesa fixa
         </label>

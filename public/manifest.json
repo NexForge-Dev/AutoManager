@@ -3,7 +3,7 @@
   "short_name": "AutoManager",
   "description": "Gestão simples e acessível para micronegócios: estoque, vendas, comissões e revendedoras.",
   "lang": "pt-BR",
-  "start_url": "/",
+  "start_url": "/login?modo=entrar",
   "scope": "/",
   "display": "standalone",
   "background_color": "#faf7f8",

@@ -108,14 +108,14 @@ export default function Pricing() {
       </div>
 
       {/* tabela de comparação */}
-      <div className="mt-12 overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Comparação dos planos" className="mt-12 overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
             <tr className="border-b border-default">
               <th className="py-3 pr-4 text-sm font-semibold text-muted">O que está incluso</th>
               <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[0].nome}</th>
               <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[1].nome}</th>
-              <th className="px-4 py-3 text-center text-sm font-bold text-brand-600">
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">
                 <span className="inline-flex items-center gap-1">
                   <Star size={13} className="fill-brand-500 text-brand-500" /> {PLANOS[2].nome}
                 </span>

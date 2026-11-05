@@ -157,6 +157,13 @@ export function diasDeTrial(a: Assinatura | null): number {
   return Math.max(0, Math.ceil((a.trialAte - Date.now()) / 86_400_000));
 }
 
+// Assinou durante o teste: o plano escolhido começa no fim dele (a assinatura do Stripe
+// nasce em trial e a sincronização grava data_fim = fim desse trial). Só o teste do
+// AutoManager, sem assinatura, tem data_fim nula.
+export function assinouNoTrial(a: Assinatura | null): boolean {
+  return trialAtivo(a) && !!a?.dataFim;
+}
+
 // Carência após o fim do ciclo pago (data_fim) antes de cair no piso — cobre o
 // atraso normal da cobrança recorrente do Stripe (que tenta de novo por alguns dias). Espelha o "3 days" de
 // private.plano_efetivo (migration 0035).
@@ -174,8 +181,13 @@ export function planoEfetivo(a: Assinatura | null): PlanoId {
   if (!a) return "ambulante";
   // parou de pagar (cancelado/inadimplente): perde as capacidades, cai no piso
   if (a.status === "canceled" || a.status === "past_due") return "ambulante";
-  // trial: vigente = EXPANSAO; vencido sem pagamento = piso (não mantém plano pago)
-  if (a.status === "trialing") return trialAtivo(a) ? "expansao" : "ambulante";
+  // trial: vigente = EXPANSAO; vencido sem pagamento = piso (não mantém plano pago).
+  // Quem assinou no teste (data_fim = fim do trial no Stripe) tem a mesma carência de
+  // 'active': o webhook da 1ª cobrança pode atrasar, e o Stripe tenta de novo por dias.
+  if (a.status === "trialing") {
+    if (trialAtivo(a)) return "expansao";
+    return a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS >= Date.now() ? a.plano : "ambulante";
+  }
   // ativa, mas o ciclo pago venceu (e passou a carência) sem renovação = inadimplente
   if (a.status === "active" && a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS < Date.now())
     return "ambulante";

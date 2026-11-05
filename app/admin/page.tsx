@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { waLink } from "@/lib/contato";
 import { useStore } from "@/lib/store";
-import { createClient } from "@/lib/supabase/client";
+import { sairDaConta } from "@/lib/sair";
 import { brlPreco, ORDEM_PLANOS, PLANOS, type PlanoId } from "@/lib/plans";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -122,7 +121,6 @@ function dataCurta(iso: string | null) {
 }
 
 function Admin() {
-  const router = useRouter();
   const { confirm } = useDialog();
   const listarChamados = useStore((s) => s.listarChamados);
   const resolverChamado = useStore((s) => s.resolverChamado);
@@ -186,10 +184,7 @@ function Admin() {
       perigo: true,
     });
     if (!ok) return;
-    await createClient().auth.signOut();
-    // não deixa os dados da conta na memória para o próximo login neste navegador
-    useStore.getState().limpar();
-    router.replace("/login");
+    await sairDaConta();
   }
 
   if (!autorizado) {
@@ -276,7 +271,7 @@ function ResumoView({ overview }: { overview: Overview | null }) {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid-kpi lg:grid-cols-3 gap-3">
         <Stat rotulo="Faturamento mensal (MRR)" icone={DollarSign} tom="brand" valorTom="brand" valor={brlPreco(r.mrrCentavos)} />
         <Stat rotulo="Projeção anual (ARR)" icone={TrendingUp} valor={brlPreco(r.arrCentavos)} />
         <Stat rotulo="Assinaturas ativas" icone={CheckCircle2} tom="ok" valor={r.ativas} />
@@ -515,7 +510,7 @@ function LojasView({
         <>
           {/* desktop: tabela */}
           <div className="card p-0 overflow-hidden hidden xl:block">
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Lista de lojas">
               <table className="table">
                 <thead>
                   <tr>
@@ -633,7 +628,7 @@ function AuditoriaView({ logs }: { logs: AdminLog[] | null }) {
 
       {/* desktop: tabela */}
       <div className="card p-0 overflow-hidden hidden lg:block">
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Registro de auditoria">
           <table className="table">
             <thead>
               <tr>

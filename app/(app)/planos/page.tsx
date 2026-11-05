@@ -23,11 +23,12 @@ export default function PlanosPage() {
 
 function Planos() {
   const router = useRouter();
-  const { assinatura, planoContratado, planoEfetivo, emTrial, diasTrial, cobrancaNoFimDoTrial, uso } = usePlano();
+  const { assinatura, planoContratado, planoEfetivo, emTrial, assinadoNoTrial, diasTrial, cobrancaNoFimDoTrial, uso } =
+    usePlano();
   // "plano atual" = pagando e com o plano valendo; trial vencido, cancelado ou
   // inadimplente precisa poder recontratar o mesmo plano
   const ehAtual = (id: PlanoId) =>
-    id === planoContratado && assinatura?.status === "active" && planoEfetivo === id;
+    id === planoContratado && (assinadoNoTrial || (assinatura?.status === "active" && planoEfetivo === id));
   const { confirm, alerta } = useDialog();
   const hydrate = useStore((s) => s.hydrate);
   const [salvando, setSalvando] = useState<PlanoId | null>(null);
@@ -158,7 +159,7 @@ function Planos() {
     <div className="space-y-4 md:space-y-5">
       <div>
         {/* destino fixo: router.back() depois de cancelar no Stripe voltaria ao Checkout */}
-        <Link href="/configuracoes/plano" className="inline-flex items-center gap-1 min-h-[36px] w-fit text-sm text-muted hover:text-strong">
+        <Link href="/configuracoes/plano" className="inline-flex items-center gap-1 min-h-[44px] w-fit text-sm text-muted hover:text-strong">
           <ArrowLeft size={15} aria-hidden /> Voltar
         </Link>
         <PageHeader titulo="Planos & assinatura" descricao="Escolha o plano que acompanha o crescimento da sua loja." />
@@ -192,7 +193,12 @@ function Planos() {
             {diasTrial} dia{diasTrial === 1 ? "" : "s"}
           </b>
           .{" "}
-          {cobrancaNoFimDoTrial ? (
+          {assinadoNoTrial ? (
+            <>
+              Você já assinou o plano <b className="text-strong">{PLANOS[planoContratado].nome}</b>: ele começa quando o teste
+              acabar{fimTrial ? <>, em <b className="text-strong tnum">{fimTrial}</b></> : null}, e só então vem a 1ª cobrança.
+            </>
+          ) : cobrancaNoFimDoTrial ? (
             <>
               Assine agora sem custo: a 1ª cobrança só acontece quando o teste acabar
               {fimTrial ? <>, em <b className="text-strong tnum">{fimTrial}</b></> : null}.
@@ -275,7 +281,7 @@ function Planos() {
           <Link href="/cancelamento" className="font-medium text-accent hover:underline">
             veja como cancelar
           </Link>
-          ) e seus dados nunca são apagados. Ao assinar, você é levado ao ambiente seguro do Stripe para
+          ) e seus dados não são apagados ao cancelar. Ao assinar, você é levado ao ambiente seguro do Stripe para
           concluir o pagamento; o AutoManager não recebe o número do seu cartão.
         </p>
       </div>

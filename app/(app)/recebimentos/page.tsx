@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl } from "@/lib/analytics";
+import { brl, brlKpi } from "@/lib/analytics";
 import type { EntradaPendente, OrigemRecebimento } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -149,7 +149,7 @@ function Recebimentos() {
               rotulo="Aguardando confirmação"
               icone={Wallet}
               tom="warn"
-              valor={brl(total)}
+              valor={brlKpi(total)}
               apoio={`${entradasPendentes.length} recebimento(s)`}
             />
           )}
@@ -221,10 +221,10 @@ function EntradaCard({
       <div className="shrink-0">
         <div className="text-sm font-medium mb-1.5 sm:text-right">Foi venda da sua loja?</div>
         <div className="flex gap-2">
-          <button disabled={ocupado} onClick={onRecusar} className="btn-ghost btn-sm !min-h-[40px] flex-1">
+          <button disabled={ocupado} onClick={onRecusar} className="btn-ghost btn-sm !min-h-[44px] flex-1">
             <X size={15} aria-hidden /> Não
           </button>
-          <button disabled={ocupado} onClick={onConfirmar} className="btn-primary btn-sm !min-h-[40px] flex-1 whitespace-nowrap">
+          <button disabled={ocupado} onClick={onConfirmar} className="btn-primary btn-sm !min-h-[44px] flex-1 whitespace-nowrap">
             <Check size={15} aria-hidden /> {ocupado ? "Lançando…" : "Sim, foi venda"}
           </button>
         </div>

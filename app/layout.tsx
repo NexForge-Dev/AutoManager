@@ -3,6 +3,7 @@ import { Figtree } from "next/font/google";
 import "./globals.css";
 import { APARENCIA_NO_FLASH } from "@/lib/aparencia";
 import { ORDEM_PLANOS, PLANOS, brlPreco } from "@/lib/plans";
+import RegistrarSW from "@/components/RegistrarSW";
 
 // fonte do produto (auto-hospedada no build). A loja pode trocar em Aparência.
 const fonte = Figtree({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -56,7 +57,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: APARENCIA_NO_FLASH }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <RegistrarSW />
+      </body>
     </html>
   );
 }

@@ -164,7 +164,7 @@ function Produtos() {
           ).length;
           const ok = ativos.length - semEstoque - acabando;
           return (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid-kpi-3 gap-3">
               <Stat rotulo="Em estoque" valor={ok} icone={Boxes} tom="ok" />
               <Stat rotulo="Acabando" valor={acabando} icone={AlertTriangle} tom="warn" valorTom={acabando > 0 ? "warn" : undefined} />
               <Stat rotulo="Sem estoque" valor={semEstoque} icone={PackageX} tom="bad" valorTom={semEstoque > 0 ? "bad" : undefined} />
@@ -197,13 +197,13 @@ function Produtos() {
 
       {/* filtro por categoria (com contador) */}
       {catsPresentes.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
+        <div tabIndex={0} role="group" aria-label="Filtrar por categoria" className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
           <button onClick={() => setFiltroCat(null)} aria-pressed={filtroCat === null} className="chip">
-            Todas <span className="opacity-70 tnum">({produtos.length})</span>
+            Todas <span className="tnum">({produtos.length})</span>
           </button>
           {catsPresentes.map((c) => (
             <button key={c} onClick={() => setFiltroCat(c)} aria-pressed={filtroCat === c} className="chip">
-              {c} <span className="opacity-70 tnum">({contagemPorCat.get(c) || 0})</span>
+              {c} <span className="tnum">({contagemPorCat.get(c) || 0})</span>
             </button>
           ))}
         </div>
@@ -222,7 +222,7 @@ function Produtos() {
       {/* desktop: tabela */}
       {produtosFiltrados.length > 0 && (
         <div className="hidden lg:block card p-0 overflow-hidden">
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Lista de produtos">
             <table className="table">
               <thead>
                 <tr>

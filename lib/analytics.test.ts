@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { calcularAnalytics, calcularMetricas, calcularRelatorio, centavos, sugestoesReposicao } from "./analytics";
+import { brl, brlKpi, calcularAnalytics, calcularMetricas, calcularRelatorio, centavos, sugestoesReposicao } from "./analytics";
 import type { Produto, Venda } from "./types";
 
 const venda = (iso: string, total: number): Venda => ({
@@ -158,5 +158,15 @@ describe("centavos", () => {
   it("arredonda e não devolve -0", () => {
     expect(centavos(0.1 + 0.2)).toBe(0.3);
     expect(Object.is(centavos(-0.001), 0)).toBe(true);
+  });
+});
+
+describe("brlKpi", () => {
+  it("valor normal segue inteiro", () => {
+    expect(brlKpi(99_999_999)).toBe(brl(99_999_999));
+  });
+
+  it("AUT-016: valor extremo vira forma curta", () => {
+    expect(brlKpi(4_500_007_011.5).replace(/\s/g, " ")).toBe("R$ 4,5 bi");
   });
 });

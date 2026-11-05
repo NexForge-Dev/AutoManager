@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { situacaoRevendedora } from "@/lib/destinoPosLogin";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
+import { sairDaConta } from "@/lib/sair";
 import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
 import { parseNumero } from "@/lib/csvProdutos";
@@ -105,8 +107,10 @@ export default function RevendaPage() {
     setFalha(false);
     (async () => {
       try {
-        const { data: { user } } = await sb.current.auth.getUser();
+        const { data: { user }, error: erroSessao } = await sb.current.auth.getUser();
         if (!user) {
+          // sem rede não é "sem sessão": mostra "tentar de novo" sem tirar ninguém daqui
+          if (falhaDeRedeAuth(erroSessao)) throw erroSessao;
           router.replace("/acesso");
           return;
         }
@@ -135,12 +139,7 @@ export default function RevendaPage() {
     setVendas([]);
     setMe(null);
     aplicarCorMarca(null);
-    try {
-      await sb.current.auth.signOut();
-    } catch {
-      // sem rede: o signOut local já apagou a sessão do navegador
-    }
-    router.replace("/acesso");
+    await sairDaConta("/acesso");
   }
 
   if (falha && me === undefined)
@@ -661,7 +660,7 @@ function MinhasVendas({ vendas, erroDados }: { vendas: any[]; erroDados: boolean
       </div>
       {/* desktop: tabela */}
       <div className="card p-0 overflow-hidden hidden md:block">
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Minhas vendas">
           <table className="table">
             <thead>
               <tr>

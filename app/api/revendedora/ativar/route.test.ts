@@ -126,9 +126,6 @@ describe("POST /api/revendedora/ativar", () => {
     const codigoErrado = await resposta();
 
     convites = [{ revendedora_id: "r1", codigo: "ABC234", expira: futuro }];
-    erroCreate = { message: "User already registered" };
-    const createFalhou = await resposta();
-
     erroCreate = { message: "Database error creating new user" };
     const createErroBanco = await resposta();
 
@@ -138,9 +135,26 @@ describe("POST /api/revendedora/ativar", () => {
 
     const naoCadastrada = (candidatas = [], await resposta());
 
-    for (const r of [createFalhou, createErroBanco, vinculoFalhou, naoCadastrada]) expect(r).toEqual(codigoErrado);
+    for (const r of [createErroBanco, vinculoFalhou, naoCadastrada]) expect(r).toEqual(codigoErrado);
     expect(codigoErrado.status).toBe(403);
     expect(JSON.stringify(codigoErrado.corpo)).not.toMatch(/duplicate|Database|already/i);
+  });
+
+  it("AUT-011: com o código CERTO, e-mail que já tem conta recebe o motivo", async () => {
+    candidatas = [{ id: "r1", nome: "Rev", org_id: "o1", acesso_liberado: true, user_id: null, ativa: true }];
+    convites = [{ revendedora_id: "r1", codigo: "ABC234", expira: futuro }];
+    erroCreate = { message: "User already registered" };
+    const r = await resposta();
+    erroCreate = null;
+    expect(r.status).toBe(409);
+    expect(JSON.stringify(r.corpo)).toMatch(/já tem uma conta/);
+
+    // com o código errado, o mesmo e-mail não revela nada
+    convites = [{ revendedora_id: "r1", codigo: "ZZZ999", expira: futuro }];
+    erroCreate = { message: "User already registered" };
+    const errado = await resposta();
+    erroCreate = null;
+    expect(errado.status).toBe(403);
   });
 
   it("código expirado também cai no 403 único", async () => {

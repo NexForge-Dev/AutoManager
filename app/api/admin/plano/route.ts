@@ -78,6 +78,10 @@ export async function POST(req: Request) {
       // cortesia/suporte: sem vencimento (data_fim null). Com data_fim, o plano
       // cairia no piso ao vencer (private.plano_efetivo, 0035) sem cobrança no Stripe.
       data_fim: null,
+      // sem cobrança no Stripe: desliga a loja da assinatura antiga, senão ela conta como
+      // paga no MRR. Mantém provider_cliente_id, que serve se o dono assinar de novo.
+      provider: null,
+      provider_assinatura_id: null,
       updated_at: new Date().toISOString(),
     })
     .eq("org_id", orgId)

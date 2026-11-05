@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
+import { apagarRascunho, chaveCarrinho, gravarRascunho, lerRascunho } from "@/lib/rascunho";
 import { brl } from "@/lib/analytics";
 import type { Canal, FormaPagamento } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -60,7 +61,15 @@ const parseKey = (k: string) => {
 function Vender() {
   const { produtos, revendedoras, config, registrarVenda } = useStore();
   const { alerta } = useDialog();
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const orgId = useStore((s) => s.orgId);
+  const usuarioId = useStore((s) => s.usuarioId);
+  const chave = chaveCarrinho(orgId, usuarioId);
+  // carrinho sobrevive ao refresh e ao login de novo (rascunho desta aba)
+  const [cart, setCart] = useState<Record<string, number>>(() => lerRascunho<Record<string, number>>(chave) ?? {});
+  useEffect(() => {
+    if (Object.keys(cart).length > 0) gravarRascunho(chave, cart);
+    else apagarRascunho(chave);
+  }, [cart, chave]);
   const [canal, setCanal] = useState<Canal>(config.canais[0] || "whatsapp");
   const [revId, setRevId] = useState<string>("");
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
@@ -278,7 +287,7 @@ function Vender() {
 
         {/* -------- carrinho: painel lateral no desktop -------- */}
         {itens.length === 0 && (
-          <aside className="hidden lg:block lg:sticky lg:top-6">
+          <aside aria-label="Resumo da venda" className="hidden lg:block lg:sticky lg:top-6">
             <div className="card p-0">
               <EstadoVazio compacto icone={ShoppingBag} titulo="Carrinho vazio">
                 Adicione produtos para registrar a venda.

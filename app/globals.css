@@ -30,7 +30,7 @@
   --surface: #1d1726;
   --surface-alt: #2a2235;
   --text: #f5f3f7;
-  --text-muted: #a79fb4;
+  --text-muted: #b5adc1;
   --border: #322a3e;
 
   /* arredondamento dos cantos (sobrescrito em runtime por lib/aparencia.ts) */
@@ -51,7 +51,7 @@
 html.light {
   --accent: var(--brand-700);
   --ok: 4 120 87;
-  --warn: 180 83 9;
+  --warn: 146 64 14;
   --bad: 185 28 28;
   --info: 29 78 216;
 
@@ -59,7 +59,7 @@ html.light {
   --surface: #ffffff;
   --surface-alt: #f3f4f6;
   --text: #1f2937;
-  --text-muted: #6b7280;
+  --text-muted: #565e6c;
   --border: #ececf1;
   --shadow-soft: 0 1px 2px rgb(17 24 39 / 0.04);
   --shadow-md: 0 4px 12px rgb(17 24 39 / 0.07), 0 1px 3px rgb(17 24 39 / 0.05);
@@ -168,8 +168,27 @@ input[type="radio"] {
   }
   /* valor monetário de destaque (KPI) */
   .figure {
-    @apply text-2xl font-bold leading-tight tracking-tight;
+    @apply font-bold leading-tight tracking-tight;
+    /* acompanha a largura do cartão (.kpi): "R$ 1.476,60" cabe inteiro em 2 colunas no
+       celular; só valor enorme chega a quebrar, e dentro do cartão */
+    font-size: clamp(0.9375rem, 13.5cqi, 1.5rem);
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .kpi {
+    container-type: inline-size;
+  }
+  .grid-kpi-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(max(5.5rem, 30%), 100%), 1fr));
+  }
+  .col-full {
+    grid-column: 1 / -1;
+  }
+  /* KPIs: 2 colunas no celular; texto ampliado (200%) empilha em vez de estourar a tela */
+  .grid-kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(max(8.25rem, 46%), 100%), 1fr));
   }
   .tnum {
     font-variant-numeric: tabular-nums;
@@ -221,7 +240,7 @@ input[type="radio"] {
   .btn-sm {
     @apply min-h-[36px] px-3 py-1.5 text-sm;
   }
-  /* botão só com ícone (alvo de toque de 40px) */
+  /* botão só com ícone */
   .icon-btn {
     @apply inline-grid place-items-center h-10 w-10 shrink-0;
     border-radius: var(--r-btn);
@@ -238,12 +257,18 @@ input[type="radio"] {
 
   /* ---- formulários ---- */
   .input {
-    @apply w-full border px-3 py-2.5 outline-none text-base md:text-[0.9375rem] min-h-[44px] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25;
+    @apply w-full border px-3 py-2.5 outline-none text-base min-h-[44px] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25;
     border-radius: var(--r-input);
     background: var(--surface);
     border-color: var(--border);
     color: var(--text);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  /* só com mouse: em tela de toque, menos de 16px faz o iOS dar zoom ao focar (vale em paisagem) */
+  @media (min-width: 768px) and (pointer: fine) {
+    .input {
+      font-size: 0.9375rem;
+    }
   }
   .input:hover:not(:focus):not(:disabled) {
     border-color: var(--text-muted);
@@ -320,6 +345,19 @@ input[type="radio"] {
     box-shadow: var(--shadow-soft);
   }
 
+  /* alvo de toque de 44px no celular e em qualquer tela de toque */
+  @media (max-width: 767.98px), (pointer: coarse) {
+    .btn-sm,
+    .chip,
+    .segmented > button {
+      min-height: 44px;
+    }
+    .icon-btn {
+      height: 44px;
+      width: 44px;
+    }
+  }
+
   /* ---- selos de estado ---- */
   .badge {
     @apply inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap;
@@ -351,7 +389,8 @@ input[type="radio"] {
 
   /* ---- tabelas ---- */
   .table-wrap {
-    @apply overflow-x-auto;
+    /* relative: senão o .sr-only (absoluto) do cabeçalho escapa do scroll e alarga a página */
+    @apply relative overflow-x-auto;
   }
   .table {
     @apply w-full text-sm border-collapse;

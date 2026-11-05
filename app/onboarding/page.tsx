@@ -7,6 +7,9 @@ import type { Canal } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
+import { apagarRascunho, chaveOnboarding, gravarRascunho, lerRascunho } from "@/lib/rascunho";
+import { TelaFalhaCarga } from "@/components/FalhaCarga";
 import { registrarMetrica, type Etapa } from "@/lib/metricas/cliente";
 
 // Passos desta tela -> etapas do funil no Painel NexForge ("descricao" faz parte de "loja").
@@ -63,11 +66,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Passo = { icone: LucideIcon; title: string; sub: string; ms: number };
 
+
 export default function Onboarding() {
   const router = useRouter();
-  const { setConfig, completarOnboarding, hydrate } = useStore();
+  const { setConfig, completarOnboarding, hydrate, tentarDeNovo } = useStore();
   const ready = useStore((s) => s.ready);
+  const falhaEssencial = useStore((s) => s.falhaEssencial);
   const completo = useStore((s) => s.config.onboardingCompleto);
+  const usuarioId = useStore((s) => s.usuarioId);
   const { planoContratado } = usePlano();
   const [gerando, setGerando] = useState(false);
 
@@ -78,33 +84,42 @@ export default function Onboarding() {
   // Só o DONO da loja faz o onboarding. Visitante anônimo (chat da loja),
   // revendedora, conta sem loja ou membro da equipe vai para o próprio destino.
   const [liberado, setLiberado] = useState(false);
+  // leitura falhou: não se sabe quem é. Nem libera (sobrescreveria a loja) nem manda embora.
+  const [falhaLeitura, setFalhaLeitura] = useState(false);
   useEffect(() => {
-    if (!ready || liberado) return;
+    if (!ready || liberado || falhaEssencial || falhaLeitura) return;
     let ativo = true;
     (async () => {
-      const { data } = await createClient().auth.getUser();
+      const { data, error } = await createClient().auth.getUser();
       if (!ativo) return;
+      if (falhaDeRedeAuth(error)) {
+        setFalhaLeitura(true);
+        return;
+      }
       if (!data.user || data.user.is_anonymous) {
         router.replace("/login");
         return;
       }
       const { semOrg, role } = useStore.getState();
       if (semOrg || role !== "owner") {
-        let destino = "/login";
+        let destino: string;
         try {
           destino = await destinoPosLogin();
-        } catch {}
+        } catch {
+          if (ativo) setFalhaLeitura(true);
+          return;
+        }
         if (ativo) router.replace(destino === "/onboarding" ? "/login" : destino);
         return;
       }
       setLiberado(true);
     })().catch(() => {
-      if (ativo) router.replace("/login");
+      if (ativo) setFalhaLeitura(true);
     });
     return () => {
       ativo = false;
     };
-  }, [ready, liberado, router]);
+  }, [ready, liberado, falhaEssencial, falhaLeitura, router]);
 
   // onboarding já concluído: sai daqui (evita re-rodar / sobrescrever a config).
   // Durante a geração NÃO redireciona aqui — a tela de carregamento controla o
@@ -136,6 +151,40 @@ export default function Onboarding() {
   const [facebook, setFacebook] = useState("");
   const [tiktok, setTiktok] = useState("");
   const [email, setEmail] = useState("");
+
+  // Rascunho desta aba e deste usuário: refresh no meio não perde o que já foi respondido.
+  // Só lê depois de saber quem é, e só grava depois de ler (senão apagaria o rascunho).
+  const [rascunhoLido, setRascunhoLido] = useState(false);
+  useEffect(() => {
+    if (!liberado || !usuarioId || rascunhoLido) return;
+    const r = lerRascunho<Record<string, any>>(chaveOnboarding(usuarioId));
+    if (r) {
+      if (typeof r.step === "number") setStep(r.step);
+      if (planoValido(r.planoEscolhido)) setPlanoEscolhido(r.planoEscolhido);
+      setNomeLoja(r.nomeLoja ?? "");
+      setDescricao(r.descricao ?? "");
+      setSegmento(r.segmento ?? "semijoias");
+      setQtdRev(r.qtdRev ?? "1-3");
+      setMargem(r.margem ?? 100);
+      setComissao(r.comissao ?? 30);
+      setWhatsapp(r.whatsapp ?? "");
+      setInstagram(r.instagram ?? "");
+      setFacebook(r.facebook ?? "");
+      setTiktok(r.tiktok ?? "");
+      setEmail(r.email ?? "");
+    }
+    setRascunhoLido(true);
+  }, [liberado, usuarioId, rascunhoLido]);
+
+  useEffect(() => {
+    if (!usuarioId) return;
+    if (completo) apagarRascunho(chaveOnboarding(usuarioId));
+    else if (rascunhoLido)
+      gravarRascunho(chaveOnboarding(usuarioId), {
+        step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao,
+        whatsapp, instagram, facebook, tiktok, email,
+      });
+  }, [usuarioId, rascunhoLido, completo, step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao, whatsapp, instagram, facebook, tiktok, email]);
 
   // escopo de perguntas conforme o PLANO ESCOLHIDO no onboarding
   const plano = planoDef(planoEscolhido);
@@ -255,6 +304,16 @@ export default function Onboarding() {
     setStep((s) => Math.max(s - 1, 0));
   };
 
+  if (falhaEssencial || falhaLeitura)
+    return (
+      <TelaFalhaCarga
+        onTentar={() => {
+          setFalhaLeitura(false);
+          void tentarDeNovo();
+        }}
+      />
+    );
+
   if (!liberado && !gerando) {
     return (
       <div className="min-h-screen grid place-items-center text-accent" role="status" aria-label="Carregando">
@@ -275,7 +334,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col md:items-center md:justify-center md:px-5 md:py-10">
+    <main className="min-h-[100dvh] flex flex-col md:items-center md:justify-center md:px-5 md:py-10">
       <div className="w-full flex-1 md:flex-none max-w-lg flex flex-col px-5 py-5 md:p-8 md:border md:border-default md:surface md:rounded-[var(--r-card)] md:shadow-[var(--shadow-md)]">
         {/* progresso */}
         <div className="mb-7">
@@ -537,7 +596,7 @@ export default function Onboarding() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -37,14 +37,14 @@ export default function EntradaShell({
           <span aria-hidden />
         </aside>
       )}
-      <div className="flex min-h-[100dvh] flex-col items-center px-5 py-8 sm:justify-center">
+      <main className="flex min-h-[100dvh] flex-col items-center px-5 py-8 sm:justify-center">
         <div className="w-full max-w-sm reveal">
           <div className={`mb-8 flex justify-center ${lado ? "lg:hidden" : ""}`}>
             <Marca />
           </div>
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

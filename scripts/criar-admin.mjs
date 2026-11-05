@@ -76,6 +76,8 @@ const { data, error } = await admin.auth.admin.createUser({
   email: EMAIL,
   password: SENHA,
   email_confirm: true,
+  // sem isto o trigger trata a conta como cadastro e cria uma loja para ela
+  user_metadata: { convite: true },
   app_metadata: { role: "superadmin" },
 });
 

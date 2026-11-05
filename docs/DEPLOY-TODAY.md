@@ -1,8 +1,15 @@
 # Production deploy — Stripe billing + launch hardening
 
 Target: Supabase project `paqsixfvmbkowedvukgz` (AWS us-east-1) + Vercel, branch `main`.
-Production currently runs the Mercado Pago build (`0a066f5`) on a database migrated up to
-`0036_estoque_vendas`. Run the steps **in this order**; each one is safe to repeat.
+Written on 2026-11-02, when production ran the Mercado Pago build (`0a066f5`) on a database migrated
+up to `0036_estoque_vendas`. The repo has moved on: check what is applied with
+`select * from supabase_migrations.schema_migrations` and start from the first missing file, up to
+`0044_dados_por_papel`. Run the steps **in this order**; each one is safe to repeat.
+
+`supabase/pos-deploy/0045_custo_so_dono.sql` runs only **after** the code that reads
+`equipe_catalogo` is live: with the old code, sellers would lose the catalogue. Run
+`notify pgrst, 'reload schema';` after `0044`. To undo: `supabase/rollback/0045_custo_so_dono_rollback.sql`
+first (before reverting the deploy), then `supabase/rollback/0044_dados_por_papel_rollback.sql` if needed.
 
 New migrations, in apply order:
 

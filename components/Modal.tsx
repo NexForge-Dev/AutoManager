@@ -24,13 +24,19 @@ type Props = {
   icone?: React.ReactNode;
   /** rótulo do X (padrão "Fechar") */
   fecharLabel?: string;
+  /** estilo do fundo: o portal sai do tema da vitrine, que precisa ser repassado aqui */
+  style?: React.CSSProperties;
+  /** o voltar do celular fecha o modal; false em menu de navegação (os links dele já trocam de página) */
+  voltarFecha?: boolean;
 };
 
 const FOCAVEIS =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-// pilha de modais abertos: só o do topo reage ao Esc
+// pilha de modais abertos: só o do topo reage ao Esc e ao voltar
 const pilha: string[] = [];
+// history.back() nosso (fechou pelo X/Esc): o popstate dele não pode fechar quem está por baixo
+let popsNossos = 0;
 
 export default function Modal({
   onClose,
@@ -41,6 +47,8 @@ export default function Modal({
   className = "space-y-3",
   icone,
   fecharLabel = "Fechar",
+  style,
+  voltarFecha = true,
 }: Props) {
   const id = useId();
   const tituloId = `${id}-titulo`;
@@ -51,6 +59,33 @@ export default function Modal({
   const [montado, setMontado] = useState(false);
 
   useEffect(() => setMontado(true), []);
+
+  // voltar do Android fecha o modal, não a página. A entrada repete o estado atual:
+  // o roteador do Next recarregaria a página ao voltar para um estado que não é dele.
+  useEffect(() => {
+    if (!montado || !voltarFecha) return;
+    const url = location.href;
+    history.pushState(history.state, "", url);
+    let viaVoltar = false;
+    function onPop() {
+      if (popsNossos > 0) {
+        popsNossos--;
+        return;
+      }
+      if (pilha[pilha.length - 1] !== id) return;
+      viaVoltar = true;
+      onCloseRef.current();
+    }
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // fechou pelo X/Esc: tira a entrada que sobrou (se não navegou para outra tela)
+      if (!viaVoltar && location.href === url) {
+        popsNossos++;
+        history.back();
+      }
+    };
+  }, [montado, voltarFecha, id]);
 
   useEffect(() => {
     if (!montado) return;
@@ -118,6 +153,7 @@ export default function Modal({
   return createPortal(
     <div
       className={`modal-backdrop fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/55 md:p-4 ${backdropClassName}`}
+      style={style}
       // fecha só com clique que começou E terminou no fundo (não ao arrastar seleção)
       onMouseDown={(e) => {
         cliqueNoFundo.current = e.target === e.currentTarget;

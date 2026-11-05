@@ -165,11 +165,11 @@ function Entregas() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid-kpi lg:grid-cols-3 gap-3">
             <Stat rotulo="Pendentes" icone={CircleDashed} tom="warn" valor={qtdPendentes} apoio="aguardando saída" />
             <Stat rotulo="A caminho" icone={Bike} tom="info" valor={qtdACaminho} apoio="na rua agora" />
             <Stat
-              className="col-span-2 lg:col-span-1"
+              className="col-full lg:col-span-1"
               rotulo="Entregues"
               icone={Check}
               tom="ok"
@@ -496,7 +496,7 @@ function EntregaInfo({ e }: { e: Entrega }) {
         {e.telefone && (
           <a
             href={`tel:${e.telefone}`}
-            className="text-sm text-accent inline-flex items-center gap-1.5 min-h-[32px] tnum hover:underline"
+            className="text-sm text-accent inline-flex items-center gap-1.5 min-h-[44px] tnum hover:underline"
           >
             <Phone size={14} aria-hidden /> {e.telefone}
           </a>
@@ -543,7 +543,7 @@ function MinhaEntregaCard({
         <button
           disabled={ocupada}
           onClick={() => onDevolver(e.id)}
-          className="w-full min-h-[40px] text-sm text-muted hover:text-strong flex items-center justify-center gap-1.5 disabled:opacity-60"
+          className="w-full min-h-[44px] text-sm text-muted hover:text-strong flex items-center justify-center gap-1.5 disabled:opacity-60"
         >
           <Undo2 size={14} aria-hidden /> Devolver ao balcão
         </button>
@@ -582,7 +582,7 @@ function EntregaCard({
       <div className="flex flex-wrap items-center gap-2">
         {dono && (
           <select
-            className="input !min-h-[40px] py-1.5 text-sm flex-1 basis-40 min-w-0"
+            className="input py-1.5 flex-1 basis-40 min-w-0"
             aria-label="Motoboy da entrega"
             disabled={ocupada}
             value={e.motoboyId ?? ""}
@@ -603,7 +603,7 @@ function EntregaCard({
               <button
                 disabled={ocupada}
                 onClick={() => onStatus(e.id, "a_caminho")}
-                className="btn-ghost btn-sm !min-h-[40px] flex-auto whitespace-nowrap sm:flex-none"
+                className="btn-ghost btn-sm flex-auto whitespace-nowrap sm:flex-none"
               >
                 <Bike size={15} aria-hidden /> Saí para entrega
               </button>
@@ -611,7 +611,7 @@ function EntregaCard({
             <button
               disabled={ocupada}
               onClick={() => onStatus(e.id, "entregue")}
-              className="btn-ghost btn-sm !min-h-[40px] flex-auto whitespace-nowrap sm:flex-none"
+              className="btn-ghost btn-sm flex-auto whitespace-nowrap sm:flex-none"
             >
               <Check size={15} aria-hidden /> Entregue
             </button>
@@ -660,7 +660,7 @@ function NovaEntrega({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label" htmlFor="ent-telefone">Telefone</label>
-            <input id="ent-telefone" className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+            <input id="ent-telefone" maxLength={30} className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
           </div>
           <div>
             <label className="label" htmlFor="ent-taxa">Taxa (R$)</label>
@@ -685,9 +685,9 @@ function NovaEntrega({
           <input id="ent-obs" maxLength={300} className="input" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: ponto de referência" />
         </div>
         {erro && (
-          <Aviso tom="bad" className="!py-2">
+          <div role="alert"><Aviso tom="bad" className="!py-2">
             <span className="text-bad">{erro}</span>
-          </Aviso>
+          </Aviso></div>
         )}
         <button
           disabled={salvando}

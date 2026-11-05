@@ -3,7 +3,7 @@ import { useState } from "react";
 import { waNumero } from "@/lib/contato";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl } from "@/lib/analytics";
+import { brl, brlKpi } from "@/lib/analytics";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import Modal from "@/components/Modal";
@@ -289,17 +289,17 @@ function Revendedoras() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Stat rotulo="Vendido no mês" icone={TrendingUp} tom="brand" valor={brl(totalVendidoMes)} apoio="por toda a equipe" />
+          <div className="grid-kpi lg:grid-cols-4 gap-3">
+            <Stat rotulo="Vendido no mês" icone={TrendingUp} tom="brand" valor={brlKpi(totalVendidoMes)} apoio="por toda a equipe" />
             <Stat
               rotulo="Comissão a pagar"
               icone={HandCoins}
               tom="warn"
               valorTom={totalAPagar > 0 ? "warn" : undefined}
-              valor={brl(totalAPagar)}
+              valor={brlKpi(totalAPagar)}
               apoio={qtdAPagar > 0 ? `para ${qtdAPagar} revendedora(s)` : "nada pendente"}
             />
-            <Stat rotulo="Comissão já paga" icone={CheckCheck} tom="ok" valor={brl(totalPago)} apoio="total acertado" />
+            <Stat rotulo="Comissão já paga" icone={CheckCheck} tom="ok" valor={brlKpi(totalPago)} apoio="total acertado" />
             <Stat
               rotulo="Com acesso ativo"
               icone={ShieldCheck}
@@ -452,6 +452,7 @@ function Revendedoras() {
               <label className="label" htmlFor="rev-whats">WhatsApp (opcional)</label>
               <input
                 id="rev-whats"
+                maxLength={30}
                 className="input"
                 placeholder="DDD + número"
                 inputMode="tel"
@@ -470,7 +471,7 @@ function Revendedoras() {
                   value={emailNova}
                   onChange={(e) => setEmailNova(e.target.value)}
                 />
-                <p className="hint">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas.</p>
+                <p className="hint">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas. Use um e-mail só para esta loja: cada conta atende uma loja.</p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">

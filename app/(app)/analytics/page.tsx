@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { calcularAnalytics, brl } from "@/lib/analytics";
+import { calcularAnalytics, brl, brlKpi } from "@/lib/analytics";
 import { usePlano } from "@/lib/usePlano";
 import { planoQueLibera } from "@/lib/plans";
 import { UpgradeBlock } from "@/components/UpgradeGate";
@@ -80,9 +80,9 @@ function Analytics() {
         <>
           {/* KPIs */}
           <div className="space-y-1.5">
-            <div className={`grid grid-cols-2 gap-3 ${caps.allowAdvancedAnalytics ? "lg:grid-cols-3" : ""}`}>
+            <div className={`grid-kpi gap-3 ${caps.allowAdvancedAnalytics ? "lg:grid-cols-3" : ""}`}>
               {/* ticket médio e itens/venda: só vendas com produtos (sem "Recebimento avulso") */}
-              <Stat rotulo="Ticket médio" icone={Receipt} tom="brand" valor={<CountUp value={a.ticketMedio} format={brl} />} />
+              <Stat rotulo="Ticket médio" icone={Receipt} tom="brand" valor={<CountUp value={a.ticketMedio} format={brlKpi} />} />
               <Stat
                 rotulo="Itens/venda"
                 icone={Hash}
@@ -92,10 +92,10 @@ function Analytics() {
               {caps.allowAdvancedAnalytics &&
                 (a.tendenciaMes === null ? (
                   // mês anterior sem vendas: não há base para comparar (nada de "+0%" verde)
-                  <Stat className="col-span-2 lg:col-span-1" rotulo="Mês vs anterior" icone={CalendarRange} valor="—" />
+                  <Stat className="col-full lg:col-span-1" rotulo="Mês vs anterior" icone={CalendarRange} valor="—" />
                 ) : (
                   <Stat
-                    className="col-span-2 lg:col-span-1"
+                    className="col-full lg:col-span-1"
                     rotulo="Mês vs anterior"
                     icone={a.tendenciaMes >= 0 ? TrendingUp : TrendingDown}
                     tom={a.tendenciaMes >= 0 ? "ok" : "bad"}

@@ -22,6 +22,8 @@ export interface AssinaturaAtual {
   plano: PlanoId;
   status: StatusAssinatura;
   providerAssinaturaId: string | null;
+  // fim do teste grátis do AutoManager (ms), se houver
+  trialAte?: number | null;
 }
 
 export interface GravarAssinatura {
@@ -32,7 +34,7 @@ export interface GravarAssinatura {
   dataFim: string | null;
   providerClienteId: string;
   providerAssinaturaId: string;
-  // assinatura viva encerra o trial interno do AutoManager
+  // assinatura cobrando de verdade encerra o trial interno do AutoManager
   limparTrial: boolean;
 }
 
@@ -230,19 +232,27 @@ async function sincronizar(
   // O Stripe avança current_period_end assim que gera a fatura de renovação, mesmo sem
   // pagamento; em past_due o ciclo pago terminou no início do período atual.
   const item = sub.items?.data?.[0];
+
+  // Quem assina no teste grátis mantém o que o teste promete até a data dele: a assinatura
+  // nasce em trial no Stripe e a linha segue "trialing" (o banco e planoEfetivo liberam o
+  // Expansão). Cancelar nesse período também não tira o resto do teste.
+  const emTesteInterno = atual.status === "trialing" && !!atual.trialAte && atual.trialAte > Date.now();
+  const cancelouNoTeste = emTesteInterno && status === "canceled";
+  const statusFinal: StatusAssinatura = emTesteInterno && (sub.status === "trialing" || cancelouNoTeste) ? "trialing" : status;
+
   const fimPago =
     sub.status === "past_due"
       ? item?.current_period_start ?? (sub as any).current_period_start
       : item?.current_period_end ?? (sub as any).current_period_end;
   await store.gravar(orgId, {
     plano,
-    status,
+    status: statusFinal,
     precoCentavos: item?.price?.unit_amount ?? PLANOS[plano].precoCentavos,
     dataInicio: iso(sub.start_date),
-    dataFim: iso(fimPago),
+    dataFim: cancelouNoTeste ? null : iso(fimPago),
     providerClienteId: customerId,
     providerAssinaturaId: sub.id,
-    limparTrial: status === "active",
+    limparTrial: statusFinal === "active",
   });
 
   return {
@@ -251,7 +261,7 @@ async function sincronizar(
     plano,
     planoAnterior: atual.plano,
     statusAnterior: atual.status,
-    status,
+    status: statusFinal,
     cancelarAnterior: outra && VIVOS.includes(status) ? outra : undefined,
     assinaturaId: sub.id,
     clienteId: customerId || undefined,

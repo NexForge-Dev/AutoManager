@@ -90,6 +90,7 @@ function visivel(it: Item, role: Role, caps: PlanoDef, admin: boolean) {
 function Contador({ n, className = "" }: { n: number; className?: string }) {
   return (
     <span
+      aria-hidden
       className={`tnum text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 grid place-items-center bg-red-600 text-white ${className}`}
     >
       {n > 99 ? "99+" : n}
@@ -150,7 +151,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <DialogProvider>
     <div className="min-h-screen md:flex">
       {/* -------- sidebar (desktop) -------- */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default">
+      <aside aria-label="Barra lateral" className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default">
         <Link href="/painel" className="shrink-0 flex items-center gap-2.5 px-4 h-16 min-w-0">
           <MarcaLoja logoUrl={logoUrl} nome={nomeLoja} />
           <span className="min-w-0">
@@ -218,7 +219,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 href="/conversas"
                 className="icon-btn relative -mr-2"
-                aria-label={conversasNaoLidas > 0 ? `Conversas (${conversasNaoLidas} não lidas)` : "Conversas"}
+                aria-label={
+                  conversasNaoLidas > 0
+                    ? `${conversasNaoLidas} ${conversasNaoLidas === 1 ? "conversa não lida" : "conversas não lidas"}`
+                    : "Conversas"
+                }
               >
                 <MessageCircle size={21} aria-hidden />
                 {conversasNaoLidas > 0 && (
@@ -240,8 +245,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* -------- bottom nav (mobile) -------- */}
       <nav
-        aria-label="Menu principal"
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 surface border-t border-default grid grid-flow-col auto-cols-fr items-end px-1 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
+        aria-label="Menu do celular"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 overflow-x-clip surface border-t border-default grid grid-flow-col auto-cols-fr items-end px-1 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
       >
         {nav.map((n) => {
           const active = ativoEm(n.href);
@@ -286,7 +291,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={22} aria-hidden />
             <span className="text-[11px] font-medium">Mais</span>
-            {badgeMais > 0 && <Contador n={badgeMais} className="absolute top-0 left-1/2 ml-1.5 scale-90" />}
+            {badgeMais > 0 && <Contador n={badgeMais} className="absolute top-0 right-1 scale-90" />}
           </button>
         )}
       </nav>
@@ -300,6 +305,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onClose={() => setMaisAberto(false)}
           titulo="Menu"
           fecharLabel="Fechar menu"
+          voltarFecha={false}
           backdropClassName="md:hidden"
           className="space-y-4"
         >

@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
 
 // telas do app (logado). Ao criar uma tela nova em app/(app), inclua aqui.
 export const ROTAS_PRIVADAS = [
@@ -48,6 +49,7 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
@@ -57,10 +59,16 @@ export async function updateSession(request: NextRequest) {
   // APIs se auto-protegem (retornam JSON 403); o webhook do Stripe chega sem sessão.
   const rotaPrivada = ROTAS_PRIVADAS.some((r) => path === r || path.startsWith(r + "/"));
 
+  // backend fora não é falta de sessão: segue, e a tela mostra "tentar de novo"
+  // (mandar para o /login faria quem está logado cair na tela de criar conta)
+  if (!user && falhaDeRedeAuth(error)) return response;
+
   // a sessão anônima do chat da vitrine não é login de verdade: trata como deslogado
   if ((!user || user.is_anonymous) && rotaPrivada) {
+    // quem tentou abrir uma tela do app já é cliente: abre no "Entrar", não no cadastro
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "?modo=entrar";
     return NextResponse.redirect(url);
   }
 

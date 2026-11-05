@@ -14,6 +14,10 @@ function admin() {
   });
 }
 
+function emailJaCadastrado(e: { code?: string; message?: string }) {
+  return e.code === "email_exists" || /already|exists|registered/i.test(e.message ?? "");
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   // valida os tipos: um campo não-string (ex.: número) derrubava a rota com 500
@@ -122,8 +126,17 @@ export async function POST(req: Request) {
     app_metadata: { role: "revendedora" },
   });
   if (errCreate) {
-    // mesma resposta do código errado (a mensagem já orienta quem ativou a usar "Entrar")
     console.error("[ativar] createUser falhou", rev.id, errCreate.message);
+    // quem chegou aqui provou posse do código: pode saber o motivo. Cada conta atende uma
+    // só loja, então o caminho é a loja cadastrar outro e-mail.
+    if (emailJaCadastrado(errCreate))
+      return NextResponse.json(
+        {
+          erro:
+            "Este e-mail já tem uma conta no AutoManager e não pode ser usado aqui. Peça à loja para cadastrar outro e-mail e gerar um novo código.",
+        },
+        { status: 409 }
+      );
     return naoElegivel();
   }
 

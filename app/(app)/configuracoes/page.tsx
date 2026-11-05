@@ -146,6 +146,11 @@ function Configuracoes() {
 
   async function salvar() {
     if (salvando) return;
+    // nome apagado sem querer não vira "Minha Loja" em silêncio
+    if (!nomeLoja.trim()) {
+      setErroNumeros("Informe o nome da loja.");
+      return;
+    }
     // número inválido não vira 0 em silêncio
     const margemNum = parseNumero(margem);
     const comissaoNum = parseNumero(comissao);
@@ -160,7 +165,7 @@ function Configuracoes() {
     setErroNumeros(null);
     setSalvando(true);
     const res = await setConfig({
-      nomeLoja: nomeLoja.trim() || "Minha Loja",
+      nomeLoja: nomeLoja.trim(),
       segmento,
       canais: canais.length ? canais : ["whatsapp"],
       usaRevendedoras: usaRev,
@@ -204,7 +209,7 @@ function Configuracoes() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="cfg-nome">Nome da loja</label>
-            <input id="cfg-nome" className="input" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} />
+            <input id="cfg-nome" maxLength={120} className="input" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} />
           </div>
           <div>
             <label className="label" htmlFor="cfg-segmento">Segmento</label>
@@ -262,7 +267,7 @@ function Configuracoes() {
                     key={c.hex}
                     type="button"
                     onClick={() => escolherCor(c.hex)}
-                    className="grid place-items-center h-10 w-10 rounded-full"
+                    className="grid place-items-center h-11 w-11 rounded-full"
                     aria-label={`Cor ${c.nome}`}
                     aria-pressed={ativa}
                     title={c.nome}
@@ -280,7 +285,7 @@ function Configuracoes() {
                   </button>
                 );
               })}
-              <label className="relative grid place-items-center h-10 w-10 rounded-full cursor-pointer" title="Escolher outra cor">
+              <label className="relative grid place-items-center h-11 w-11 rounded-full cursor-pointer" title="Escolher outra cor">
                 <span
                   className={`grid place-items-center h-7 w-7 rounded-full ${
                     cor && !CORES.some((c) => c.hex === cor)
@@ -302,7 +307,7 @@ function Configuracoes() {
               <button
                 type="button"
                 onClick={() => escolherCor(null)}
-                className="text-sm text-muted hover:text-strong ml-1 px-1 min-h-[40px] underline underline-offset-2"
+                className="text-sm text-muted hover:text-strong ml-1 px-1 min-h-[44px] underline underline-offset-2"
               >
                 padrão
               </button>

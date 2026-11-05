@@ -168,6 +168,18 @@ export function brl(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Cartão de KPI: a partir de R$ 100 milhões o valor não cabe em 2 colunas no celular e
+// quebraria no meio do número. Forma curta: "R$ 4,5 bi".
+export function brlKpi(n: number) {
+  if (Math.abs(n) < 100_000_000) return brl(n);
+  return n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
+}
+
 // ----------------------------------------------------- relatório financeiro
 const FORMA_LABEL: Record<string, string> = {
   dinheiro: "Dinheiro",

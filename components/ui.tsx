@@ -32,7 +32,7 @@ export function PageHeader({
         <h1 className="page-title">{titulo}</h1>
         {descricao && <p className="mt-1 text-sm text-muted max-w-2xl">{descricao}</p>}
       </div>
-      {acoes && <div className="flex items-center gap-2 shrink-0 print-hidden">{acoes}</div>}
+      {acoes && <div className="flex flex-wrap items-center gap-2 max-w-full print-hidden">{acoes}</div>}
     </header>
   );
 }
@@ -61,7 +61,7 @@ export function Stat({
   const conteudo = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="eyebrow truncate">{rotulo}</span>
+        <span className="eyebrow min-w-0">{rotulo}</span>
         {Icone && (
           <span className={`badge p-1 shrink-0 hidden sm:inline-flex tone-${tom}`} aria-hidden>
             <Icone size={15} />
@@ -74,12 +74,12 @@ export function Stat({
   );
   if (href) {
     return (
-      <Link href={href} className={`card block min-w-0 ${className}`}>
+      <Link href={href} className={`card kpi block min-w-0 ${className}`}>
         {conteudo}
       </Link>
     );
   }
-  return <div className={`card min-w-0 ${className}`}>{conteudo}</div>;
+  return <div className={`card kpi min-w-0 ${className}`}>{conteudo}</div>;
 }
 
 /** Variação percentual com seta; `null` = sem base de comparação. */
@@ -137,7 +137,7 @@ export function Painel({
 /** Link discreto "ver tudo" usado nos cabeçalhos de bloco. */
 export function LinkAcao({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+    <Link href={href} className="inline-flex items-center gap-1 min-h-[44px] md:min-h-0 text-sm font-medium text-accent hover:underline">
       {children}
       <ArrowRight size={14} aria-hidden />
     </Link>
@@ -196,15 +196,15 @@ export function Aviso({
   };
   return (
     <div
-      className={`flex items-start gap-3 border px-3.5 py-3 ${borda[tom]} ${fundo[tom]} ${className}`}
+      className={`flex flex-wrap items-start gap-3 border px-3.5 py-3 ${borda[tom]} ${fundo[tom]} ${className}`}
       style={{ borderRadius: "var(--r-card)" }}
     >
       {Icone && <Icone size={18} className={`shrink-0 mt-0.5 ${TEXTO_TOM[tom]}`} aria-hidden />}
-      <div className="min-w-0 flex-1 text-sm">
+      <div className="min-w-0 flex-1 basis-40 text-sm">
         {titulo && <div className="font-semibold">{titulo}</div>}
         {children && <div className={`text-muted ${titulo ? "mt-0.5" : ""}`}>{children}</div>}
       </div>
-      {acao && <div className="shrink-0 self-center">{acao}</div>}
+      {acao && <div className="max-w-full self-center">{acao}</div>}
     </div>
   );
 }
@@ -285,7 +285,7 @@ export function Progresso({
       aria-valuenow={Math.round(seguro)}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={rotulo}
+      aria-label={rotulo ?? "Progresso"}
     >
       <div className={`h-full rounded-full progress-fill ${cor}`} style={{ width: `${seguro}%` }} />
     </div>

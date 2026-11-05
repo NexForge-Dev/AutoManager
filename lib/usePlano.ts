@@ -4,6 +4,7 @@ import {
   capacidades,
   planoEfetivo,
   trialAtivo,
+  assinouNoTrial,
   diasDeTrial,
   atingiuLimite,
   planoDef,
@@ -31,7 +32,10 @@ export type SituacaoAssinatura =
 
 export function situacaoDaAssinatura(a: Assinatura | null, agora = Date.now()): SituacaoAssinatura {
   if (!a) return "sem_assinatura";
-  if (a.status === "trialing") return trialAtivo(a) ? "trial" : "trial_vencido";
+  if (a.status === "trialing") {
+    if (trialAtivo(a)) return "trial";
+    return a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS >= agora ? "ativa" : "trial_vencido";
+  }
   if (a.status === "canceled") return "cancelada";
   if (a.status === "past_due") return "pendente";
   if (a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS < agora) return "pendente";
@@ -63,6 +67,7 @@ export function usePlano() {
     planoContratado,
     defContratado: planoDef(planoContratado),
     emTrial,
+    assinadoNoTrial: assinouNoTrial(assinatura),
     diasTrial: diasDeTrial(assinatura),
     situacao,
     // sem assinatura, teste vencido, cancelada ou inadimplente: recursos pagos bloqueados

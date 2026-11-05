@@ -59,7 +59,7 @@ const TENTATIVAS_CONFIRMAR = 10; // ~30 s
 function PlanoAdmin() {
   const role = useStore((s) => s.role);
   const hydrate = useStore((s) => s.hydrate);
-  const { defContratado, caps, uso, emTrial, diasTrial, assinatura, situacao, bloqueado } = usePlano();
+  const { defContratado, caps, uso, emTrial, diasTrial, assinatura, situacao, bloqueado, assinadoNoTrial } = usePlano();
 
   const [retorno, setRetorno] = useState<null | { ok: boolean; msg: string }>(null);
   const [confirmando, setConfirmando] = useState<string | null>(null);
@@ -108,7 +108,13 @@ function PlanoAdmin() {
           if (!montado.current) return;
           if (j?.plano) {
             await hydrate().catch(() => {});
-            if (montado.current) setRetorno({ ok: true, msg: "Assinatura confirmada! Seu plano já está ativo." });
+            if (montado.current)
+              setRetorno({
+                ok: true,
+                msg: j.emTrial
+                  ? "Assinatura confirmada! Seu teste grátis continua, e a 1ª cobrança só acontece quando ele acabar."
+                  : "Assinatura confirmada! Seu plano já está ativo.",
+              });
             return;
           }
           const aguardando =
@@ -174,7 +180,7 @@ function PlanoAdmin() {
   // limite 0 (Ambulante/piso): sem divisão por zero (NaN na largura da barra)
   const pctRev =
     limRev === Infinity ? 0 : limRev > 0 ? Math.min(100, (uso.revendedoras / limRev) * 100) : uso.revendedoras > 0 ? 100 : 0;
-  const temPortal = !!assinatura?.status && assinatura.status !== "trialing";
+  const temPortal = !!assinatura?.status && (assinatura.status !== "trialing" || assinadoNoTrial);
   const botaoPortal = temPortal && (
     <button
       type="button"
@@ -190,7 +196,7 @@ function PlanoAdmin() {
   return (
     <div className="space-y-4 md:space-y-5">
       <div>
-        <Link href="/configuracoes" className="inline-flex items-center gap-1 min-h-[36px] text-sm text-muted hover:text-strong">
+        <Link href="/configuracoes" className="inline-flex items-center gap-1 min-h-[44px] text-sm text-muted hover:text-strong">
           <ArrowLeft size={15} aria-hidden /> Configurações
         </Link>
         <PageHeader titulo="Assinatura" />
