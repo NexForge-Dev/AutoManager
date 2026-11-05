@@ -87,6 +87,12 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // leitura falhou: não se sabe quem é, então não redireciona para lugar nenhum
     if (jaMontado || !ready || falhaEssencial) return;
+    // sem sessão (saiu em outra aba, por exemplo): é alguém de volta, não um dono sem
+    // onboarding. Os defaults do store mandariam para /onboarding.
+    if (!usuarioId) {
+      window.location.assign("/login?modo=entrar");
+      return;
+    }
     // autenticado mas sem loja própria (revendedora/visitante que caiu no painel):
     // não pertence ao painel do dono — manda para o acesso da revendedora.
     // Revendedora ativa vai para /revenda; suspensa ou sem loja vai para /acesso com o
@@ -115,7 +121,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     }
     // bloqueia rota fora do papel
     if (!podeAcessar(role, path)) router.replace(homeDe(role));
-  }, [jaMontado, ready, falhaEssencial, completo, role, path, router, semOrg, adminSemLoja, tentativaDestino]);
+  }, [jaMontado, ready, falhaEssencial, usuarioId, completo, role, path, router, semOrg, adminSemLoja, tentativaDestino]);
 
   // Já há um Guard/AppShell acima (no layout) -> não duplica, só repassa.
   if (jaMontado) return <>{children}</>;
@@ -138,6 +144,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
   // Enquanto o redirecionamento acima não acontece, NUNCA renderiza a tela de
   // uma rota que o papel não pode ver (vendedor/motoboy veriam telas do dono).
   const redirecionando =
+    !usuarioId ||
     semOrg || (!completo && role === "owner") || !podeAcessar(role, path);
   if (semOrg && falhaDestino) return <TelaFalhaCarga onTentar={() => setTentativaDestino((n) => n + 1)} />;
   if (redirecionando) return <AppLoadingSkeleton />;

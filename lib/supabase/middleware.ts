@@ -65,8 +65,10 @@ export async function updateSession(request: NextRequest) {
 
   // a sessão anônima do chat da vitrine não é login de verdade: trata como deslogado
   if ((!user || user.is_anonymous) && rotaPrivada) {
+    // quem tentou abrir uma tela do app já é cliente: abre no "Entrar", não no cadastro
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "?modo=entrar";
     return NextResponse.redirect(url);
   }
 

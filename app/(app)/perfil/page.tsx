@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
+import { sairDaConta } from "@/lib/sair";
 import { usePlano } from "@/lib/usePlano";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -12,7 +12,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import CountUp from "@/components/CountUp";
 import { PageHeader, Painel, Selo, Stat } from "@/components/ui";
 import { Skeleton } from "@/components/Skeleton";
-import { brl, centavos } from "@/lib/analytics";
+import { brlKpi, centavos } from "@/lib/analytics";
 import { Store, Mail, Palette, LogOut, BadgeCheck, ChevronRight } from "lucide-react";
 
 export default function PerfilPage() {
@@ -24,7 +24,6 @@ export default function PerfilPage() {
 }
 
 function Perfil() {
-  const router = useRouter();
   const { config, produtos, vendas, role } = useStore();
   const { confirm } = useDialog();
   const [email, setEmail] = useState("");
@@ -43,10 +42,7 @@ function Perfil() {
       perigo: true,
     });
     if (!ok) return;
-    await createClient().auth.signOut();
-    // não deixa os dados desta loja na memória para a próxima conta do navegador
-    useStore.getState().limpar();
-    router.replace("/login?modo=entrar");
+    await sairDaConta();
   }
 
   // canceladas não são faturamento nem venda
@@ -82,7 +78,7 @@ function Perfil() {
           <Stat
             rotulo="Faturado"
             className="col-span-2 sm:col-span-1"
-            valor={<CountUp value={faturamento} format={brl} />}
+            valor={<CountUp value={faturamento} format={brlKpi} />}
           />
         </div>
       )}

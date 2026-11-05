@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { situacaoRevendedora } from "@/lib/destinoPosLogin";
 import { falhaDeRedeAuth } from "@/lib/cargaLoja";
+import { sairDaConta } from "@/lib/sair";
 import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
 import { parseNumero } from "@/lib/csvProdutos";
@@ -138,12 +139,7 @@ export default function RevendaPage() {
     setVendas([]);
     setMe(null);
     aplicarCorMarca(null);
-    try {
-      await sb.current.auth.signOut();
-    } catch {
-      // sem rede: o signOut local já apagou a sessão do navegador
-    }
-    router.replace("/acesso");
+    await sairDaConta("/acesso");
   }
 
   if (falha && me === undefined)

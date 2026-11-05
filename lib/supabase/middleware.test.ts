@@ -20,7 +20,7 @@ beforeEach(() => {
 describe("updateSession", () => {
   it("sem sessão: rota privada vai para o login", async () => {
     resposta = { data: { user: null }, error: { name: "AuthSessionMissingError", status: 400 } };
-    expect(destino(await pedir("/painel"))).toContain("/login");
+    expect(destino(await pedir("/painel"))).toContain("/login?modo=entrar");
   });
 
   it("token recusado: rota privada vai para o login", async () => {

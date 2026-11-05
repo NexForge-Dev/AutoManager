@@ -8,7 +8,7 @@ import { usePlano } from "@/lib/usePlano";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { falhaDeRedeAuth } from "@/lib/cargaLoja";
-import { apagarRascunho, gravarRascunho, lerRascunho } from "@/lib/rascunho";
+import { apagarRascunho, chaveOnboarding, gravarRascunho, lerRascunho } from "@/lib/rascunho";
 import { TelaFalhaCarga } from "@/components/FalhaCarga";
 import { registrarMetrica, type Etapa } from "@/lib/metricas/cliente";
 
@@ -66,7 +66,6 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Passo = { icone: LucideIcon; title: string; sub: string; ms: number };
 
-const CHAVE_RASCUNHO = "am_onboarding";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -74,6 +73,7 @@ export default function Onboarding() {
   const ready = useStore((s) => s.ready);
   const falhaEssencial = useStore((s) => s.falhaEssencial);
   const completo = useStore((s) => s.config.onboardingCompleto);
+  const usuarioId = useStore((s) => s.usuarioId);
   const { planoContratado } = usePlano();
   const [gerando, setGerando] = useState(false);
 
@@ -128,44 +128,63 @@ export default function Onboarding() {
     if (ready && liberado && completo && !gerando) router.replace("/painel");
   }, [ready, liberado, completo, gerando, router]);
 
-  // rascunho desta aba: refresh no meio não perde o que já foi respondido
-  const [rascunho] = useState(() => lerRascunho<Record<string, any>>(CHAVE_RASCUNHO) ?? {});
-  const [step, setStep] = useState<number>(rascunho.step ?? 0);
+  const [step, setStep] = useState(0);
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
 
   // respostas
-  const [nomeLoja, setNomeLoja] = useState<string>(rascunho.nomeLoja ?? "");
-  const [descricao, setDescricao] = useState<string>(rascunho.descricao ?? "");
-  const [segmento, setSegmento] = useState<string>(rascunho.segmento ?? "semijoias");
-  const [planoEscolhido, setPlanoEscolhido] = useState<PlanoId>(
-    planoValido(rascunho.planoEscolhido) ? rascunho.planoEscolhido : planoContratado || "solo"
-  );
+  const [nomeLoja, setNomeLoja] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [segmento, setSegmento] = useState("semijoias");
+  const [planoEscolhido, setPlanoEscolhido] = useState<PlanoId>(planoContratado || "solo");
   // plano escolhido na landing (guardado pelo /login?plano=...)
   useEffect(() => {
-    if (rascunho.planoEscolhido) return; // já decidiu aqui: a escolha do rascunho vale
     try {
       const p = sessionStorage.getItem("am_plano_landing");
       if (planoValido(p)) setPlanoEscolhido(p);
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [qtdRev, setQtdRev] = useState<string>(rascunho.qtdRev ?? "1-3");
-  const [margem, setMargem] = useState<number>(rascunho.margem ?? 100);
-  const [comissao, setComissao] = useState<number>(rascunho.comissao ?? 30);
-  const [whatsapp, setWhatsapp] = useState<string>(rascunho.whatsapp ?? "");
-  const [instagram, setInstagram] = useState<string>(rascunho.instagram ?? "");
-  const [facebook, setFacebook] = useState<string>(rascunho.facebook ?? "");
-  const [tiktok, setTiktok] = useState<string>(rascunho.tiktok ?? "");
-  const [email, setEmail] = useState<string>(rascunho.email ?? "");
+  const [qtdRev, setQtdRev] = useState("1-3");
+  const [margem, setMargem] = useState(100);
+  const [comissao, setComissao] = useState(30);
+  const [whatsapp, setWhatsapp] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [tiktok, setTiktok] = useState("");
+  const [email, setEmail] = useState("");
+
+  // Rascunho desta aba e deste usuário: refresh no meio não perde o que já foi respondido.
+  // Só lê depois de saber quem é, e só grava depois de ler (senão apagaria o rascunho).
+  const [rascunhoLido, setRascunhoLido] = useState(false);
+  useEffect(() => {
+    if (!liberado || !usuarioId || rascunhoLido) return;
+    const r = lerRascunho<Record<string, any>>(chaveOnboarding(usuarioId));
+    if (r) {
+      if (typeof r.step === "number") setStep(r.step);
+      if (planoValido(r.planoEscolhido)) setPlanoEscolhido(r.planoEscolhido);
+      setNomeLoja(r.nomeLoja ?? "");
+      setDescricao(r.descricao ?? "");
+      setSegmento(r.segmento ?? "semijoias");
+      setQtdRev(r.qtdRev ?? "1-3");
+      setMargem(r.margem ?? 100);
+      setComissao(r.comissao ?? 30);
+      setWhatsapp(r.whatsapp ?? "");
+      setInstagram(r.instagram ?? "");
+      setFacebook(r.facebook ?? "");
+      setTiktok(r.tiktok ?? "");
+      setEmail(r.email ?? "");
+    }
+    setRascunhoLido(true);
+  }, [liberado, usuarioId, rascunhoLido]);
 
   useEffect(() => {
-    if (completo) apagarRascunho(CHAVE_RASCUNHO);
-    else
-      gravarRascunho(CHAVE_RASCUNHO, {
+    if (!usuarioId) return;
+    if (completo) apagarRascunho(chaveOnboarding(usuarioId));
+    else if (rascunhoLido)
+      gravarRascunho(chaveOnboarding(usuarioId), {
         step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao,
         whatsapp, instagram, facebook, tiktok, email,
       });
-  }, [completo, step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao, whatsapp, instagram, facebook, tiktok, email]);
+  }, [usuarioId, rascunhoLido, completo, step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao, whatsapp, instagram, facebook, tiktok, email]);
 
   // escopo de perguntas conforme o PLANO ESCOLHIDO no onboarding
   const plano = planoDef(planoEscolhido);
