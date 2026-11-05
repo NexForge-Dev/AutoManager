@@ -17,6 +17,9 @@ export const LIMITES_ATIVACAO = {
   porEmail: { max: 5, janelaSegundos: 15 * 60 },
 } satisfies Record<string, Regra>;
 
+/** Balão de feedback e card de suporte, por usuário. */
+export const LIMITE_FEEDBACK: Regra = { max: 10, janelaSegundos: 60 * 60 };
+
 export function chaveLimite(escopo: string, valor: string): string {
   const h = createHash("sha256").update(valor.trim().toLowerCase()).digest("hex");
   return `${escopo}:${h}`;

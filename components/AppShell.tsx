@@ -30,6 +30,7 @@ import { useRecebimentosPendentes } from "@/lib/useRecebimentos";
 import type { PlanoDef } from "@/lib/plans";
 import PageTransition from "./PageTransition";
 import { DialogProvider } from "./Dialog";
+import BalaoFeedback from "./BalaoFeedback";
 import Modal from "./Modal";
 
 type Grupo = "operacao" | "clientes" | "gestao" | "conta";
@@ -231,7 +232,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <main
           className={`${
             COLUNA_ESTREITA.includes(path) ? "max-w-3xl" : "max-w-6xl"
-          } mx-auto px-4 pt-4 pb-28 md:px-8 md:pt-7 md:pb-12`}
+          } mx-auto px-4 pt-4 pb-32 md:px-8 md:pt-7 md:pb-20`}
         >
           <PageTransition>{children}</PageTransition>
         </main>
@@ -289,6 +290,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         )}
       </nav>
+
+      {/* na tela de venda o carrinho fixo ocupa esse canto e tem o botão de concluir */}
+      {path !== "/vender" && <BalaoFeedback />}
 
       {/* -------- "Mais" (mobile): demais telas -------- */}
       {maisAberto && (

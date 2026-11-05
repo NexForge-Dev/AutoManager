@@ -178,6 +178,7 @@ Navegação e rotas se adaptam ao papel e às **capacidades do plano**
 ### API (server-side, service role)
 | Rota | O que faz |
 |---|---|
+| `POST /api/feedback` | Usuário logado abre chamado (10 por hora): grava em `chamado` com a sessão e repassa ao Painel NexForge, sem identidade. |
 | `POST /api/membros` | Dono cria/remove login de vendedor/motoboy (valida que quem chama é owner + plano). |
 | `POST /api/onboarding/plano` | Dono define no onboarding o plano escolhido como **trial de 30 dias** (1º mês grátis). Service role após checar owner. |
 | `POST /api/revendedora/ativar` | Revendedora ativa o acesso com o e-mail liberado + **código de convite** + senha escolhida (§7). |
@@ -389,6 +390,7 @@ components/
   MembrosManager.tsx → gestão de equipe (vendedor/motoboy), usado em configurações e perfil
   UpgradeGate.tsx → modal/bloco de upgrade de plano (com animação)
   ThemeToggle.tsx → tema claro/escuro; Reporte.tsx → abrir chamado de suporte
+  BalaoFeedback.tsx → balão flutuante de sugestão/problema (grava em `chamado`)
   charts/         → VendasArea (gráfico de vendas; usa a cor da marca, tooltip e animação)
   landing/        → Pricing, Faq, StickyCta, Rodape, ContatoEmpresa, LegalLayout, Mostras (labelled
                     illustrative UI samples), EntradaShell (login/acesso/redefinir-senha frame)
@@ -423,7 +425,8 @@ o SaaS — não é o "admin" de uma loja (esse é o `owner`). Tudo nas rotas `/a
   cascata + as contas de auth — **irreversível**). Trava de segurança: nunca age sobre a própria
   conta do super-admin.
 - **Chamados:** suporte das lojas. Tabela `chamado` (migration `0016_chamados.sql`) com RLS que
-  libera **só** o e-mail do superadmin; o lojista abre chamado pelo componente `Reporte.tsx`.
+  libera **só** o e-mail do superadmin; o lojista abre chamado pelo balão de feedback (`BalaoFeedback.tsx`) ou pelo card `Reporte.tsx`,
+  os dois via `POST /api/feedback`, que grava o chamado e repassa ao Painel NexForge.
 - **Auditoria** (`GET /api/admin/logs`): trilha **append-only** das ações sensíveis (moderar
   conta e trocar plano) — quem, quando, sobre qual loja e o quê. As rotas `/api/admin/*` gravam
   via `lib/adminAudit.ts` (tabela `admin_log`, `0032`); ninguém atualiza nem apaga.

@@ -342,10 +342,9 @@ interface State {
   // suporte / chamados
   abrirChamado: (args: {
     tipo: TipoChamado;
-    assunto: string;
+    assunto?: string;
     mensagem: string;
     emailContato?: string;
-    whatsapp?: string;
   }) => Promise<{ ok: boolean; erro?: string }>;
   // erro = não conseguiu ler (a tela mostra o erro em vez de "nenhum chamado")
   listarChamados: () => Promise<{ chamados: Chamado[]; erro?: string }>;
@@ -1806,23 +1805,20 @@ export const useStore = create<State>()((set, get) => {
       return { ok: true };
     },
 
-    abrirChamado: async ({ tipo, assunto, mensagem, emailContato, whatsapp }) => {
-      const { orgId, usuarioId, email, config } = get();
-      if (!usuarioId) return { ok: false, erro: "Sessão expirada. Entre novamente." };
-      if (!assunto.trim() || !mensagem.trim())
-        return { ok: false, erro: "Preencha assunto e mensagem." };
-      const { error } = await sb().from("chamado").insert({
-        org_id: orgId,
-        usuario_id: usuarioId,
-        nome_loja: config.nomeLoja || null,
-        email_contato: (emailContato || email || "").trim() || null,
-        whatsapp: (whatsapp || "").trim() || null,
-        tipo,
-        assunto: assunto.trim(),
-        mensagem: mensagem.trim(),
-      });
-      if (error) return { ok: false, erro: erroAmigavel(error.message) };
-      return { ok: true };
+    // pela rota do servidor: ela grava e repassa ao Painel NexForge (precisa da chave)
+    abrirChamado: async ({ tipo, assunto, mensagem, emailContato }) => {
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo, assunto, mensagem, emailContato, pagina: window.location.pathname }),
+        });
+        if (res.ok) return { ok: true };
+        const json = await res.json().catch(() => ({}));
+        return { ok: false, erro: json?.erro || "Não foi possível enviar. Tente de novo." };
+      } catch {
+        return { ok: false, erro: "Sem conexão. Tente de novo." };
+      }
     },
 
     listarChamados: async () => {

@@ -10,6 +10,14 @@ export interface NexforgeOptions {
   onError?: (err: unknown) => void;
 }
 
+export interface FeedbackItem {
+  externalId: string | number;
+  kind: "suggestion" | "problem";
+  message: string;
+  page?: string;
+  occurredAt?: Date;
+}
+
 export type NexforgeEvent =
   | "signup_started"
   | "signup_step_completed"
@@ -45,6 +53,8 @@ export interface NexforgeClient {
   pseudonym(id: string | number): string;
   /** deterministic UUID-shaped id for one-time events */
   onceId(...parts: Array<string | number>): string;
+  /** Sends one saved suggestion or problem report as free text, never the author's identity. Never throws. */
+  feedback(item: FeedbackItem, maxWaitMs?: number): Promise<boolean>;
   enabled: boolean;
 }
 

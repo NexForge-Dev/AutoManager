@@ -3,8 +3,9 @@
 // Sai daqui apenas: nome do evento, um id pseudônimo da LOJA (HMAC do org_id com
 // NEXFORGE_PSEUDONYM_SECRET, que nunca sai deste servidor) e códigos fixos
 // (plano, etapa, recurso). Nunca nomes, e-mails, telefones, produtos ou valores
-// de vendas. Sem as três variáveis NEXFORGE_* tudo vira no-op.
-import { createNexforge, type NexforgeClient, type NexforgeEvent } from "./nexforge-client.cjs";
+// de vendas. A exceção é enviarFeedback: o texto que o usuário escreveu, sem a
+// identidade dele. Sem as três variáveis NEXFORGE_* tudo vira no-op.
+import { createNexforge, type FeedbackItem, type NexforgeClient, type NexforgeEvent } from "./nexforge-client.cjs";
 import { PLANOS, type PlanoId } from "@/lib/plans";
 
 let cliente: NexforgeClient | null = null;
@@ -45,6 +46,18 @@ export function registrarEvento(evento: NexforgeEvent, orgId: string | null | un
 export async function enviarMetricas() {
   const c = nf();
   if (c.enabled) await c.flush(1500);
+}
+
+/**
+ * Repassa um chamado já gravado no nosso banco (única chamada com texto livre: nunca
+ * incluir nome, e-mail ou id do autor). Espera no máximo 2,5 s e nunca lança.
+ */
+export async function enviarFeedback(item: FeedbackItem) {
+  try {
+    await nf().feedback(item, 2500);
+  } catch (e) {
+    console.warn("[nexforge]", e instanceof Error ? e.message : e);
+  }
 }
 
 /** Propriedades de cobrança no formato do painel (preço em centavos de BRL). */

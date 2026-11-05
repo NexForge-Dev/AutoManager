@@ -50,13 +50,13 @@ describe("dados da empresa", () => {
 
 describe("páginas legais com razão social, CNPJ e cidade vazios", () => {
   it.each([
-    ["privacidade", PrivacidadePage],
-    ["termos", TermosPage],
-    ["cancelamento", CancelamentoPage],
-  ])("%s mostra o e-mail, não deixa rótulo vazio nem cita o Mercado Pago", (_nome, Pagina) => {
+    ["privacidade", PrivacidadePage, "05/11/2026"],
+    ["termos", TermosPage, "04/11/2026"],
+    ["cancelamento", CancelamentoPage, "04/11/2026"],
+  ])("%s mostra o e-mail, não deixa rótulo vazio nem cita o Mercado Pago", (_nome, Pagina, atualizadoEm) => {
     const t = texto(Pagina);
     expect(t).toContain(EMAIL);
-    expect(t).toContain("04/11/2026");
+    expect(t).toContain(atualizadoEm);
     expect(t).not.toMatch(/undefined|null|Razão social:|CNPJ:|Sede:/);
     expect(t).not.toMatch(/Mercado ?Pago/i);
   });

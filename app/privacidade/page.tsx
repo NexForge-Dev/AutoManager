@@ -16,7 +16,7 @@ export default function PrivacidadePage() {
   return (
     <LegalLayout
       titulo="Política de Privacidade"
-      atualizadoEm="04/11/2026"
+      atualizadoEm="05/11/2026"
       resumo="Em resumo: usamos dados para fazer o AutoManager funcionar, cobrar a assinatura, dar suporte e proteger o serviço. Não vendemos dados pessoais. Os dados que a loja registra sobre clientes e equipe são da loja: ela decide o que fazer com eles e nós tratamos esses dados em nome dela. Os dados ficam em servidores nos Estados Unidos. Pedidos sobre seus dados, inclusive de exclusão da conta, são feitos pelo nosso e-mail."
     >
       <Secao n={1} titulo="A quem esta Política se aplica">
@@ -92,8 +92,10 @@ export default function PrivacidadePage() {
           Não pedimos documento nem senha. Evite enviar dados sensíveis ou de pagamento pelo chat.
         </p>
         <p>
-          <strong>Suporte:</strong> o que você enviar por e-mail, WhatsApp ou pelo botão de suporte do
-          Painel, que registra nome da loja, e-mail e WhatsApp de contato, assunto e mensagem.
+          <strong>Suporte, sugestões e problemas:</strong> o que você enviar por e-mail, WhatsApp, pelo
+          botão de suporte do Painel ou pelo balão de sugestões e problemas do app. O botão e o balão
+          registram nome da loja, e-mail de contato, assunto, mensagem e a página em que você estava.
+          Uma cópia vai para o Painel NexForge, como descrito na seção 5.
         </p>
         <p>
           <strong>Dados técnicos:</strong> endereço IP, navegador, data e hora de acesso e registros de
@@ -166,14 +168,18 @@ export default function PrivacidadePage() {
             os dados do navegador. A caixa de e-mail do suporte também é hospedada no Google (Gmail).
           </li>
           <li>
-            <strong>Painel NexForge</strong>: nossa ferramenta interna de estatísticas de produto, que
-            funciona quando está configurada. Recebe eventos como &quot;cadastro concluído&quot;,
+            <strong>Painel NexForge</strong>: nossa ferramenta interna de gestão e de estatísticas de
+            produto, que funciona quando está configurada. Recebe eventos como &quot;cadastro concluído&quot;,
             &quot;recurso usado&quot; ou &quot;plano alterado&quot;, com data, plano, etapa, recurso,
             quantidade e o valor da assinatura. A loja é identificada só por um{" "}
-            <strong>código pseudônimo</strong>, gerado no servidor do AutoManager. O painel não recebe
+            <strong>código pseudônimo</strong>, gerado no servidor do AutoManager. Os eventos não levam
             nomes, e-mails, telefones, produtos, clientes nem valores das vendas da loja. Dado
             pseudônimo continua sendo dado pessoal quando se refere a uma pessoa identificável, e por
-            isso o tratamos conforme esta Política.
+            isso o tratamos conforme esta Política. O painel também recebe uma cópia das sugestões e
+            dos relatos de problema enviados pelo balão ou pelo botão de suporte do Painel: o tipo, o
+            texto escrito (com o assunto, quando houver), a página do app e a data. A cópia vai sem
+            nome, e-mail ou identificador da conta, mas leva o texto exatamente como foi escrito. Por
+            isso, não escreva dados pessoais nessas mensagens, nem seus nem de outras pessoas.
           </li>
           <li>
             <strong>Autoridades</strong>, quando houver obrigação legal ou ordem judicial.
@@ -236,6 +242,11 @@ export default function PrivacidadePage() {
           </li>
           <li>chamados e conversas de suporte, que podem conter e-mail, WhatsApp e mensagens;</li>
           <li>eventos pseudônimos no Painel NexForge, sem ligação com a conta apagada;</li>
+          <li>
+            cópias de sugestões e relatos de problema no Painel NexForge, que não são apagadas junto com
+            a conta. Para pedir a exclusão de uma cópia, escreva para o e-mail da seção 9 informando a
+            data e o assunto da mensagem;
+          </li>
           <li>identificadores técnicos de sessões anônimas do chat, sem nome nem mensagens;</li>
           <li>registros técnicos e cópias de segurança dos provedores, conforme o ciclo de cada um.</li>
         </ul>
