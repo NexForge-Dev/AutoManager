@@ -4,6 +4,7 @@ import {
   capacidades,
   planoEfetivo,
   trialAtivo,
+  assinouNoTrial,
   diasDeTrial,
   atingiuLimite,
   planoDef,
@@ -63,6 +64,7 @@ export function usePlano() {
     planoContratado,
     defContratado: planoDef(planoContratado),
     emTrial,
+    assinadoNoTrial: assinouNoTrial(assinatura),
     diasTrial: diasDeTrial(assinatura),
     situacao,
     // sem assinatura, teste vencido, cancelada ou inadimplente: recursos pagos bloqueados

@@ -311,7 +311,7 @@ interface State {
   addRevendedora: (r: Omit<Revendedora, "id" | "criadaEm" | "ativa" | "acessoLiberado" | "temAcesso">) => Promise<Resultado>;
   updateRevendedora: (id: string, patch: Partial<Revendedora>) => Promise<Resultado>;
   // libera o 1º acesso e devolve o código de convite (uso único) p/ o dono compartilhar
-  liberarAcessoRevendedora: (id: string) => Promise<{ ok: boolean; codigo?: string; erro?: string }>;
+  liberarAcessoRevendedora: (id: string) => Promise<{ ok: boolean; codigo?: string; erro?: string; emailEmUso?: boolean }>;
   revogarAcessoRevendedora: (id: string) => Promise<void>;
 
   registrarVenda: (args: {
@@ -1442,7 +1442,9 @@ export const useStore = create<State>()((set, get) => {
       set((s) => ({
         revendedoras: s.revendedoras.map((r) => (r.id === id ? { ...r, acessoLiberado: true } : r)),
       }));
-      return { ok: true, codigo: (data as any)?.codigo };
+      // e-mail que já tem conta nunca ativa: avisa agora (sem a RPC, banco sem a 0044, segue)
+      const { data: emUso } = await sb().rpc("revendedora_email_em_uso", { p_id: id });
+      return { ok: true, codigo: (data as any)?.codigo, emailEmUso: emUso === true };
     },
 
     revogarAcessoRevendedora: async (id) => {

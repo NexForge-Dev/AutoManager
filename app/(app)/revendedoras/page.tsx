@@ -548,6 +548,11 @@ function AcessoRevendedora({
     }
     setCodigo(res.codigo ?? null);
     setCopiado(false);
+    if (res.emailEmUso)
+      alerta({
+        titulo: "Este e-mail já tem conta",
+        mensagem: `${r.nome} não vai conseguir ativar com esse e-mail, porque ele já tem uma conta no AutoManager. Cadastre outro e-mail dela e gere um novo código.`,
+      });
   }
 
   // Pede confirmação e mostra o erro se o banco recusar. Chama a RPC direto

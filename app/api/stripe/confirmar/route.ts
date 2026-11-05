@@ -29,7 +29,14 @@ export async function POST(req: Request) {
     );
     await posSincronizar(r, sessao.id);
     await enviarMetricas();
-    return NextResponse.json({ resultado: r.resultado, status: r.status ?? null, plano: r.status === "active" ? r.plano : null });
+    // assinou no teste grátis: confirmado, mas a cobrança e o plano começam no fim do teste
+    const confirmado = r.status === "active" || (r.resultado === "sincronizada" && r.emTrialStripe);
+    return NextResponse.json({
+      resultado: r.resultado,
+      status: r.status ?? null,
+      plano: confirmado ? r.plano : null,
+      emTrial: !!r.emTrialStripe,
+    });
   } catch (e) {
     console.error("Falha ao confirmar checkout Stripe", e);
     return NextResponse.json({ erro: "Não foi possível confirmar o pagamento agora." }, { status: 502 });

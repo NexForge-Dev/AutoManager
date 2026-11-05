@@ -212,7 +212,7 @@ export function supabaseBillingStore(admin: SupabaseClient): BillingStore {
     async assinaturaDaOrg(orgId) {
       const { data, error } = await admin
         .from("assinatura")
-        .select("plano, status, provider, provider_assinatura_id")
+        .select("plano, status, provider, provider_assinatura_id, trial_ate")
         .eq("org_id", orgId)
         .maybeSingle();
       if (error) throw new Error(error.message);
@@ -222,6 +222,7 @@ export function supabaseBillingStore(admin: SupabaseClient): BillingStore {
         status: data.status,
         // ids de outro provedor (legado Mercado Pago) não contam como assinatura Stripe
         providerAssinaturaId: data.provider === "stripe" ? data.provider_assinatura_id : null,
+        trialAte: data.trial_ate ? new Date(data.trial_ate).getTime() : null,
       };
     },
     async orgDoCliente(customerId) {

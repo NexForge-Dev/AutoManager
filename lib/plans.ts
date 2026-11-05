@@ -157,6 +157,13 @@ export function diasDeTrial(a: Assinatura | null): number {
   return Math.max(0, Math.ceil((a.trialAte - Date.now()) / 86_400_000));
 }
 
+// Assinou durante o teste: o plano escolhido começa no fim dele (a assinatura do Stripe
+// nasce em trial e a sincronização grava data_fim = fim desse trial). Só o teste do
+// AutoManager, sem assinatura, tem data_fim nula.
+export function assinouNoTrial(a: Assinatura | null): boolean {
+  return trialAtivo(a) && !!a?.dataFim;
+}
+
 // Carência após o fim do ciclo pago (data_fim) antes de cair no piso — cobre o
 // atraso normal da cobrança recorrente do Stripe (que tenta de novo por alguns dias). Espelha o "3 days" de
 // private.plano_efetivo (migration 0035).
