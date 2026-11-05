@@ -181,8 +181,13 @@ export function planoEfetivo(a: Assinatura | null): PlanoId {
   if (!a) return "ambulante";
   // parou de pagar (cancelado/inadimplente): perde as capacidades, cai no piso
   if (a.status === "canceled" || a.status === "past_due") return "ambulante";
-  // trial: vigente = EXPANSAO; vencido sem pagamento = piso (não mantém plano pago)
-  if (a.status === "trialing") return trialAtivo(a) ? "expansao" : "ambulante";
+  // trial: vigente = EXPANSAO; vencido sem pagamento = piso (não mantém plano pago).
+  // Quem assinou no teste (data_fim = fim do trial no Stripe) tem a mesma carência de
+  // 'active': o webhook da 1ª cobrança pode atrasar, e o Stripe tenta de novo por dias.
+  if (a.status === "trialing") {
+    if (trialAtivo(a)) return "expansao";
+    return a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS >= Date.now() ? a.plano : "ambulante";
+  }
   // ativa, mas o ciclo pago venceu (e passou a carência) sem renovação = inadimplente
   if (a.status === "active" && a.dataFim && a.dataFim + CARENCIA_PAGAMENTO_MS < Date.now())
     return "ambulante";

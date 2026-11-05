@@ -63,6 +63,30 @@ const comoAssinatura = (g: GravarAssinatura, trialAte: number | null): Assinatur
   trialAte,
 });
 
+describe("F4: webhook atrasado depois do fim do teste", () => {
+  const assinou = (fimHa: number): Assinatura => ({
+    plano: "equipe",
+    status: "trialing",
+    precoCentavos: 9900,
+    periodo: "mensal",
+    dataInicio: null,
+    dataFim: Date.now() - fimHa,
+    trialAte: Date.now() - fimHa,
+  });
+
+  it("assinante tem a carência de 3 dias, no plano contratado", () => {
+    expect(planoEfetivo(assinou(2 * 3600 * 1000))).toBe("equipe");
+  });
+
+  it("passada a carência cai no piso", () => {
+    expect(planoEfetivo(assinou(4 * DIA))).toBe("ambulante");
+  });
+
+  it("teste sem assinatura não ganha carência", () => {
+    expect(planoEfetivo({ ...assinou(2 * 3600 * 1000), dataFim: null })).toBe("ambulante");
+  });
+});
+
 describe("assinar durante o teste grátis", () => {
   it("segue com o Expansão até o fim do teste e guarda o plano contratado", async () => {
     const { estado, store } = loja();
