@@ -267,7 +267,7 @@ function Configuracoes() {
                     key={c.hex}
                     type="button"
                     onClick={() => escolherCor(c.hex)}
-                    className="grid place-items-center h-10 w-10 rounded-full"
+                    className="grid place-items-center h-11 w-11 rounded-full"
                     aria-label={`Cor ${c.nome}`}
                     aria-pressed={ativa}
                     title={c.nome}
@@ -285,7 +285,7 @@ function Configuracoes() {
                   </button>
                 );
               })}
-              <label className="relative grid place-items-center h-10 w-10 rounded-full cursor-pointer" title="Escolher outra cor">
+              <label className="relative grid place-items-center h-11 w-11 rounded-full cursor-pointer" title="Escolher outra cor">
                 <span
                   className={`grid place-items-center h-7 w-7 rounded-full ${
                     cor && !CORES.some((c) => c.hex === cor)
@@ -307,7 +307,7 @@ function Configuracoes() {
               <button
                 type="button"
                 onClick={() => escolherCor(null)}
-                className="text-sm text-muted hover:text-strong ml-1 px-1 min-h-[40px] underline underline-offset-2"
+                className="text-sm text-muted hover:text-strong ml-1 px-1 min-h-[44px] underline underline-offset-2"
               >
                 padrão
               </button>

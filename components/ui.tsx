@@ -137,7 +137,7 @@ export function Painel({
 /** Link discreto "ver tudo" usado nos cabeçalhos de bloco. */
 export function LinkAcao({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+    <Link href={href} className="inline-flex items-center gap-1 min-h-[44px] md:min-h-0 text-sm font-medium text-accent hover:underline">
       {children}
       <ArrowRight size={14} aria-hidden />
     </Link>

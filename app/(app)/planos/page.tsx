@@ -159,7 +159,7 @@ function Planos() {
     <div className="space-y-4 md:space-y-5">
       <div>
         {/* destino fixo: router.back() depois de cancelar no Stripe voltaria ao Checkout */}
-        <Link href="/configuracoes/plano" className="inline-flex items-center gap-1 min-h-[36px] w-fit text-sm text-muted hover:text-strong">
+        <Link href="/configuracoes/plano" className="inline-flex items-center gap-1 min-h-[44px] w-fit text-sm text-muted hover:text-strong">
           <ArrowLeft size={15} aria-hidden /> Voltar
         </Link>
         <PageHeader titulo="Planos & assinatura" descricao="Escolha o plano que acompanha o crescimento da sua loja." />

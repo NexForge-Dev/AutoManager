@@ -190,7 +190,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={esqueciSenha}
                   disabled={enviandoReset}
-                  className="mb-1 min-h-[32px] text-sm font-medium text-accent hover:underline disabled:opacity-60"
+                  className="mb-1 min-h-[44px] text-sm font-medium text-accent hover:underline disabled:opacity-60"
                 >
                   {enviandoReset ? "Enviando…" : "Esqueci minha senha"}
                 </button>

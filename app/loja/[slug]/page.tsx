@@ -399,6 +399,7 @@ export default function LojaPage() {
       )}
 
       {/* botão de chat; sem chat, o WhatsApp da loja ocupa o lugar */}
+      <aside aria-label="Falar com a loja">
       {chatLigado ? (
         <button
           onClick={abrirChat}
@@ -424,6 +425,7 @@ export default function LojaPage() {
           </a>
         )
       )}
+      </aside>
 
       {chat && (
         <ChatWidget
@@ -444,7 +446,7 @@ function ProdutoCard({ p, onAbrir }: { p: ProdutoPub; onAbrir: () => void }) {
   const esgotado = p.esgotado;
   return (
     <article className="min-w-0 flex flex-col">
-      <button type="button" onClick={onAbrir} aria-label={`Ver detalhes de ${p.nome}`} className="min-w-0 flex-1 flex flex-col text-left">
+      <button type="button" onClick={onAbrir} className="min-w-0 flex-1 flex flex-col text-left">
       <div className={`w-full aspect-square relative overflow-hidden ${p.imagens[0] ? "surface-alt" : "bg-brand-500/10"}`} style={{ borderRadius: "var(--r-card)" }}>
         {p.imagens[0] ? (
           // eslint-disable-next-line @next/next/no-img-element

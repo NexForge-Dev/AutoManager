@@ -36,7 +36,7 @@ export default function ThemeToggle() {
   ];
 
   return (
-    <div className="segmented flex [&>button]:min-h-[40px]" role="group" aria-label="Tema do aplicativo">
+    <div className="segmented flex [&>button]:min-h-[44px]" role="group" aria-label="Tema do aplicativo">
       {opcoes.map((o) => {
         const Icon = o.icon;
         return (

@@ -221,7 +221,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="icon-btn relative -mr-2"
                 aria-label={
                   conversasNaoLidas > 0
-                    ? `Conversas (${conversasNaoLidas} ${conversasNaoLidas === 1 ? "não lida" : "não lidas"})`
+                    ? `${conversasNaoLidas} ${conversasNaoLidas === 1 ? "conversa não lida" : "conversas não lidas"}`
                     : "Conversas"
                 }
               >

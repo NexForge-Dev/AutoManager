@@ -23,7 +23,7 @@ export default function LegalLayout({
           <Link href="/" className="flex items-center gap-2 font-bold text-accent">
             <Gem size={19} aria-hidden /> AutoManager
           </Link>
-          <Link href="/" className="inline-flex min-h-[40px] items-center gap-1.5 text-sm text-muted transition hover:text-strong">
+          <Link href="/" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted transition hover:text-strong">
             <ArrowLeft size={15} aria-hidden /> Voltar ao início
           </Link>
         </div>

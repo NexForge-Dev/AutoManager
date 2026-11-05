@@ -15,14 +15,14 @@ export default function Rodape({ ancoras = false }: { ancoras?: boolean }) {
           <nav aria-label="Rodapé" className="flex flex-wrap justify-center gap-x-5 gap-y-0 sm:gap-y-2">
             {ancoras && (
               <>
-                <a href="#planos" className="py-2.5 transition hover:text-strong sm:py-0">Planos</a>
-                <a href="#faq" className="py-2.5 transition hover:text-strong sm:py-0">Dúvidas</a>
+                <a href="#planos" className="inline-flex min-h-[44px] items-center transition hover:text-strong sm:min-h-0">Planos</a>
+                <a href="#faq" className="inline-flex min-h-[44px] items-center transition hover:text-strong sm:min-h-0">Dúvidas</a>
               </>
             )}
-            <Link href="/termos" className="py-2.5 transition hover:text-strong sm:py-0">Termos de Uso</Link>
-            <Link href="/privacidade" className="py-2.5 transition hover:text-strong sm:py-0">Privacidade</Link>
-            <Link href="/cancelamento" className="py-2.5 transition hover:text-strong sm:py-0">Cancelamento</Link>
-            <Link href="/login?modo=entrar" className="py-2.5 transition hover:text-strong sm:py-0">Entrar</Link>
+            <Link href="/termos" className="inline-flex min-h-[44px] items-center transition hover:text-strong sm:min-h-0">Termos de Uso</Link>
+            <Link href="/privacidade" className="inline-flex min-h-[44px] items-center transition hover:text-strong sm:min-h-0">Privacidade</Link>
+            <Link href="/cancelamento" className="inline-flex min-h-[44px] items-center transition hover:text-strong sm:min-h-0">Cancelamento</Link>
+            <Link href="/login?modo=entrar" className="inline-flex min-h-[44px] items-center transition hover:text-strong sm:min-h-0">Entrar</Link>
           </nav>
         </div>
         <div className="space-y-1 text-center text-xs sm:text-left">

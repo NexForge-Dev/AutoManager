@@ -196,7 +196,7 @@ function PlanoAdmin() {
   return (
     <div className="space-y-4 md:space-y-5">
       <div>
-        <Link href="/configuracoes" className="inline-flex items-center gap-1 min-h-[36px] text-sm text-muted hover:text-strong">
+        <Link href="/configuracoes" className="inline-flex items-center gap-1 min-h-[44px] text-sm text-muted hover:text-strong">
           <ArrowLeft size={15} aria-hidden /> Configurações
         </Link>
         <PageHeader titulo="Assinatura" />

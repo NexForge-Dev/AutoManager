@@ -496,7 +496,7 @@ function EntregaInfo({ e }: { e: Entrega }) {
         {e.telefone && (
           <a
             href={`tel:${e.telefone}`}
-            className="text-sm text-accent inline-flex items-center gap-1.5 min-h-[32px] tnum hover:underline"
+            className="text-sm text-accent inline-flex items-center gap-1.5 min-h-[44px] tnum hover:underline"
           >
             <Phone size={14} aria-hidden /> {e.telefone}
           </a>

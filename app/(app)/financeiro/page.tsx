@@ -252,7 +252,7 @@ function Financeiro() {
                         type="button"
                         onClick={() => remover(c)}
                         disabled={ocupada}
-                        className="icon-btn h-9 w-9 hover:!text-bad"
+                        className="icon-btn hover:!text-bad"
                         aria-label={`Excluir conta ${c.descricao}`}
                       >
                         <Trash2 size={16} aria-hidden />
@@ -365,7 +365,7 @@ function ContaForm({ onClose }: { onClose: () => void }) {
             <input id="conta-fornecedor" className="input" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm min-h-[32px]">
+        <label className="flex items-center gap-2 text-sm min-h-[44px]">
           <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} />
           <Repeat size={14} className="text-muted" aria-hidden /> Marcar como despesa fixa
         </label>
