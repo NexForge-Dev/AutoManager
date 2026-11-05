@@ -182,7 +182,7 @@ function mapProduto(r: any): Produto {
     categoria: r.categoria,
     sku: r.sku ?? undefined,
     marca: r.marca ?? undefined,
-    custo: Number(r.custo),
+    custo: Number(r.custo ?? 0), // o catálogo do vendedor vem sem custo (equipe_catalogo)
     precoVenda: Number(r.preco_venda),
     precoComparativo: r.preco_comparativo != null ? Number(r.preco_comparativo) : undefined,
     impostoPercent: Number(r.imposto_percent ?? 0),
@@ -203,7 +203,7 @@ function mapRevendedora(r: any): Revendedora {
     nome: r.nome,
     whatsapp: r.whatsapp ?? undefined,
     email: r.email ?? null,
-    comissaoPercent: Number(r.comissao_percent),
+    comissaoPercent: Number(r.comissao_percent ?? 0),
     metaMensal: Number(r.meta_mensal ?? 0),
     ativa: r.ativa,
     criadaEm: new Date(r.criada_em).getTime(),
@@ -424,6 +424,29 @@ async function lerAssinatura(supabase: ReturnType<typeof createClient>): Promise
   return { data: tabela ?? null, error: erroTabela };
 }
 
+// Vendedor lê o catálogo pela RPC, sem custo (0044). Sem a RPC (banco ainda sem a 0044),
+// cai na tabela, como antes.
+async function catalogoDoVendedor(
+  supabase: ReturnType<typeof createClient>,
+  ids: string[] | null
+): Promise<{ data: any[] | null; error: any }> {
+  const { data, error } = await supabase.rpc("equipe_catalogo", ids ? { p_ids: ids } : {});
+  if (!error) return { data: (data as any[]) ?? [], error: null };
+  if (!recursoAusente(error)) return { data: null, error };
+  const tabela = () => supabase.from("produto").select("*, produto_variacao(*)");
+  if (ids) return await tabela().in("id", ids);
+  return await lerPaginado((de, ate) => tabela().order("id", { ascending: true }).range(de, ate));
+}
+
+async function revendedorasDoVendedor(
+  supabase: ReturnType<typeof createClient>
+): Promise<{ data: any[] | null; error: any }> {
+  const { data, error } = await supabase.rpc("equipe_revendedoras");
+  if (!error) return { data: (data as any[]) ?? [], error: null };
+  if (!recursoAusente(error)) return { data: null, error };
+  return await supabase.from("revendedora").select("*").order("criada_em", { ascending: true });
+}
+
 // Janela inicial de vendas carregada na hydrate (cobre painel + analytics de 6 meses).
 // O histórico mais antigo é buscado em segundo plano, paginado, e mesclado.
 const JANELA_VENDAS_DIAS = 180;
@@ -437,10 +460,10 @@ export const useStore = create<State>()((set, get) => {
   async function recarregarProdutos(ids: string[]) {
     const unicos = [...new Set(ids)].filter(Boolean);
     if (unicos.length === 0) return;
-    const { data, error } = await sb()
-      .from("produto")
-      .select("*, produto_variacao(*)")
-      .in("id", unicos);
+    const { data, error } =
+      get().role === "vendedor"
+        ? await catalogoDoVendedor(sb(), unicos)
+        : await sb().from("produto").select("*, produto_variacao(*)").in("id", unicos);
     if (error || !data) return;
     const frescos = new Map(data.map((r: any) => [r.id as string, mapProduto(r)]));
     set((s) => ({
@@ -466,6 +489,26 @@ export const useStore = create<State>()((set, get) => {
     // só a janela recente entra na carga inicial (resto vem em 2º plano, abaixo)
     const corteISO = new Date(Date.now() - JANELA_VENDAS_DIAS * 86_400_000).toISOString();
 
+    // o papel decide de onde vêm produtos e revendedoras
+    const lendoEu = supabase.from("usuario").select("role").eq("id", user.id).maybeSingle();
+    const ehVendedor = async (): Promise<boolean> => (await lendoEu).data?.role === "vendedor";
+    const lerProdutos = async (): Promise<{ data: any[] | null; error: any }> =>
+      (await ehVendedor())
+        ? catalogoDoVendedor(supabase, null)
+        : // paginadas: sem isso o PostgREST corta em 1000 linhas e some dado
+          lerPaginado((de, ate) =>
+            supabase
+              .from("produto")
+              .select("*, produto_variacao(*)")
+              .order("criado_em", { ascending: true })
+              .order("id", { ascending: true })
+              .range(de, ate)
+          );
+    const lerRevendedoras = async (): Promise<{ data: any[] | null; error: any }> =>
+      (await ehVendedor())
+        ? revendedorasDoVendedor(supabase)
+        : await supabase.from("revendedora").select("*").order("criada_em", { ascending: true });
+
     const [
       { data: org, error: erroOrg },
       { data: eu, error: erroEu },
@@ -479,17 +522,9 @@ export const useStore = create<State>()((set, get) => {
       { data: assin, error: erroAssin },
     ] = await Promise.all([
       supabase.from("org").select("*").limit(1).maybeSingle(),
-      supabase.from("usuario").select("role").eq("id", user.id).maybeSingle(),
-      // paginadas: sem isso o PostgREST corta em 1000 linhas e some dado
-      lerPaginado((de, ate) =>
-        supabase
-          .from("produto")
-          .select("*, produto_variacao(*)")
-          .order("criado_em", { ascending: true })
-          .order("id", { ascending: true })
-          .range(de, ate)
-      ),
-      supabase.from("revendedora").select("*").order("criada_em", { ascending: true }),
+      lendoEu,
+      lerProdutos(),
+      lerRevendedoras(),
       lerPaginado((de, ate) =>
         supabase
           .from("venda")
