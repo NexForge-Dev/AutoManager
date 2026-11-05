@@ -311,7 +311,7 @@ interface State {
   addRevendedora: (r: Omit<Revendedora, "id" | "criadaEm" | "ativa" | "acessoLiberado" | "temAcesso">) => Promise<Resultado>;
   updateRevendedora: (id: string, patch: Partial<Revendedora>) => Promise<Resultado>;
   // libera o 1º acesso e devolve o código de convite (uso único) p/ o dono compartilhar
-  liberarAcessoRevendedora: (id: string) => Promise<{ ok: boolean; codigo?: string; erro?: string; emailEmUso?: boolean }>;
+  liberarAcessoRevendedora: (id: string) => Promise<{ ok: boolean; codigo?: string; erro?: string }>;
   revogarAcessoRevendedora: (id: string) => Promise<void>;
 
   registrarVenda: (args: {
@@ -419,8 +419,16 @@ export function erroAmigavel(msg: string | undefined): string {
 // (migration 0041: tem ids do provedor de pagamento); a RPC minha_assinatura
 // (0042) devolve só os campos de plano. Sem a RPC (banco ainda sem a 0042),
 // cai na leitura direta da tabela, como antes.
+const ESPERAS_ASSINATURA_MS = [400, 1200];
 async function lerAssinatura(supabase: ReturnType<typeof createClient>): Promise<{ data: any; error: any }> {
-  const { data, error } = await supabase.rpc("minha_assinatura");
+  // RPC vai por POST e o cliente só repete GET: uma falha solta pararia o app inteiro.
+  // É só leitura, então repetir é seguro.
+  let { data, error } = await supabase.rpc("minha_assinatura");
+  for (const espera of ESPERAS_ASSINATURA_MS) {
+    if (!error || recursoAusente(error)) break;
+    await new Promise((ok) => setTimeout(ok, espera));
+    ({ data, error } = await supabase.rpc("minha_assinatura"));
+  }
   if (!error) return { data: data ?? null, error: null };
   // RPC que falhou por rede não é "banco sem a 0042": a tabela só responde ao dono e
   // devolveria vazio para a equipe, que veria a loja sem plano
@@ -494,11 +502,18 @@ export const useStore = create<State>()((set, get) => {
     // só a janela recente entra na carga inicial (resto vem em 2º plano, abaixo)
     const corteISO = new Date(Date.now() - JANELA_VENDAS_DIAS * 86_400_000).toISOString();
 
-    // o papel decide de onde vêm produtos e revendedoras
-    const lendoEu = supabase.from("usuario").select("role").eq("id", user.id).maybeSingle();
-    const ehVendedor = async (): Promise<boolean> => (await lendoEu).data?.role === "vendedor";
+    // O papel decide de onde vêm produtos e revendedoras, então vem antes do resto, numa
+    // leitura só (o builder repete a consulta a cada await). Se falhar não dá para escolher
+    // a fonte: depois da 0045 a tabela responde vazio ao vendedor, sem erro.
+    const { data: eu, error: erroEu } = await supabase.from("usuario").select("role").eq("id", user.id).maybeSingle();
+    if (erroEu) {
+      console.error("[hydrate] leitura do papel falhou", erroEu);
+      set({ ready: true, falhaEssencial: true });
+      return;
+    }
+    const ehVendedor = eu?.role === "vendedor";
     const lerProdutos = async (): Promise<{ data: any[] | null; error: any }> =>
-      (await ehVendedor())
+      ehVendedor
         ? catalogoDoVendedor(supabase, null)
         : // paginadas: sem isso o PostgREST corta em 1000 linhas e some dado
           lerPaginado((de, ate) =>
@@ -510,13 +525,12 @@ export const useStore = create<State>()((set, get) => {
               .range(de, ate)
           );
     const lerRevendedoras = async (): Promise<{ data: any[] | null; error: any }> =>
-      (await ehVendedor())
+      ehVendedor
         ? revendedorasDoVendedor(supabase)
         : await supabase.from("revendedora").select("*").order("criada_em", { ascending: true });
 
     const [
       { data: org, error: erroOrg },
-      { data: eu, error: erroEu },
       { data: produtos, error: erroProdutos },
       { data: revendedoras, error: erroRevendedoras },
       { data: vendas, error: erroVendas },
@@ -527,7 +541,6 @@ export const useStore = create<State>()((set, get) => {
       { data: assin, error: erroAssin },
     ] = await Promise.all([
       supabase.from("org").select("*").limit(1).maybeSingle(),
-      lendoEu,
       lerProdutos(),
       lerRevendedoras(),
       lerPaginado((de, ate) =>
@@ -561,7 +574,7 @@ export const useStore = create<State>()((set, get) => {
 
     // Sem saber a loja, o papel e o plano, qualquer decisão seria errada (mandar para
     // o onboarding, encerrar a sessão, bloquear recursos). Mantém tudo como está.
-    const erroEssencial = erroOrg || erroEu || erroAssin;
+    const erroEssencial = erroOrg || erroAssin;
     if (erroEssencial) {
       console.error("[hydrate] leitura essencial falhou", erroEssencial);
       set({ ready: true, falhaEssencial: true });
@@ -1447,9 +1460,7 @@ export const useStore = create<State>()((set, get) => {
       set((s) => ({
         revendedoras: s.revendedoras.map((r) => (r.id === id ? { ...r, acessoLiberado: true } : r)),
       }));
-      // e-mail que já tem conta nunca ativa: avisa agora (sem a RPC, banco sem a 0044, segue)
-      const { data: emUso } = await sb().rpc("revendedora_email_em_uso", { p_id: id });
-      return { ok: true, codigo: (data as any)?.codigo, emailEmUso: emUso === true };
+      return { ok: true, codigo: (data as any)?.codigo };
     },
 
     revogarAcessoRevendedora: async (id) => {

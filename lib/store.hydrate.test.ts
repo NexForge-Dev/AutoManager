@@ -7,12 +7,23 @@ const USUARIO = { id: "u1", email: "dono@t.local", app_metadata: {} };
 
 let respostas: Record<string, Resp>;
 let getUser: () => Promise<any>;
+let leiturasPapel = 0;
+let chamadasAssinatura = 0;
 
 function consulta(chave: string) {
-  const r = () => respostas[chave] ?? { data: null, error: null };
+  const r = () => {
+    // como o PostgREST: cada await do builder é uma nova requisição
+    if (chave === "usuario:eu") leiturasPapel++;
+    if (chave === "rpc:minha_assinatura") {
+      chamadasAssinatura++;
+      const fila = respostas["rpc:minha_assinatura:fila"] as unknown as Resp[] | undefined;
+      if (fila?.length) return fila.shift()!;
+    }
+    return respostas[chave] ?? { data: null, error: null };
+  };
   const b: any = {};
   for (const m of ["select", "eq", "gte", "lt", "order", "limit", "range", "in"]) b[m] = () => b;
-  b.maybeSingle = () => Promise.resolve(r());
+  b.maybeSingle = () => b;
   b.then = (ok: any, ko: any) => Promise.resolve(r()).then(ok, ko);
   return b;
 }
@@ -40,6 +51,8 @@ const ASSIN = { plano: "solo", status: "active", preco_centavos: 4900 };
 
 beforeEach(() => {
   useStore.getState().limpar();
+  leiturasPapel = 0;
+  chamadasAssinatura = 0;
   getUser = async () => ({ data: { user: USUARIO }, error: null });
   respostas = {
     org: { data: ORG, error: null },
@@ -140,6 +153,35 @@ describe("hydrate: falha de leitura não vira ausência de dado", () => {
     respostas.entrada_pendente = { data: null, error: { code: "42P01", message: "no table" } };
     await useStore.getState().hydrate();
     expect(useStore.getState().falhasCarga).toEqual([]);
+  });
+
+  it("F2: o papel é lido uma vez só", async () => {
+    await useStore.getState().hydrate();
+    expect(leiturasPapel).toBe(1);
+  });
+
+  it("F2: vendedor com leitura de papel falhando não cai na tabela (vazia depois da 0045)", async () => {
+    respostas["usuario:eu"] = { data: null, error: ERRO_REDE };
+    respostas.produto = { data: [], error: null };
+    await useStore.getState().hydrate();
+    expect(useStore.getState().falhaEssencial).toBe(true);
+  });
+
+  it("vendedor lê o catálogo pela RPC", async () => {
+    respostas["usuario:eu"] = { data: { role: "vendedor" }, error: null };
+    respostas["rpc:equipe_catalogo"] = { data: [{ id: "p1", nome: "Colar", produto_variacao: [] }], error: null };
+    respostas["rpc:equipe_revendedoras"] = { data: [], error: null };
+    await useStore.getState().hydrate();
+    expect(useStore.getState().produtos.map((p) => p.id)).toEqual(["p1"]);
+    expect(useStore.getState().produtos[0].custo).toBe(0);
+  });
+
+  it("minha_assinatura: falha solta é repetida e não para o app", async () => {
+    (respostas as any)["rpc:minha_assinatura:fila"] = [{ data: null, error: ERRO_REDE }];
+    await useStore.getState().hydrate();
+    expect(chamadasAssinatura).toBe(2);
+    expect(useStore.getState().falhaEssencial).toBe(false);
+    expect(useStore.getState().assinatura?.plano).toBe("solo");
   });
 
   it("sem sessão: não é falha", async () => {
