@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl, centavos, resumoContas } from "@/lib/analytics";
+import { brl, brlKpi, centavos, resumoContas } from "@/lib/analytics";
 import { ymdSP } from "@/lib/fuso";
 import type { ContaPagar } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -135,14 +135,14 @@ function Financeiro() {
           rotulo="A receber"
           icone={TrendingUp}
           tom="ok"
-          valor={brl(aReceber)}
+          valor={brlKpi(aReceber)}
           apoio="vendas fiado em aberto"
         />
         <Stat
           rotulo="A pagar"
           icone={TrendingDown}
           tom="bad"
-          valor={brl(resumo.aPagar)}
+          valor={brlKpi(resumo.aPagar)}
           apoio={`${resumo.qtdPendentes} conta(s) pendente(s)`}
         />
         <Stat
@@ -151,7 +151,7 @@ function Financeiro() {
           icone={Scale}
           tom={saldoProjetado >= 0 ? "ok" : "bad"}
           valorTom={saldoProjetado >= 0 ? "ok" : "bad"}
-          valor={brl(saldoProjetado)}
+          valor={brlKpi(saldoProjetado)}
           apoio="Se tudo a receber entrar e tudo a pagar sair."
         />
       </div>

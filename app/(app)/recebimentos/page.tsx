@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl } from "@/lib/analytics";
+import { brl, brlKpi } from "@/lib/analytics";
 import type { EntradaPendente, OrigemRecebimento } from "@/lib/types";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
@@ -149,7 +149,7 @@ function Recebimentos() {
               rotulo="Aguardando confirmação"
               icone={Wallet}
               tom="warn"
-              valor={brl(total)}
+              valor={brlKpi(total)}
               apoio={`${entradasPendentes.length} recebimento(s)`}
             />
           )}

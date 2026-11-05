@@ -3,7 +3,7 @@ import { useState } from "react";
 import { waNumero } from "@/lib/contato";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
-import { brl } from "@/lib/analytics";
+import { brl, brlKpi } from "@/lib/analytics";
 import Guard from "@/components/Guard";
 import { useDialog } from "@/components/Dialog";
 import Modal from "@/components/Modal";
@@ -290,16 +290,16 @@ function Revendedoras() {
       ) : (
         <>
           <div className="grid-kpi lg:grid-cols-4 gap-3">
-            <Stat rotulo="Vendido no mês" icone={TrendingUp} tom="brand" valor={brl(totalVendidoMes)} apoio="por toda a equipe" />
+            <Stat rotulo="Vendido no mês" icone={TrendingUp} tom="brand" valor={brlKpi(totalVendidoMes)} apoio="por toda a equipe" />
             <Stat
               rotulo="Comissão a pagar"
               icone={HandCoins}
               tom="warn"
               valorTom={totalAPagar > 0 ? "warn" : undefined}
-              valor={brl(totalAPagar)}
+              valor={brlKpi(totalAPagar)}
               apoio={qtdAPagar > 0 ? `para ${qtdAPagar} revendedora(s)` : "nada pendente"}
             />
-            <Stat rotulo="Comissão já paga" icone={CheckCheck} tom="ok" valor={brl(totalPago)} apoio="total acertado" />
+            <Stat rotulo="Comissão já paga" icone={CheckCheck} tom="ok" valor={brlKpi(totalPago)} apoio="total acertado" />
             <Stat
               rotulo="Com acesso ativo"
               icone={ShieldCheck}
@@ -471,7 +471,7 @@ function Revendedoras() {
                   value={emailNova}
                   onChange={(e) => setEmailNova(e.target.value)}
                 />
-                <p className="hint">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas.</p>
+                <p className="hint">Com e-mail, ela pode acessar o catálogo e registrar as próprias vendas. Use um e-mail só para esta loja: cada conta atende uma loja.</p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -549,11 +549,6 @@ function AcessoRevendedora({
     }
     setCodigo(res.codigo ?? null);
     setCopiado(false);
-    if (res.emailEmUso)
-      alerta({
-        titulo: "Este e-mail já tem conta",
-        mensagem: `${r.nome} não vai conseguir ativar com esse e-mail, porque ele já tem uma conta no AutoManager. Cadastre outro e-mail dela e gere um novo código.`,
-      });
   }
 
   // Pede confirmação e mostra o erro se o banco recusar. Chama a RPC direto

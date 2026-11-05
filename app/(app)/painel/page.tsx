@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useStore } from "@/lib/store";
-import { calcularMetricas, brl } from "@/lib/analytics";
+import { calcularMetricas, brl, brlKpi } from "@/lib/analytics";
 import { usePlano } from "@/lib/usePlano";
 import { fmtLimite } from "@/lib/plans";
 import { FUSO_LOJA } from "@/lib/fuso";
@@ -106,7 +106,7 @@ function Painel() {
           rotulo="Faturamento do mês"
           icone={Wallet}
           tom="brand"
-          valor={<CountUp value={m.faturamentoMes} format={brl} />}
+          valor={<CountUp value={m.faturamentoMes} format={brlKpi} />}
           apoio={variacao !== null ? <Variacao pct={variacao} sufixo="vs mês anterior" /> : "no mês atual"}
         />
         <Stat
@@ -114,7 +114,7 @@ function Painel() {
           icone={TrendingUp}
           tom={m.lucroMes < 0 ? "bad" : "ok"}
           valorTom={m.lucroMes < 0 ? "bad" : "ok"}
-          valor={<CountUp value={m.lucroMes} format={brl} />}
+          valor={<CountUp value={m.lucroMes} format={brlKpi} />}
           apoio={
             m.faturamentoMes > 0
               ? `margem de ${Math.round((m.lucroMes / m.faturamentoMes) * 100)}% no mês`
@@ -125,13 +125,13 @@ function Painel() {
           rotulo="Comissão pendente"
           icone={HandCoins}
           tom="warn"
-          valor={<CountUp value={m.comissaoPendente} format={brl} />}
+          valor={<CountUp value={m.comissaoPendente} format={brlKpi} />}
           apoio="a repassar"
         />
         <Stat
           rotulo="Valor em estoque"
           icone={Package}
-          valor={<CountUp value={m.valorEstoque} format={brl} />}
+          valor={<CountUp value={m.valorEstoque} format={brlKpi} />}
           apoio="a preço de custo"
         />
       </div>

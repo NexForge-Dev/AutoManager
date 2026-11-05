@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { calcularAnalytics, brl } from "@/lib/analytics";
+import { calcularAnalytics, brl, brlKpi } from "@/lib/analytics";
 import { usePlano } from "@/lib/usePlano";
 import { planoQueLibera } from "@/lib/plans";
 import { UpgradeBlock } from "@/components/UpgradeGate";
@@ -82,7 +82,7 @@ function Analytics() {
           <div className="space-y-1.5">
             <div className={`grid-kpi gap-3 ${caps.allowAdvancedAnalytics ? "lg:grid-cols-3" : ""}`}>
               {/* ticket médio e itens/venda: só vendas com produtos (sem "Recebimento avulso") */}
-              <Stat rotulo="Ticket médio" icone={Receipt} tom="brand" valor={<CountUp value={a.ticketMedio} format={brl} />} />
+              <Stat rotulo="Ticket médio" icone={Receipt} tom="brand" valor={<CountUp value={a.ticketMedio} format={brlKpi} />} />
               <Stat
                 rotulo="Itens/venda"
                 icone={Hash}

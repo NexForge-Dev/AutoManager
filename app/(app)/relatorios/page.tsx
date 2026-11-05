@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useStore } from "@/lib/store";
-import { calcularRelatorio, rankingRevendedoras, brl } from "@/lib/analytics";
+import { calcularRelatorio, rankingRevendedoras, brl, brlKpi } from "@/lib/analytics";
 import { baixarCSV, dataHora } from "@/lib/export";
 import Guard from "@/components/Guard";
 import { registrarMetrica } from "@/lib/metricas/cliente";
@@ -279,10 +279,10 @@ function Relatorios() {
 
       {/* receita */}
       <div className="grid-kpi lg:grid-cols-4 gap-3 stagger">
-        <Stat rotulo="Faturamento bruto" icone={Receipt} tom="brand" valor={<CountUp value={r.faturamento} format={brl} />} apoio="vendas (competência)" />
-        <Stat rotulo="Recebido (caixa)" icone={Wallet} tom="ok" valor={<CountUp value={r.recebido} format={brl} />} apoio={`${r.qtdPagas} pagas`} />
-        <Stat rotulo="A receber" icone={Clock} tom="warn" valor={<CountUp value={r.aReceber} format={brl} />} apoio={`${r.qtdPendentes} pendentes`} />
-        <Stat rotulo="Descontos" icone={Percent} valor={<CountUp value={r.descontos} format={brl} />} apoio={`em ${r.qtdComDesconto} venda(s)`} />
+        <Stat rotulo="Faturamento bruto" icone={Receipt} tom="brand" valor={<CountUp value={r.faturamento} format={brlKpi} />} apoio="vendas (competência)" />
+        <Stat rotulo="Recebido (caixa)" icone={Wallet} tom="ok" valor={<CountUp value={r.recebido} format={brlKpi} />} apoio={`${r.qtdPagas} pagas`} />
+        <Stat rotulo="A receber" icone={Clock} tom="warn" valor={<CountUp value={r.aReceber} format={brlKpi} />} apoio={`${r.qtdPendentes} pendentes`} />
+        <Stat rotulo="Descontos" icone={Percent} valor={<CountUp value={r.descontos} format={brlKpi} />} apoio={`em ${r.qtdComDesconto} venda(s)`} />
       </div>
 
       {/* lucro */}
@@ -293,7 +293,7 @@ function Relatorios() {
           icone={TrendingUp}
           tom="ok"
           valorTom="ok"
-          valor={<CountUp value={r.lucroProjetado} format={brl} />}
+          valor={<CountUp value={r.lucroProjetado} format={brlKpi} />}
           apoio={
             <>
               Se todas as vendas do período forem pagas · margem {r.margem.toFixed(1)}%
@@ -301,8 +301,8 @@ function Relatorios() {
             </>
           }
         />
-        <Stat rotulo="Lucro realizado" valor={brl(r.lucroRealizado)} apoio="proporcional ao caixa" />
-        <Stat rotulo="Custo das vendas" valor={brl(r.custoVendas)} apoio="custo congelado na venda" />
+        <Stat rotulo="Lucro realizado" valor={brlKpi(r.lucroRealizado)} apoio="proporcional ao caixa" />
+        <Stat rotulo="Custo das vendas" valor={brlKpi(r.custoVendas)} apoio="custo congelado na venda" />
       </div>
 
       <div className="grid gap-4 md:gap-5 lg:grid-cols-3 items-start">
@@ -315,8 +315,8 @@ function Relatorios() {
           acao={<CountUp value={r.fluxoTotal} format={brl} className="text-lg font-bold tnum" />}
         >
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <Mini label="Média" valor={brl(r.fluxoMedia)} />
-            <Mini label="Pico" valor={brl(r.fluxoPico.valor)} sub={r.fluxoPico.dia} />
+            <Mini label="Média" valor={brlKpi(r.fluxoMedia)} />
+            <Mini label="Pico" valor={brlKpi(r.fluxoPico.valor)} sub={r.fluxoPico.dia} />
             {/* sem base de comparação (ex.: "Hoje"): neutro, nada de "+0%" verde */}
             <Mini
               label="Tendência"
