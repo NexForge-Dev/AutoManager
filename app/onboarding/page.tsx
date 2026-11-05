@@ -7,6 +7,8 @@ import type { Canal } from "@/lib/types";
 import { usePlano } from "@/lib/usePlano";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
+import { TelaFalhaCarga } from "@/components/FalhaCarga";
 import { registrarMetrica, type Etapa } from "@/lib/metricas/cliente";
 
 // Passos desta tela -> etapas do funil no Painel NexForge ("descricao" faz parte de "loja").
@@ -65,8 +67,9 @@ type Passo = { icone: LucideIcon; title: string; sub: string; ms: number };
 
 export default function Onboarding() {
   const router = useRouter();
-  const { setConfig, completarOnboarding, hydrate } = useStore();
+  const { setConfig, completarOnboarding, hydrate, tentarDeNovo } = useStore();
   const ready = useStore((s) => s.ready);
+  const falhaEssencial = useStore((s) => s.falhaEssencial);
   const completo = useStore((s) => s.config.onboardingCompleto);
   const { planoContratado } = usePlano();
   const [gerando, setGerando] = useState(false);
@@ -78,33 +81,42 @@ export default function Onboarding() {
   // Só o DONO da loja faz o onboarding. Visitante anônimo (chat da loja),
   // revendedora, conta sem loja ou membro da equipe vai para o próprio destino.
   const [liberado, setLiberado] = useState(false);
+  // leitura falhou: não se sabe quem é. Nem libera (sobrescreveria a loja) nem manda embora.
+  const [falhaLeitura, setFalhaLeitura] = useState(false);
   useEffect(() => {
-    if (!ready || liberado) return;
+    if (!ready || liberado || falhaEssencial || falhaLeitura) return;
     let ativo = true;
     (async () => {
-      const { data } = await createClient().auth.getUser();
+      const { data, error } = await createClient().auth.getUser();
       if (!ativo) return;
+      if (falhaDeRedeAuth(error)) {
+        setFalhaLeitura(true);
+        return;
+      }
       if (!data.user || data.user.is_anonymous) {
         router.replace("/login");
         return;
       }
       const { semOrg, role } = useStore.getState();
       if (semOrg || role !== "owner") {
-        let destino = "/login";
+        let destino: string;
         try {
           destino = await destinoPosLogin();
-        } catch {}
+        } catch {
+          if (ativo) setFalhaLeitura(true);
+          return;
+        }
         if (ativo) router.replace(destino === "/onboarding" ? "/login" : destino);
         return;
       }
       setLiberado(true);
     })().catch(() => {
-      if (ativo) router.replace("/login");
+      if (ativo) setFalhaLeitura(true);
     });
     return () => {
       ativo = false;
     };
-  }, [ready, liberado, router]);
+  }, [ready, liberado, falhaEssencial, falhaLeitura, router]);
 
   // onboarding já concluído: sai daqui (evita re-rodar / sobrescrever a config).
   // Durante a geração NÃO redireciona aqui — a tela de carregamento controla o
@@ -254,6 +266,16 @@ export default function Onboarding() {
     setDir("back");
     setStep((s) => Math.max(s - 1, 0));
   };
+
+  if (falhaEssencial || falhaLeitura)
+    return (
+      <TelaFalhaCarga
+        onTentar={() => {
+          setFalhaLeitura(false);
+          void tentarDeNovo();
+        }}
+      />
+    );
 
   if (!liberado && !gerando) {
     return (

@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { fetchComLimite } from "@/lib/fetchComLimite";
 
 // Client de navegador - usa a chave pública (anon/publishable). Seguro no browser.
 // Singleton: reaproveita a MESMA instância em todo o app, evitando múltiplos
@@ -6,7 +7,8 @@ import { createBrowserClient } from "@supabase/ssr";
 function novoClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { fetch: fetchComLimite() } }
   );
 }
 

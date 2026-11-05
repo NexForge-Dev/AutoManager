@@ -37,12 +37,13 @@ export default function AcessoPage() {
 
   // /acesso?motivo=suspenso|sem_loja (destinoPosLogin): conta sem loja ativa.
   // Mostra o motivo e encerra a sessão, para não ficar preso num login sem acesso.
+  // Só neste aparelho: quem chega aqui nunca é motivo para derrubar os outros.
   useEffect(() => {
     const motivo = motivoDaUrl(window.location.search);
     if (!motivo) return;
     setModo("entrar");
     setErro(MOTIVOS_ACESSO[motivo]);
-    void createClient().auth.signOut();
+    void createClient().auth.signOut({ scope: "local" });
   }, []);
 
   // link enviado pela loja (/acesso#email=…&codigo=…): preenche e limpa a barra de endereço
@@ -65,7 +66,7 @@ export default function AcessoPage() {
     const motivo = destino.startsWith("/acesso") ? motivoDaUrl(destino.slice(destino.indexOf("?"))) : null;
     if (motivo) {
       // já estamos no /acesso: mostra o motivo aqui mesmo e sai da sessão sem acesso
-      await createClient().auth.signOut();
+      await createClient().auth.signOut({ scope: "local" });
       setErro(MOTIVOS_ACESSO[motivo]);
       setLoading(false);
       return;

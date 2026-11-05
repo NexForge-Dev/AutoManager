@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
 import { registrarMetrica, registrarSessao } from "@/lib/metricas/cliente";
 import { planoValido } from "@/lib/plans";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2, ShieldCheck, Smartphone, Timer, Wallet } from "lucide-react";
@@ -47,8 +48,16 @@ export default function LoginPage() {
     let ativo = true;
     createClient()
       .auth.getUser()
-      .then(async ({ data }) => {
-        if (!ativo || !data.user || data.user.is_anonymous) return;
+      .then(async ({ data, error }) => {
+        if (!ativo) return;
+        // backend fora com sessão guardada: é alguém de volta, não um cadastro novo
+        if (falhaDeRedeAuth(error)) {
+          setModo("entrar");
+          return;
+        }
+        if (!data.user || data.user.is_anonymous) return;
+        // já tem conta: se a leitura falhar abaixo, o formulário abre no "Entrar"
+        setModo("entrar");
         const destino = await destinoPosLogin();
         if (ativo) router.replace(destino);
       })

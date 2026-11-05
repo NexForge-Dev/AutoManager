@@ -23,6 +23,7 @@ import type {
 import type { Assinatura, PlanoId } from "./plans";
 import { ehSuperadminUser } from "./admin";
 import { registrarMetrica } from "./metricas/cliente";
+import { falhaDeRedeAuth, recursoAusente, recursosFalhos, type RecursoCarga } from "./cargaLoja";
 
 function uid() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -251,6 +252,12 @@ interface State {
   role: Role;
   // autenticado, porém sem loja própria (revendedora/visitante): não pertence ao painel
   semOrg: boolean;
+  // leitura da sessão, da org, do papel ou do plano falhou: não dá para saber quem é
+  // nem o que pode. Nada de redirecionar ou decidir: a Guard mostra "tentar de novo".
+  falhaEssencial: boolean;
+  // demais leituras que falharam (o que estava no estado foi mantido)
+  falhasCarga: RecursoCarga[];
+  recarregando: boolean;
   config: Config;
   assinatura: Assinatura | null;
   produtos: Produto[];
@@ -263,6 +270,7 @@ interface State {
   contasPagar: ContaPagar[];
 
   hydrate: () => Promise<void>;
+  tentarDeNovo: () => Promise<void>;
 
   setConfig: (c: Partial<Config>) => Promise<Resultado>;
   definirSlug: (slug: string) => Promise<{ ok: boolean; erro?: string }>;
@@ -406,11 +414,14 @@ function erroAmigavel(msg: string | undefined): string {
 // (migration 0041: tem ids do provedor de pagamento); a RPC minha_assinatura
 // (0042) devolve só os campos de plano. Sem a RPC (banco ainda sem a 0042),
 // cai na leitura direta da tabela, como antes.
-async function lerAssinatura(supabase: ReturnType<typeof createClient>): Promise<{ data: any }> {
+async function lerAssinatura(supabase: ReturnType<typeof createClient>): Promise<{ data: any; error: any }> {
   const { data, error } = await supabase.rpc("minha_assinatura");
-  if (!error) return { data: data ?? null };
-  const { data: tabela } = await supabase.from("assinatura").select("*").limit(1).maybeSingle();
-  return { data: tabela ?? null };
+  if (!error) return { data: data ?? null, error: null };
+  // RPC que falhou por rede não é "banco sem a 0042": a tabela só responde ao dono e
+  // devolveria vazio para a equipe, que veria a loja sem plano
+  if (!recursoAusente(error)) return { data: null, error };
+  const { data: tabela, error: erroTabela } = await supabase.from("assinatura").select("*").limit(1).maybeSingle();
+  return { data: tabela ?? null, error: erroTabela };
 }
 
 // Janela inicial de vendas carregada na hydrate (cobre painel + analytics de 6 meses).
@@ -439,6 +450,193 @@ export const useStore = create<State>()((set, get) => {
     }));
   }
 
+  // Carga inteira da loja. Quem falha entra em falhaEssencial/falhasCarga: erro de
+  // leitura nunca vira "não tem nada" (AUT-002/AUT-003).
+  async function carregarLoja() {
+    const supabase = sb();
+    const {
+      data: { user },
+      error: erroSessao,
+    } = await supabase.auth.getUser();
+    if (!user) {
+      set({ ready: true, falhaEssencial: falhaDeRedeAuth(erroSessao) });
+      return;
+    }
+
+    // só a janela recente entra na carga inicial (resto vem em 2º plano, abaixo)
+    const corteISO = new Date(Date.now() - JANELA_VENDAS_DIAS * 86_400_000).toISOString();
+
+    const [
+      { data: org, error: erroOrg },
+      { data: eu, error: erroEu },
+      { data: produtos, error: erroProdutos },
+      { data: revendedoras, error: erroRevendedoras },
+      { data: vendas, error: erroVendas },
+      { data: membros, error: erroMembros },
+      { data: entregas, error: erroEntregas },
+      { data: entradas, error: erroEntradas },
+      { data: contas, error: erroContas },
+      { data: assin, error: erroAssin },
+    ] = await Promise.all([
+      supabase.from("org").select("*").limit(1).maybeSingle(),
+      supabase.from("usuario").select("role").eq("id", user.id).maybeSingle(),
+      // paginadas: sem isso o PostgREST corta em 1000 linhas e some dado
+      lerPaginado((de, ate) =>
+        supabase
+          .from("produto")
+          .select("*, produto_variacao(*)")
+          .order("criado_em", { ascending: true })
+          .order("id", { ascending: true })
+          .range(de, ate)
+      ),
+      supabase.from("revendedora").select("*").order("criada_em", { ascending: true }),
+      lerPaginado((de, ate) =>
+        supabase
+          .from("venda")
+          .select("*, venda_item(*)")
+          .gte("data", corteISO)
+          .order("data", { ascending: false })
+          .order("id", { ascending: true })
+          .range(de, ate)
+      ),
+      supabase.from("usuario").select("id, nome, email, role"),
+      lerPaginado((de, ate) =>
+        supabase
+          .from("entrega")
+          .select("*")
+          .order("criada_em", { ascending: false })
+          .order("id", { ascending: true })
+          .range(de, ate)
+      ),
+      // recebimentos pendentes de confirmação (tabela pode não existir se 0024 não rodou)
+      supabase
+        .from("entrada_pendente")
+        .select("*")
+        .eq("status", "pendente")
+        .order("recebido_em", { ascending: false }),
+      // contas a pagar (tabela pode não existir se 0033 não rodou)
+      supabase.from("conta_pagar").select("*").order("vencimento", { ascending: true }),
+      lerAssinatura(supabase),
+    ]);
+
+    // Sem saber a loja, o papel e o plano, qualquer decisão seria errada (mandar para
+    // o onboarding, encerrar a sessão, bloquear recursos). Mantém tudo como está.
+    const erroEssencial = erroOrg || erroEu || erroAssin;
+    if (erroEssencial) {
+      console.error("[hydrate] leitura essencial falhou", erroEssencial);
+      set({ ready: true, falhaEssencial: true });
+      return;
+    }
+
+    const falhas = recursosFalhos(
+      {
+        produtos: erroProdutos,
+        revendedoras: erroRevendedoras,
+        vendas: erroVendas,
+        membros: erroMembros,
+        entregas: erroEntregas,
+        entradasPendentes: erroEntradas,
+        contasPagar: erroContas,
+      },
+      ["entradasPendentes", "contasPagar"]
+    );
+    if (falhas.length) console.error("[hydrate] leituras falharam", falhas);
+
+    const assinatura: Assinatura | null = assin
+      ? {
+          plano: assin.plano as PlanoId,
+          status: assin.status,
+          precoCentavos: Number(assin.preco_centavos ?? 0),
+          periodo: assin.periodo ?? "mensal",
+          dataInicio: assin.data_inicio ? new Date(assin.data_inicio).getTime() : null,
+          dataFim: assin.data_fim ? new Date(assin.data_fim).getTime() : null,
+          trialAte: assin.trial_ate ? new Date(assin.trial_ate).getTime() : null,
+        }
+      : null;
+
+    // quem falhou fica fora do set: mantém o que já estava carregado em vez de zerar
+    const dados: Partial<State> = {};
+    if (!falhas.includes("produtos")) dados.produtos = (produtos || []).map(mapProduto);
+    if (!falhas.includes("revendedoras")) dados.revendedoras = (revendedoras || []).map(mapRevendedora);
+    if (!falhas.includes("vendas")) dados.vendas = (vendas || []).map(mapVenda);
+    if (!falhas.includes("membros")) dados.membros = (membros || []).map(mapMembro);
+    if (!falhas.includes("entregas")) dados.entregas = (entregas || []).map(mapEntrega);
+    if (!falhas.includes("entradasPendentes")) dados.entradasPendentes = (entradas || []).map(mapEntradaPendente);
+    if (!falhas.includes("contasPagar")) dados.contasPagar = (contas || []).map(mapContaPagar);
+
+    set({
+      ready: true,
+      falhaEssencial: false,
+      falhasCarga: falhas,
+      orgId: org?.id ?? null,
+      usuarioId: user.id,
+      email: user.email ?? null,
+      superadmin: ehSuperadminUser(user),
+      role: (eu?.role as Role) ?? "owner",
+      // sem linha em usuario = não é dono nem membro desta loja (revendedora/visitante)
+      semOrg: !eu,
+      assinatura,
+      config: org
+        ? {
+            nomeLoja: org.nome,
+            segmento: org.segmento,
+            categorias: org.categorias ?? [],
+            canais: org.canais,
+            usaRevendedoras: org.usa_revendedoras,
+            margemPadrao: Number(org.margem_padrao),
+            comissaoPadrao: Number(org.comissao_padrao),
+            onboardingCompleto: org.onboarding_completo,
+            corMarca: org.cor_marca ?? null,
+            temaBase: org.tema_base ?? null,
+            appFonte: org.app_fonte ?? null,
+            appRaio: org.app_raio ?? null,
+            logoUrl: org.logo_url ?? null,
+            plano: (assin?.plano as PlanoId) ?? "solo",
+            slug: org.slug ?? null,
+            lojaAtiva: org.loja_ativa ?? false,
+            lojaDescricao: org.loja_descricao ?? null,
+            lojaCapaUrl: org.loja_capa_url ?? null,
+            lojaFonte: org.loja_fonte ?? null,
+            lojaSobre: org.loja_sobre ?? null,
+            lojaEmail: org.loja_email ?? null,
+            lojaWhatsapp: org.loja_whatsapp ?? null,
+            lojaTelefone: org.loja_telefone ?? null,
+            lojaInstagram: org.loja_instagram ?? null,
+            lojaFacebook: org.loja_facebook ?? null,
+            lojaTiktok: org.loja_tiktok ?? null,
+          }
+        : configInicial,
+      ...dados,
+    });
+
+    // 2ª fase: histórico anterior à janela, paginado e mesclado em segundo plano.
+    // O app já está utilizável; relatórios de períodos longos vão se completando.
+    void (async () => {
+      for (let offset = 0; ; offset += PAGINA_VENDAS) {
+        const { data: antigas, error } = await supabase
+          .from("venda")
+          .select("*, venda_item(*)")
+          .lt("data", corteISO)
+          .order("data", { ascending: false })
+          .order("id", { ascending: true })
+          .range(offset, offset + PAGINA_VENDAS - 1);
+        if (error) {
+          // relatório de período longo ficaria incompleto sem ninguém saber
+          set((s) => (s.falhasCarga.includes("vendasAntigas") ? s : { falhasCarga: [...s.falhasCarga, "vendasAntigas"] }));
+          break;
+        }
+        if (!antigas || antigas.length === 0) break;
+        const mapeadas = antigas.map(mapVenda);
+        set((s) => {
+          const ids = new Set(s.vendas.map((v) => v.id));
+          const novas = mapeadas.filter((v) => !ids.has(v.id));
+          return novas.length ? { vendas: [...s.vendas, ...novas] } : s;
+        });
+        if (antigas.length < PAGINA_VENDAS) break;
+      }
+    })();
+  }
+
   return {
     ready: false,
     orgId: null,
@@ -447,6 +645,9 @@ export const useStore = create<State>()((set, get) => {
     superadmin: false,
     role: "owner",
     semOrg: false,
+    falhaEssencial: false,
+    falhasCarga: [],
+    recarregando: false,
     config: configInicial,
     assinatura: null,
     produtos: [],
@@ -458,154 +659,20 @@ export const useStore = create<State>()((set, get) => {
     entradasPendentes: [],
     contasPagar: [],
 
+    tentarDeNovo: async () => {
+      set({ recarregando: true });
+      await get().hydrate();
+      set({ recarregando: false });
+    },
+
     hydrate: async () => {
-      const supabase = sb();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        set({ ready: true });
-        return;
+      try {
+        await carregarLoja();
+      } catch (e) {
+        // nunca deixa a tela presa no esqueleto
+        console.error("[hydrate]", e);
+        set({ ready: true, falhaEssencial: true });
       }
-
-      // só a janela recente entra na carga inicial (resto vem em 2º plano, abaixo)
-      const corteISO = new Date(Date.now() - JANELA_VENDAS_DIAS * 86_400_000).toISOString();
-
-      const [
-        { data: org },
-        { data: eu },
-        { data: produtos },
-        { data: revendedoras },
-        { data: vendas },
-        { data: membros },
-        { data: entregas },
-        { data: entradas },
-        { data: contas },
-        { data: assin },
-      ] = await Promise.all([
-        supabase.from("org").select("*").limit(1).maybeSingle(),
-        supabase.from("usuario").select("role").eq("id", user.id).maybeSingle(),
-        // paginadas: sem isso o PostgREST corta em 1000 linhas e some dado
-        lerPaginado((de, ate) =>
-          supabase
-            .from("produto")
-            .select("*, produto_variacao(*)")
-            .order("criado_em", { ascending: true })
-            .order("id", { ascending: true })
-            .range(de, ate)
-        ),
-        supabase.from("revendedora").select("*").order("criada_em", { ascending: true }),
-        lerPaginado((de, ate) =>
-          supabase
-            .from("venda")
-            .select("*, venda_item(*)")
-            .gte("data", corteISO)
-            .order("data", { ascending: false })
-            .order("id", { ascending: true })
-            .range(de, ate)
-        ),
-        supabase.from("usuario").select("id, nome, email, role"),
-        lerPaginado((de, ate) =>
-          supabase
-            .from("entrega")
-            .select("*")
-            .order("criada_em", { ascending: false })
-            .order("id", { ascending: true })
-            .range(de, ate)
-        ),
-        // recebimentos pendentes de confirmação (tabela pode não existir se 0024 não rodou)
-        supabase
-          .from("entrada_pendente")
-          .select("*")
-          .eq("status", "pendente")
-          .order("recebido_em", { ascending: false }),
-        // contas a pagar (tabela pode não existir se 0033 não rodou)
-        supabase.from("conta_pagar").select("*").order("vencimento", { ascending: true }),
-        lerAssinatura(supabase),
-      ]);
-
-      const assinatura: Assinatura | null = assin
-        ? {
-            plano: assin.plano as PlanoId,
-            status: assin.status,
-            precoCentavos: Number(assin.preco_centavos ?? 0),
-            periodo: assin.periodo ?? "mensal",
-            dataInicio: assin.data_inicio ? new Date(assin.data_inicio).getTime() : null,
-            dataFim: assin.data_fim ? new Date(assin.data_fim).getTime() : null,
-            trialAte: assin.trial_ate ? new Date(assin.trial_ate).getTime() : null,
-          }
-        : null;
-
-      set({
-        ready: true,
-        orgId: org?.id ?? null,
-        usuarioId: user.id,
-        email: user.email ?? null,
-        superadmin: ehSuperadminUser(user),
-        role: (eu?.role as Role) ?? "owner",
-        // sem linha em usuario = não é dono nem membro desta loja (revendedora/visitante)
-        semOrg: !eu,
-        assinatura,
-        config: org
-          ? {
-              nomeLoja: org.nome,
-              segmento: org.segmento,
-              categorias: org.categorias ?? [],
-              canais: org.canais,
-              usaRevendedoras: org.usa_revendedoras,
-              margemPadrao: Number(org.margem_padrao),
-              comissaoPadrao: Number(org.comissao_padrao),
-              onboardingCompleto: org.onboarding_completo,
-              corMarca: org.cor_marca ?? null,
-              temaBase: org.tema_base ?? null,
-              appFonte: org.app_fonte ?? null,
-              appRaio: org.app_raio ?? null,
-              logoUrl: org.logo_url ?? null,
-              plano: (assin?.plano as PlanoId) ?? "solo",
-              slug: org.slug ?? null,
-              lojaAtiva: org.loja_ativa ?? false,
-              lojaDescricao: org.loja_descricao ?? null,
-              lojaCapaUrl: org.loja_capa_url ?? null,
-              lojaFonte: org.loja_fonte ?? null,
-              lojaSobre: org.loja_sobre ?? null,
-              lojaEmail: org.loja_email ?? null,
-              lojaWhatsapp: org.loja_whatsapp ?? null,
-              lojaTelefone: org.loja_telefone ?? null,
-              lojaInstagram: org.loja_instagram ?? null,
-              lojaFacebook: org.loja_facebook ?? null,
-              lojaTiktok: org.loja_tiktok ?? null,
-            }
-          : configInicial,
-        produtos: (produtos || []).map(mapProduto),
-        revendedoras: (revendedoras || []).map(mapRevendedora),
-        vendas: (vendas || []).map(mapVenda),
-        membros: (membros || []).map(mapMembro),
-        entregas: (entregas || []).map(mapEntrega),
-        entradasPendentes: (entradas || []).map(mapEntradaPendente),
-        contasPagar: (contas || []).map(mapContaPagar),
-      });
-
-      // 2ª fase: histórico anterior à janela, paginado e mesclado em segundo plano.
-      // O app já está utilizável; relatórios de períodos longos vão se completando.
-      void (async () => {
-        for (let offset = 0; ; offset += PAGINA_VENDAS) {
-          const { data: antigas, error } = await supabase
-            .from("venda")
-            .select("*, venda_item(*)")
-            .lt("data", corteISO)
-            .order("data", { ascending: false })
-            .order("id", { ascending: true })
-            .range(offset, offset + PAGINA_VENDAS - 1);
-          if (error || !antigas || antigas.length === 0) break;
-          const mapeadas = antigas.map(mapVenda);
-          set((s) => {
-            const ids = new Set(s.vendas.map((v) => v.id));
-            const novas = mapeadas.filter((v) => !ids.has(v.id));
-            return novas.length ? { vendas: [...s.vendas, ...novas] } : s;
-          });
-          if (antigas.length < PAGINA_VENDAS) break;
-        }
-      })();
     },
 
     setConfig: async (c) => {
@@ -1851,6 +1918,9 @@ export const useStore = create<State>()((set, get) => {
         superadmin: false,
         role: "owner",
         semOrg: false,
+        falhaEssencial: false,
+        falhasCarga: [],
+        recarregando: false,
         config: configInicial,
         assinatura: null,
         produtos: [],

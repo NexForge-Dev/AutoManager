@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { situacaoRevendedora } from "@/lib/destinoPosLogin";
+import { falhaDeRedeAuth } from "@/lib/cargaLoja";
 import { aplicarCorMarca } from "@/lib/brand";
 import { brl } from "@/lib/analytics";
 import { parseNumero } from "@/lib/csvProdutos";
@@ -105,8 +106,10 @@ export default function RevendaPage() {
     setFalha(false);
     (async () => {
       try {
-        const { data: { user } } = await sb.current.auth.getUser();
+        const { data: { user }, error: erroSessao } = await sb.current.auth.getUser();
         if (!user) {
+          // sem rede não é "sem sessão": mostra "tentar de novo" sem tirar ninguém daqui
+          if (falhaDeRedeAuth(erroSessao)) throw erroSessao;
           router.replace("/acesso");
           return;
         }

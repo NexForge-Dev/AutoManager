@@ -35,6 +35,7 @@ async function buscarOrgs(a: ReturnType<typeof admin>): Promise<any[]> {
   const comAcesso = await a.from("org").select("id, nome, slug, acesso");
   if (!comAcesso.error) return comAcesso.data ?? [];
   const sem = await a.from("org").select("id, nome, slug");
+  if (sem.error) throw sem.error;
   return sem.data ?? [];
 }
 
@@ -43,11 +44,24 @@ export async function GET() {
   if (!su) return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
 
   const a = admin();
-  const [orgs, { data: assinaturas }, { data: usuarios }] = await Promise.all([
-    buscarOrgs(a),
-    a.from("assinatura").select("org_id, plano, status, preco_centavos, trial_ate, data_inicio, data_fim, provider, created_at"),
-    a.from("usuario").select("email, role, org_id"),
-  ]);
+  let orgs: any[];
+  let assinaturas: any[] | null;
+  let usuarios: any[] | null;
+  try {
+    const [o, s, u] = await Promise.all([
+      buscarOrgs(a),
+      a.from("assinatura").select("org_id, plano, status, preco_centavos, trial_ate, data_inicio, data_fim, provider, created_at"),
+      a.from("usuario").select("email, role, org_id"),
+    ]);
+    if (s.error || u.error) throw s.error || u.error;
+    orgs = o;
+    assinaturas = s.data;
+    usuarios = u.data;
+  } catch (e) {
+    // leitura que falhou não pode virar "0 lojas, MRR R$ 0,00": a tela mostra o erro
+    console.error("[admin/overview]", e);
+    return NextResponse.json({ erro: "Falha ao ler os dados da plataforma" }, { status: 500 });
+  }
 
   const assinByOrg = new Map<string, any>();
   for (const s of assinaturas ?? []) assinByOrg.set(s.org_id, s);
