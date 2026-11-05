@@ -474,9 +474,9 @@ function Relatorios() {
 
 function Mini({ label, valor, sub, up }: { label: string; valor: string; sub?: string; up?: boolean }) {
   return (
-    <div className="surface-alt rounded-lg px-3 py-2 min-w-0">
+    <div className="surface-alt rounded-lg px-2 py-2 min-w-0">
       <div className="text-xs text-muted">{label}</div>
-      <div className={`font-bold text-sm tnum truncate ${up === undefined ? "" : up ? "text-ok" : "text-bad"}`}>
+      <div className={`font-bold text-sm tnum [overflow-wrap:anywhere] ${up === undefined ? "" : up ? "text-ok" : "text-bad"}`}>
         {valor}
       </div>
       {sub && <div className="text-[11px] text-muted truncate">{sub}</div>}

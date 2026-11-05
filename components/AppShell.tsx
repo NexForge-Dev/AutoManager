@@ -291,7 +291,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={22} aria-hidden />
             <span className="text-[11px] font-medium">Mais</span>
-            {badgeMais > 0 && <Contador n={badgeMais} className="absolute top-0 left-1/2 ml-1.5 scale-90" />}
+            {badgeMais > 0 && <Contador n={badgeMais} className="absolute top-0 right-1 scale-90" />}
           </button>
         )}
       </nav>
