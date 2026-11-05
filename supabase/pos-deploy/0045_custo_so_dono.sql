@@ -5,7 +5,16 @@
 --
 -- Fecha a última parte de AUT-005: o vendedor deixa de ler custo e contato das
 -- revendedoras pela API. O catálogo dele vem de public.equipe_catalogo (sem custo).
+-- Para reverter: supabase/rollback/0045_custo_so_dono_rollback.sql, ANTES de voltar o deploy.
 -- ============================================================================
+
+-- sem a 0044 o vendedor ficaria sem catálogo e sem nenhum erro na tela
+do $$
+begin
+  if to_regprocedure('public.equipe_catalogo(uuid[])') is null then
+    raise exception 'Rode a migration 0044 antes desta.';
+  end if;
+end $$;
 
 drop policy if exists produto_select on public.produto;
 create policy produto_select on public.produto for select to authenticated
