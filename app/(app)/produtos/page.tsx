@@ -197,13 +197,13 @@ function Produtos() {
 
       {/* filtro por categoria (com contador) */}
       {catsPresentes.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
+        <div tabIndex={0} role="group" aria-label="Filtrar por categoria" className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
           <button onClick={() => setFiltroCat(null)} aria-pressed={filtroCat === null} className="chip">
-            Todas <span className="opacity-70 tnum">({produtos.length})</span>
+            Todas <span className="tnum">({produtos.length})</span>
           </button>
           {catsPresentes.map((c) => (
             <button key={c} onClick={() => setFiltroCat(c)} aria-pressed={filtroCat === c} className="chip">
-              {c} <span className="opacity-70 tnum">({contagemPorCat.get(c) || 0})</span>
+              {c} <span className="tnum">({contagemPorCat.get(c) || 0})</span>
             </button>
           ))}
         </div>

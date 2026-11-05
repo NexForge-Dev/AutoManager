@@ -276,7 +276,7 @@ function ResumoView({ overview }: { overview: Overview | null }) {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid-kpi lg:grid-cols-3 gap-3">
         <Stat rotulo="Faturamento mensal (MRR)" icone={DollarSign} tom="brand" valorTom="brand" valor={brlPreco(r.mrrCentavos)} />
         <Stat rotulo="Projeção anual (ARR)" icone={TrendingUp} valor={brlPreco(r.arrCentavos)} />
         <Stat rotulo="Assinaturas ativas" icone={CheckCircle2} tom="ok" valor={r.ativas} />

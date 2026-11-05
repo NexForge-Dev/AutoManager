@@ -80,7 +80,7 @@ function Analytics() {
         <>
           {/* KPIs */}
           <div className="space-y-1.5">
-            <div className={`grid grid-cols-2 gap-3 ${caps.allowAdvancedAnalytics ? "lg:grid-cols-3" : ""}`}>
+            <div className={`grid-kpi gap-3 ${caps.allowAdvancedAnalytics ? "lg:grid-cols-3" : ""}`}>
               {/* ticket médio e itens/venda: só vendas com produtos (sem "Recebimento avulso") */}
               <Stat rotulo="Ticket médio" icone={Receipt} tom="brand" valor={<CountUp value={a.ticketMedio} format={brl} />} />
               <Stat

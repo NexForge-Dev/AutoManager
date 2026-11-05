@@ -101,7 +101,7 @@ function Painel() {
       )}
 
       {/* indicadores do mês */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+      <div className="grid-kpi lg:grid-cols-4 gap-3 stagger">
         <Stat
           rotulo="Faturamento do mês"
           icone={Wallet}

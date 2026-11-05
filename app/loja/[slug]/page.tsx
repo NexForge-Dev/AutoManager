@@ -356,16 +356,17 @@ export default function LojaPage() {
                 <>
                   {categorias.length > 1 && (
                     <div
+                      tabIndex={0}
                       className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap [scrollbar-width:none]"
                       role="group"
                       aria-label="Filtrar por categoria"
                     >
                       <button onClick={() => setFiltroCat(null)} aria-pressed={filtroCat === null} className="chip">
-                        Tudo <span className="opacity-70 tnum">({loja.produtos.length})</span>
+                        Tudo <span className="tnum">({loja.produtos.length})</span>
                       </button>
                       {categorias.map((c) => (
                         <button key={c} onClick={() => setFiltroCat(c)} aria-pressed={filtroCat === c} className="chip">
-                          {c} <span className="opacity-70 tnum">({contagem.get(c) || 0})</span>
+                          {c} <span className="tnum">({contagem.get(c) || 0})</span>
                         </button>
                       ))}
                     </div>
@@ -449,7 +450,7 @@ function ProdutoCard({ p, onAbrir }: { p: ProdutoPub; onAbrir: () => void }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={p.imagens[0]}
-            alt={p.nome}
+            alt=""
             loading="lazy"
             decoding="async"
             className={`h-full w-full object-cover ${esgotado ? "opacity-60" : ""}`}
@@ -493,7 +494,7 @@ function ProdutoDetalhe({ p, whatsapp, onClose }: { p: ProdutoPub; whatsapp: str
   return (
     <Modal onClose={onClose} titulo={<span className="[overflow-wrap:anywhere]">{p.nome}</span>} style={TEMA_VITRINE} className="space-y-4">
       {p.imagens.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-5 px-5 [scrollbar-width:none]">
+        <div tabIndex={0} role="group" aria-label="Fotos do produto" className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-5 px-5 [scrollbar-width:none]">
           {p.imagens.map((src, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img

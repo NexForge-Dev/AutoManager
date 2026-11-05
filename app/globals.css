@@ -30,7 +30,7 @@
   --surface: #1d1726;
   --surface-alt: #2a2235;
   --text: #f5f3f7;
-  --text-muted: #a79fb4;
+  --text-muted: #b5adc1;
   --border: #322a3e;
 
   /* arredondamento dos cantos (sobrescrito em runtime por lib/aparencia.ts) */
@@ -59,7 +59,7 @@ html.light {
   --surface: #ffffff;
   --surface-alt: #f3f4f6;
   --text: #1f2937;
-  --text-muted: #6b7280;
+  --text-muted: #565e6c;
   --border: #ececf1;
   --shadow-soft: 0 1px 2px rgb(17 24 39 / 0.04);
   --shadow-md: 0 4px 12px rgb(17 24 39 / 0.07), 0 1px 3px rgb(17 24 39 / 0.05);
@@ -170,6 +170,12 @@ input[type="radio"] {
   .figure {
     @apply text-2xl font-bold leading-tight tracking-tight;
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere; /* valor enorme quebra dentro do cartão */
+  }
+  /* KPIs: 2 colunas no celular; texto ampliado (200%) empilha em vez de estourar a tela */
+  .grid-kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(max(8.25rem, 46%), 100%), 1fr));
   }
   .tnum {
     font-variant-numeric: tabular-nums;
@@ -221,7 +227,7 @@ input[type="radio"] {
   .btn-sm {
     @apply min-h-[36px] px-3 py-1.5 text-sm;
   }
-  /* botão só com ícone (alvo de toque de 40px) */
+  /* botão só com ícone */
   .icon-btn {
     @apply inline-grid place-items-center h-10 w-10 shrink-0;
     border-radius: var(--r-btn);
@@ -238,12 +244,18 @@ input[type="radio"] {
 
   /* ---- formulários ---- */
   .input {
-    @apply w-full border px-3 py-2.5 outline-none text-base md:text-[0.9375rem] min-h-[44px] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25;
+    @apply w-full border px-3 py-2.5 outline-none text-base min-h-[44px] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25;
     border-radius: var(--r-input);
     background: var(--surface);
     border-color: var(--border);
     color: var(--text);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  /* só com mouse: em tela de toque, menos de 16px faz o iOS dar zoom ao focar (vale em paisagem) */
+  @media (min-width: 768px) and (pointer: fine) {
+    .input {
+      font-size: 0.9375rem;
+    }
   }
   .input:hover:not(:focus):not(:disabled) {
     border-color: var(--text-muted);
@@ -318,6 +330,19 @@ input[type="radio"] {
     background: var(--surface);
     color: var(--text);
     box-shadow: var(--shadow-soft);
+  }
+
+  /* alvo de toque de 44px no celular e em qualquer tela de toque */
+  @media (max-width: 767.98px), (pointer: coarse) {
+    .btn-sm,
+    .chip,
+    .segmented > button {
+      min-height: 44px;
+    }
+    .icon-btn {
+      height: 44px;
+      width: 44px;
+    }
   }
 
   /* ---- selos de estado ---- */

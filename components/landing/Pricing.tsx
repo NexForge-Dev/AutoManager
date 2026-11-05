@@ -108,7 +108,7 @@ export default function Pricing() {
       </div>
 
       {/* tabela de comparação */}
-      <div className="mt-12 overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Comparação dos planos" className="mt-12 overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
             <tr className="border-b border-default">

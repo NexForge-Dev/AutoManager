@@ -278,7 +278,7 @@ function Relatorios() {
       )}
 
       {/* receita */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+      <div className="grid-kpi lg:grid-cols-4 gap-3 stagger">
         <Stat rotulo="Faturamento bruto" icone={Receipt} tom="brand" valor={<CountUp value={r.faturamento} format={brl} />} apoio="vendas (competência)" />
         <Stat rotulo="Recebido (caixa)" icone={Wallet} tom="ok" valor={<CountUp value={r.recebido} format={brl} />} apoio={`${r.qtdPagas} pagas`} />
         <Stat rotulo="A receber" icone={Clock} tom="warn" valor={<CountUp value={r.aReceber} format={brl} />} apoio={`${r.qtdPendentes} pendentes`} />
@@ -286,7 +286,7 @@ function Relatorios() {
       </div>
 
       {/* lucro */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid-kpi lg:grid-cols-3 gap-3">
         <Stat
           className="col-span-2 lg:col-span-1"
           rotulo="Lucro projetado"

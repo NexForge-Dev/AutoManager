@@ -289,7 +289,7 @@ function Revendedoras() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid-kpi lg:grid-cols-4 gap-3">
             <Stat rotulo="Vendido no mês" icone={TrendingUp} tom="brand" valor={brl(totalVendidoMes)} apoio="por toda a equipe" />
             <Stat
               rotulo="Comissão a pagar"

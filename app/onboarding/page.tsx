@@ -8,6 +8,7 @@ import { usePlano } from "@/lib/usePlano";
 import { createClient } from "@/lib/supabase/client";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
 import { falhaDeRedeAuth } from "@/lib/cargaLoja";
+import { apagarRascunho, gravarRascunho, lerRascunho } from "@/lib/rascunho";
 import { TelaFalhaCarga } from "@/components/FalhaCarga";
 import { registrarMetrica, type Etapa } from "@/lib/metricas/cliente";
 
@@ -64,6 +65,8 @@ const REV_BUCKETS: Record<string, string[]> = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Passo = { icone: LucideIcon; title: string; sub: string; ms: number };
+
+const CHAVE_RASCUNHO = "am_onboarding";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -125,29 +128,44 @@ export default function Onboarding() {
     if (ready && liberado && completo && !gerando) router.replace("/painel");
   }, [ready, liberado, completo, gerando, router]);
 
-  const [step, setStep] = useState(0);
+  // rascunho desta aba: refresh no meio não perde o que já foi respondido
+  const [rascunho] = useState(() => lerRascunho<Record<string, any>>(CHAVE_RASCUNHO) ?? {});
+  const [step, setStep] = useState<number>(rascunho.step ?? 0);
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
 
   // respostas
-  const [nomeLoja, setNomeLoja] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [segmento, setSegmento] = useState("semijoias");
-  const [planoEscolhido, setPlanoEscolhido] = useState<PlanoId>(planoContratado || "solo");
+  const [nomeLoja, setNomeLoja] = useState<string>(rascunho.nomeLoja ?? "");
+  const [descricao, setDescricao] = useState<string>(rascunho.descricao ?? "");
+  const [segmento, setSegmento] = useState<string>(rascunho.segmento ?? "semijoias");
+  const [planoEscolhido, setPlanoEscolhido] = useState<PlanoId>(
+    planoValido(rascunho.planoEscolhido) ? rascunho.planoEscolhido : planoContratado || "solo"
+  );
   // plano escolhido na landing (guardado pelo /login?plano=...)
   useEffect(() => {
+    if (rascunho.planoEscolhido) return; // já decidiu aqui: a escolha do rascunho vale
     try {
       const p = sessionStorage.getItem("am_plano_landing");
       if (planoValido(p)) setPlanoEscolhido(p);
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [qtdRev, setQtdRev] = useState("1-3");
-  const [margem, setMargem] = useState(100);
-  const [comissao, setComissao] = useState(30);
-  const [whatsapp, setWhatsapp] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [facebook, setFacebook] = useState("");
-  const [tiktok, setTiktok] = useState("");
-  const [email, setEmail] = useState("");
+  const [qtdRev, setQtdRev] = useState<string>(rascunho.qtdRev ?? "1-3");
+  const [margem, setMargem] = useState<number>(rascunho.margem ?? 100);
+  const [comissao, setComissao] = useState<number>(rascunho.comissao ?? 30);
+  const [whatsapp, setWhatsapp] = useState<string>(rascunho.whatsapp ?? "");
+  const [instagram, setInstagram] = useState<string>(rascunho.instagram ?? "");
+  const [facebook, setFacebook] = useState<string>(rascunho.facebook ?? "");
+  const [tiktok, setTiktok] = useState<string>(rascunho.tiktok ?? "");
+  const [email, setEmail] = useState<string>(rascunho.email ?? "");
+
+  useEffect(() => {
+    if (completo) apagarRascunho(CHAVE_RASCUNHO);
+    else
+      gravarRascunho(CHAVE_RASCUNHO, {
+        step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao,
+        whatsapp, instagram, facebook, tiktok, email,
+      });
+  }, [completo, step, nomeLoja, descricao, segmento, planoEscolhido, qtdRev, margem, comissao, whatsapp, instagram, facebook, tiktok, email]);
 
   // escopo de perguntas conforme o PLANO ESCOLHIDO no onboarding
   const plano = planoDef(planoEscolhido);
@@ -297,7 +315,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col md:items-center md:justify-center md:px-5 md:py-10">
+    <main className="min-h-[100dvh] flex flex-col md:items-center md:justify-center md:px-5 md:py-10">
       <div className="w-full flex-1 md:flex-none max-w-lg flex flex-col px-5 py-5 md:p-8 md:border md:border-default md:surface md:rounded-[var(--r-card)] md:shadow-[var(--shadow-md)]">
         {/* progresso */}
         <div className="mb-7">
@@ -559,7 +577,7 @@ export default function Onboarding() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -61,7 +61,7 @@ export function Stat({
   const conteudo = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="eyebrow truncate">{rotulo}</span>
+        <span className="eyebrow min-w-0">{rotulo}</span>
         {Icone && (
           <span className={`badge p-1 shrink-0 hidden sm:inline-flex tone-${tom}`} aria-hidden>
             <Icone size={15} />
@@ -285,7 +285,7 @@ export function Progresso({
       aria-valuenow={Math.round(seguro)}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={rotulo}
+      aria-label={rotulo ?? "Progresso"}
     >
       <div className={`h-full rounded-full progress-fill ${cor}`} style={{ width: `${seguro}%` }} />
     </div>

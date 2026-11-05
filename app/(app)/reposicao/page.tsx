@@ -72,7 +72,7 @@ function Reposicao() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid-kpi lg:grid-cols-3 gap-3">
             <Stat rotulo="Sem estoque" icone={PackageX} tom="bad" valor={contar("sem_estoque")} apoio="produtos zerados" />
             <Stat rotulo="Estoque baixo" icone={CircleAlert} tom="warn" valor={contar("estoque_baixo")} apoio="abaixo do mínimo" />
             <Stat

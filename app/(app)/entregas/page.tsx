@@ -165,7 +165,7 @@ function Entregas() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid-kpi lg:grid-cols-3 gap-3">
             <Stat rotulo="Pendentes" icone={CircleDashed} tom="warn" valor={qtdPendentes} apoio="aguardando saída" />
             <Stat rotulo="A caminho" icone={Bike} tom="info" valor={qtdACaminho} apoio="na rua agora" />
             <Stat
@@ -543,7 +543,7 @@ function MinhaEntregaCard({
         <button
           disabled={ocupada}
           onClick={() => onDevolver(e.id)}
-          className="w-full min-h-[40px] text-sm text-muted hover:text-strong flex items-center justify-center gap-1.5 disabled:opacity-60"
+          className="w-full min-h-[44px] text-sm text-muted hover:text-strong flex items-center justify-center gap-1.5 disabled:opacity-60"
         >
           <Undo2 size={14} aria-hidden /> Devolver ao balcão
         </button>
@@ -582,7 +582,7 @@ function EntregaCard({
       <div className="flex flex-wrap items-center gap-2">
         {dono && (
           <select
-            className="input !min-h-[40px] py-1.5 text-sm flex-1 basis-40 min-w-0"
+            className="input py-1.5 flex-1 basis-40 min-w-0"
             aria-label="Motoboy da entrega"
             disabled={ocupada}
             value={e.motoboyId ?? ""}
@@ -603,7 +603,7 @@ function EntregaCard({
               <button
                 disabled={ocupada}
                 onClick={() => onStatus(e.id, "a_caminho")}
-                className="btn-ghost btn-sm !min-h-[40px] flex-auto whitespace-nowrap sm:flex-none"
+                className="btn-ghost btn-sm flex-auto whitespace-nowrap sm:flex-none"
               >
                 <Bike size={15} aria-hidden /> Saí para entrega
               </button>
@@ -611,7 +611,7 @@ function EntregaCard({
             <button
               disabled={ocupada}
               onClick={() => onStatus(e.id, "entregue")}
-              className="btn-ghost btn-sm !min-h-[40px] flex-auto whitespace-nowrap sm:flex-none"
+              className="btn-ghost btn-sm flex-auto whitespace-nowrap sm:flex-none"
             >
               <Check size={15} aria-hidden /> Entregue
             </button>

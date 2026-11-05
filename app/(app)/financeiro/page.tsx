@@ -130,7 +130,7 @@ function Financeiro() {
       />
 
       {/* fluxo: o que entra, o que sai e o que sobra */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid-kpi lg:grid-cols-3 gap-3">
         <Stat
           rotulo="A receber"
           icone={TrendingUp}
