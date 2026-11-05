@@ -178,6 +178,10 @@ input[type="radio"] {
   .kpi {
     container-type: inline-size;
   }
+  .grid-kpi-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(max(5.5rem, 30%), 100%), 1fr));
+  }
   .col-full {
     grid-column: 1 / -1;
   }

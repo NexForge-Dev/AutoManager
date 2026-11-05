@@ -314,7 +314,7 @@ function Relatorios() {
           icone={Wallet}
           acao={<CountUp value={r.fluxoTotal} format={brl} className="text-lg font-bold tnum" />}
         >
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid-kpi-3 gap-2 mb-3">
             <Mini label="Média" valor={brlKpi(r.fluxoMedia)} />
             <Mini label="Pico" valor={brlKpi(r.fluxoPico.valor)} sub={r.fluxoPico.dia} />
             {/* sem base de comparação (ex.: "Hoje"): neutro, nada de "+0%" verde */}

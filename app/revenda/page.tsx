@@ -660,7 +660,7 @@ function MinhasVendas({ vendas, erroDados }: { vendas: any[]; erroDados: boolean
       </div>
       {/* desktop: tabela */}
       <div className="card p-0 overflow-hidden hidden md:block">
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Minhas vendas">
           <table className="table">
             <thead>
               <tr>

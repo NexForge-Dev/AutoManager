@@ -164,7 +164,7 @@ function Produtos() {
           ).length;
           const ok = ativos.length - semEstoque - acabando;
           return (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid-kpi-3 gap-3">
               <Stat rotulo="Em estoque" valor={ok} icone={Boxes} tom="ok" />
               <Stat rotulo="Acabando" valor={acabando} icone={AlertTriangle} tom="warn" valorTom={acabando > 0 ? "warn" : undefined} />
               <Stat rotulo="Sem estoque" valor={semEstoque} icone={PackageX} tom="bad" valorTom={semEstoque > 0 ? "bad" : undefined} />
@@ -222,7 +222,7 @@ function Produtos() {
       {/* desktop: tabela */}
       {produtosFiltrados.length > 0 && (
         <div className="hidden lg:block card p-0 overflow-hidden">
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Lista de produtos">
             <table className="table">
               <thead>
                 <tr>

@@ -287,7 +287,7 @@ function Vender() {
 
         {/* -------- carrinho: painel lateral no desktop -------- */}
         {itens.length === 0 && (
-          <aside className="hidden lg:block lg:sticky lg:top-6">
+          <aside aria-label="Resumo da venda" className="hidden lg:block lg:sticky lg:top-6">
             <div className="card p-0">
               <EstadoVazio compacto icone={ShoppingBag} titulo="Carrinho vazio">
                 Adicione produtos para registrar a venda.

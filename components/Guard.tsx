@@ -163,7 +163,7 @@ export default function Guard({ children }: { children: React.ReactNode }) {
 function AppLoadingSkeleton() {
   return (
     <div className="min-h-screen md:flex">
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default p-3 gap-2">
+      <aside aria-label="Barra lateral" className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default p-3 gap-2">
         <div className="flex items-center gap-2 px-2 py-3">
           <Skeleton className="h-7 w-7 rounded-lg" />
           <Skeleton className="h-4 w-28" />

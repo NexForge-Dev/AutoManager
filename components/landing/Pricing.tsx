@@ -115,7 +115,7 @@ export default function Pricing() {
               <th className="py-3 pr-4 text-sm font-semibold text-muted">O que está incluso</th>
               <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[0].nome}</th>
               <th className="px-4 py-3 text-center text-sm font-bold text-strong">{PLANOS[1].nome}</th>
-              <th className="px-4 py-3 text-center text-sm font-bold text-brand-600">
+              <th className="px-4 py-3 text-center text-sm font-bold text-strong">
                 <span className="inline-flex items-center gap-1">
                   <Star size={13} className="fill-brand-500 text-brand-500" /> {PLANOS[2].nome}
                 </span>

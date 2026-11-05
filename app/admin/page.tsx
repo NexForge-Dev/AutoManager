@@ -510,7 +510,7 @@ function LojasView({
         <>
           {/* desktop: tabela */}
           <div className="card p-0 overflow-hidden hidden xl:block">
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Lista de lojas">
               <table className="table">
                 <thead>
                   <tr>
@@ -628,7 +628,7 @@ function AuditoriaView({ logs }: { logs: AdminLog[] | null }) {
 
       {/* desktop: tabela */}
       <div className="card p-0 overflow-hidden hidden lg:block">
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Registro de auditoria">
           <table className="table">
             <thead>
               <tr>

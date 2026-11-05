@@ -799,7 +799,7 @@ function MinhaLoja() {
         </div>
 
         {/* ---------------- preview ---------------- */}
-        <aside className={`min-w-0 lg:sticky lg:top-7 ${vista === "editar" ? "hidden lg:block" : ""}`}>
+        <aside aria-label="Prévia da loja" className={`min-w-0 lg:sticky lg:top-7 ${vista === "editar" ? "hidden lg:block" : ""}`}>
           <div className="mx-auto w-full max-w-[320px]">
             <div className="flex items-start gap-2 mb-2.5">
               <Smartphone size={16} className="text-muted shrink-0 mt-0.5" aria-hidden />

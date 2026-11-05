@@ -151,7 +151,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <DialogProvider>
     <div className="min-h-screen md:flex">
       {/* -------- sidebar (desktop) -------- */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default">
+      <aside aria-label="Barra lateral" className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-60 surface border-r border-default">
         <Link href="/painel" className="shrink-0 flex items-center gap-2.5 px-4 h-16 min-w-0">
           <MarcaLoja logoUrl={logoUrl} nome={nomeLoja} />
           <span className="min-w-0">
