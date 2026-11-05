@@ -35,6 +35,7 @@ export default function LoginPage() {
     if (q.get("modo") === "entrar") {
       setModo("entrar");
     }
+    if (q.get("expirada")) setAviso("Sua sessão expirou. Entre de novo para continuar de onde parou.");
     // plano clicado na landing (/login?plano=...): o onboarding já abre com ele marcado
     const plano = q.get("plano");
     if (planoValido(plano)) {

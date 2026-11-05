@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
+import { EVENTO_SEM_SESSAO } from "@/lib/supabase/client";
 import { aplicarAparencia, aplicarFavicon, temaDoUsuario } from "@/lib/aparencia";
 import { homeDe, podeAcessar } from "@/lib/permissoes";
 import { destinoPosLogin } from "@/lib/destinoPosLogin";
@@ -43,6 +44,18 @@ export default function Guard({ children }: { children: React.ReactNode }) {
     if (jaMontado) return;
     if (!ready) hydrate();
   }, [jaMontado, ready, hydrate]);
+
+  // sessão acabou no meio do uso: leva ao login em vez de dizer "sem permissão".
+  // O que estava sendo feito (carrinho) fica no rascunho da aba.
+  useEffect(() => {
+    if (jaMontado) return;
+    const irAoLogin = () => {
+      useStore.getState().limpar();
+      window.location.assign("/login?modo=entrar&expirada=1");
+    };
+    window.addEventListener(EVENTO_SEM_SESSAO, irAoLogin);
+    return () => window.removeEventListener(EVENTO_SEM_SESSAO, irAoLogin);
+  }, [jaMontado]);
 
   // volta ao app já logado (sem passar pelo /login): também é session_started
   // (uma vez por sessão do navegador; o login já marca, então não duplica)

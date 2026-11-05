@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { parseNumero } from "@/lib/csvProdutos";
+import { apagarRascunho, gravarRascunho, lerRascunho } from "@/lib/rascunho";
 import { brl } from "@/lib/analytics";
 import type { Canal, FormaPagamento } from "@/lib/types";
 import Guard from "@/components/Guard";
@@ -60,7 +61,14 @@ const parseKey = (k: string) => {
 function Vender() {
   const { produtos, revendedoras, config, registrarVenda } = useStore();
   const { alerta } = useDialog();
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const orgId = useStore((s) => s.orgId);
+  const chaveCarrinho = `am_carrinho_${orgId}`;
+  // carrinho sobrevive ao refresh e ao login de novo (rascunho desta aba)
+  const [cart, setCart] = useState<Record<string, number>>(() => lerRascunho<Record<string, number>>(chaveCarrinho) ?? {});
+  useEffect(() => {
+    if (Object.keys(cart).length > 0) gravarRascunho(chaveCarrinho, cart);
+    else apagarRascunho(chaveCarrinho);
+  }, [cart, chaveCarrinho]);
   const [canal, setCanal] = useState<Canal>(config.canais[0] || "whatsapp");
   const [revId, setRevId] = useState<string>("");
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");

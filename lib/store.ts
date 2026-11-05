@@ -382,7 +382,7 @@ async function lerPaginado(
 }
 
 // mensagens amigáveis p/ erros levantados pelas RPCs de estoque/venda
-function erroAmigavel(msg: string | undefined): string {
+export function erroAmigavel(msg: string | undefined): string {
   const m = msg || "";
   if (/sem_estoque|estoque_nao_negativo/.test(m)) return "Estoque insuficiente.";
   if (/escolha_variacao/.test(m)) return "Este produto tem variações: escolha a variação.";
@@ -395,7 +395,10 @@ function erroAmigavel(msg: string | undefined): string {
   if (/plano_sem_vendedores/.test(m))
     return "Seu acesso de vendedor está pausado pelo plano atual da loja. Fale com o dono.";
   if (/venda_canal_valido/.test(m)) return "Canal de venda inválido.";
-  if (/canal_invalido|_len"/.test(m)) return "Texto muito longo. Encurte e tente de novo.";
+  if (/canal_invalido|_len"|value too long/.test(m)) return "Texto muito longo. Encurte e tente de novo.";
+  if (/numeric field overflow|out of range/i.test(m)) return "Valor alto demais. Confira o número digitado.";
+  if (/limite_revendedoras/.test(m)) return "Você atingiu o limite de revendedoras do seu plano.";
+  if (/limite_vendedores/.test(m)) return "Você atingiu o limite de vendedores do seu plano.";
   if (/preco_nao_negativo|valor_positivo|taxa_nao_negativa/.test(m)) return "Informe um valor maior ou igual a zero.";
   if (/comissao_faixa|comissao_padrao_faixa/.test(m)) return "A comissão precisa ficar entre 0% e 100%.";
   if (/use_cancelar_venda/.test(m)) return "Para cancelar uma venda, use o botão Cancelar venda.";
@@ -407,7 +410,9 @@ function erroAmigavel(msg: string | undefined): string {
   if (/org_slug_formato/.test(m)) return "Use só letras minúsculas, números e hífens no link (até 60 caracteres).";
   if (/permission denied|row-level security/i.test(m)) return "Você não tem permissão para fazer isso.";
   if (/failed to fetch|network/i.test(m)) return "Sem conexão. Tente de novo.";
-  return m || "Não foi possível salvar. Tente de novo.";
+  // mensagem crua do banco é em inglês e não ajuda ninguém: fica no console
+  if (m) console.error("[erro não traduzido]", m);
+  return "Não foi possível salvar. Tente de novo.";
 }
 
 // Plano da loja para qualquer papel. A tabela `assinatura` é só do dono

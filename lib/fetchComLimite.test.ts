@@ -30,6 +30,16 @@ describe("fetchComLimite", () => {
     expect((base.mock.calls[0] as any[])[1]).toBeUndefined();
   });
 
+  it("AUT-018: 401 do banco avisa que a sessão acabou; 403 (RLS) não", async () => {
+    const aviso = vi.fn();
+    const resp = (status: number) => (async () => new Response("{}", { status })) as unknown as typeof fetch;
+    await fetchComLimite(1000, resp(403), aviso)("http://x/rest/v1/venda");
+    await fetchComLimite(1000, resp(401), aviso)("http://x/auth/v1/token");
+    expect(aviso).not.toHaveBeenCalled();
+    await fetchComLimite(1000, resp(401), aviso)("http://x/rest/v1/rpc/registrar_venda");
+    expect(aviso).toHaveBeenCalledOnce();
+  });
+
   it("cancelamento de quem chamou é repassado", async () => {
     const c = new AbortController();
     const p = fetchComLimite(60_000, pendurado)("http://x/rest/v1/produto", { signal: c.signal });
