@@ -41,7 +41,7 @@ const TEMA_VITRINE = {
   "--border": "#e7e5e1",
   "--accent": "var(--brand-700)",
   "--ok": "4 120 87",
-  "--warn": "180 83 9",
+  "--warn": "146 64 14",
   "--bad": "185 28 28",
   "--info": "29 78 216",
   "--hover": "rgb(28 25 23 / 0.04)",

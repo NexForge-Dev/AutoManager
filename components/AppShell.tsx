@@ -246,7 +246,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* -------- bottom nav (mobile) -------- */}
       <nav
         aria-label="Menu do celular"
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 surface border-t border-default grid grid-flow-col auto-cols-fr items-end px-1 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 overflow-x-clip surface border-t border-default grid grid-flow-col auto-cols-fr items-end px-1 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
       >
         {nav.map((n) => {
           const active = ativoEm(n.href);
