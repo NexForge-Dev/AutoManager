@@ -13,3 +13,6 @@ backups/
 
 # Claude Code worktrees/local state
 .claude/
+
+# CLI do Supabase
+supabase/.temp/

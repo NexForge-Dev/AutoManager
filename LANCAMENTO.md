@@ -1,9 +1,11 @@
 # Checklist de lançamento (GO-LIVE) — AutoManager
 
-Banco: Supabase **na nuvem** (projeto `paqsixfvmbkowedvukgz`, região us-east-1). Todas as migrations
-até a `0036_estoque_vendas.sql` já estão aplicadas (conferido em 02/11/2026); faltam
-`0037_stripe` → `0040_rpc_sem_anon`. Não rode migrations novas sem backup — o passo a passo exato
-está em [`docs/DEPLOY-TODAY.md`](docs/DEPLOY-TODAY.md).
+Banco: Supabase **na nuvem** (projeto `paqsixfvmbkowedvukgz`, região us-east-1). O repositório vai até
+a `0044_dados_por_papel.sql`. Antes de lançar, confira o que está aplicado com
+`select * from supabase_migrations.schema_migrations` (a última conferência, em 02/11/2026, parava na
+`0036_estoque_vendas`). Não rode migrations novas sem backup. O passo a passo está em
+[`docs/DEPLOY-TODAY.md`](docs/DEPLOY-TODAY.md). Depois do deploy do código, rode
+`supabase/pos-deploy/0045_custo_so_dono.sql`.
 
 ## 1. Contas e chaves que você precisa criar/pegar
 

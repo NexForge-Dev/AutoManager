@@ -20,7 +20,12 @@ let cliente: Stripe | null = null;
 export function stripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY não configurado");
-  if (!cliente) cliente = new Stripe(key, { appInfo: { name: "AutoManager" } });
+  if (!cliente) cliente = new Stripe(key, {
+      appInfo: { name: "AutoManager" },
+      // falha antes do limite da função serverless, com uma nova tentativa
+      timeout: 20_000,
+      maxNetworkRetries: 1,
+    });
   return cliente;
 }
 
