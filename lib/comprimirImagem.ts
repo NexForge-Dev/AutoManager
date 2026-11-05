@@ -32,11 +32,22 @@ export async function comprimirImagem(file: File, ladoMax = LADO_MAX_PRODUTO): P
     const ctx = canvas.getContext("2d");
     if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, alvo.largura, alvo.altura);
-    // PNG pode ter transparência: webp preserva. Sem suporte, toBlob devolve png.
-    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/webp", QUALIDADE));
-    if (!blob || blob.type !== "image/webp" || blob.size >= file.size) return file;
-    const nome = file.name.replace(/\.[^.]+$/, "") + ".webp";
-    return new File([blob], nome, { type: "image/webp" });
+    const codificar = (tipo: string) =>
+      new Promise<Blob | null>((ok) => canvas.toBlob(ok, tipo, QUALIDADE));
+    // webp preserva transparência. Navegador que não codifica webp (Safari) devolve png:
+    // confere o tipo e cai para jpeg, sobre fundo branco (jpeg não tem transparência)
+    let blob = await codificar("image/webp");
+    let tipo = "image/webp";
+    if (blob?.type !== tipo) {
+      ctx.globalCompositeOperation = "destination-over";
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, alvo.largura, alvo.altura);
+      tipo = "image/jpeg";
+      blob = await codificar(tipo);
+    }
+    if (!blob || blob.type !== tipo || blob.size >= file.size) return file;
+    const nome = file.name.replace(/\.[^.]+$/, "") + (tipo === "image/webp" ? ".webp" : ".jpg");
+    return new File([blob], nome, { type: tipo });
   } catch {
     return file;
   } finally {
